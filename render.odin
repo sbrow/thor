@@ -148,6 +148,7 @@ render_chrome :: proc(page_title: string, body: string) -> string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>%s</title>
   <link rel="stylesheet" href="/css/main.css">
+  <script src="/js/main.js" defer></script>
 </head>
 <body>
 %s%s<footer>
