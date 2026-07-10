@@ -13,27 +13,16 @@ MONTHS: [12]string = {
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 }
 
-CSS :: `
-body { background: #020617; color: #e2e8f0; font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
-a { color: #7dd3fc; }
-h1, h2, h3 { color: #f1f5f9; line-height: 1.3; }
-nav { display: flex; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #1e293b; }
-pre { background: #1e293b; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
-code { font-family: monospace; font-size: 0.9em; }
-p code { background: #1e293b; padding: 0.1em 0.3em; border-radius: 0.25em; }
-blockquote { border-left: 4px solid #475569; margin: 0; padding: 0.5rem 0 0.5rem 1rem; color: #94a3b8; }
-img { max-width: 100%; }
-hr { border: none; border-top: 1px solid #1e293b; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #334155; padding: 0.5rem; }
-`
-
-NAV :: `
-<nav>
-  <a href="/">Home</a>
-  <a href="/posts/">Posts</a>
-  <a href="/ideas/">Ideas</a>
-</nav>
+HEADER :: `
+<header>
+  <nav>
+    <ul>
+      <li class="mr-auto"><a href="/">Home</a></li>
+      <li><a href="/ideas/">Ideas</a></li>
+      <li><a href="/posts/">Posts</a></li>
+    </ul>
+  </nav>
+</header>
 `
 
 render_site :: proc(pages: []Page, output_dir: string) {
@@ -56,7 +45,7 @@ render_site :: proc(pages: []Page, output_dir: string) {
 render_page_html :: proc(page: Page) -> string {
 	body := fmt.aprintf(
 		`<main>
-  <article>
+  <article class="prose">
     <h1>%s</h1>
 %s    %s
   </article>
@@ -82,9 +71,10 @@ render_home_html :: proc(pages: []Page) -> string {
 
 	body := fmt.aprintf(
 		`<main>
-  <header>
-    <h1>%s</h1>
-    <p>%s</p>
+  <header class="text-center mb-28">
+    <img class="mx-auto w-18 h-18 rounded-full" src="/avatar.jpg">
+    <h1 class="text-2xl/12 mt-2.5 mb-0 font-bold">%s</h1>
+    <p class="text-slate-400">%s</p>
   </header>
   <ul>
 %s
@@ -103,7 +93,8 @@ render_posts_html :: proc(pages: []Page) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 
-	append(&parts, "<main>\n  <h1>Posts</h1>\n")
+	append(&parts, "<main>\n")
+	append(&parts, `  <h1 class="text-center">Posts</h1>` + "\n")
 
 	current_year := ""
 	open := false
@@ -114,17 +105,20 @@ render_posts_html :: proc(pages: []Page) -> string {
 		year := get_year(page.date)
 		if year != current_year {
 			if open {
-				append(&parts, "  </ul>\n")
+				append(&parts, "    </ul>\n  </section>\n")
 			}
 			open = true
 			current_year = year
-			append(&parts, fmt.aprintf("  <h2>%s</h2>\n  <hr>\n  <ul>\n", year))
+			append(
+				&parts,
+				fmt.aprintf("  <section>\n    <h2>%s</h2>\n    <hr class=\"text-slate-800 mb-1\">\n    <ul>\n", year),
+			)
 		}
 		append(&parts, render_post_item(page))
 		append(&parts, "\n")
 	}
 	if open {
-		append(&parts, "  </ul>\n")
+		append(&parts, "    </ul>\n  </section>\n")
 	}
 	append(&parts, "</main>\n")
 
@@ -141,16 +135,20 @@ render_chrome :: proc(page_title: string, body: string) -> string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>%s</title>
-  <style>%s</style>
+  <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
-%s%s
+%s%s<footer>
+  <a href="https://github.com/sbrow" target="_blank" rel="noopener noreferrer me" title="Github">GitHub</a>
+  <a href="/index.xml" target="_blank" rel="noopener noreferrer me" title="Rss">RSS</a>
+  <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a></p>
+  <p><small>&copy;</small> 2026</p>
+</footer>
 </body>
 </html>
 `,
 		page_title,
-		CSS,
-		NAV,
+		HEADER,
 		body,
 	)
 }
@@ -158,18 +156,22 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 render_post_item :: proc(page: Page) -> string {
 	date_html := ""
 	if page.date != "" {
-		date_html = fmt.aprintf(" <time>%s</time>", format_date(page.date))
+		date_html = fmt.aprintf(
+			"<time datetime=\"%s\">%s</time>",
+			page.date,
+			format_date(page.date),
+		)
 	}
 	star := ""
 	if page.is_starred {
-		star = " \xe2\x98\x85"
+		star = `<span class="text-yellow-500 mr-2">★</span>`
 	}
 	return fmt.aprintf(
-		`    <li><a href="%s">%s</a>%s%s</li>`,
+		`      <li class="flex justify-between"><a href="%s">%s</a><span>%s%s</span></li>`,
 		page.permalink,
 		page.title,
-		date_html,
 		star,
+		date_html,
 	)
 }
 
