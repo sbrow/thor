@@ -6,6 +6,7 @@ import "core:strings"
 
 Frontmatter :: struct {
 	title:       string,
+	description: string,
 	date:        string,
 	publishDate: string,
 	draft:       bool,
@@ -44,8 +45,9 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 		return
 	}
 
-	fm.title = json_get_string(obj, "title")
-	fm.date = json_get_string(obj, "date")
+	fm.title       = json_get_string(obj, "title")
+	fm.description = json_get_string(obj, "description")
+	fm.date        = json_get_string(obj, "date")
 	fm.publishDate = json_get_string(obj, "publishDate")
 	fm.draft = json_get_bool(obj, "draft")
 	fm.isStarred = json_get_bool(obj, "isStarred")

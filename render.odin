@@ -4,45 +4,58 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 
-SITE_TITLE :: "One Idiot Developer"
-SITE_DESC :: "This is fine...right?"
-
-@(rodata)
 MONTHS: [12]string = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 }
 
-HEADER :: `
-<header>
-  <nav>
-    <ul>
-      <li class="mr-auto"><a href="/">Home</a></li>
-      <li><a href="/ideas/">Ideas</a></li>
-      <li><a href="/posts/">Posts</a></li>
-    </ul>
-  </nav>
-</header>
-`
-
-render_site :: proc(pages: []Page, output_dir: string) {
+render_site :: proc(pages: []Page, content_path: string, output_dir: string) {
 	sort_pages_by_date(pages)
 
+	// Find home page and extract site title
+	home: Page
+	has_home := false
+	site_title := "Site"
+
 	for page in pages {
-		html := render_page_html(page)
+		if page.type == .Home {
+			home = page
+			has_home = true
+			site_title = page.title
+			break
+		}
+	}
+
+	// Copy static assets (avatar, favicon, etc.)
+	copy_static_assets(content_path, output_dir)
+
+	// Render individual content pages (skip home)
+	for page in pages {
+		if page.type == .Home {
+			continue
+		}
+		html := render_page_html(page, site_title)
 		write_page(output_dir, page.permalink, html)
 	}
 
-	home_html := render_home_html(pages)
-	write_file(fmt.tprintf("%s/index.html", output_dir), home_html)
+	// Render home page
+	if has_home {
+		home_html := render_home_html(home, pages, site_title)
+		write_file(fmt.tprintf("%s/index.html", output_dir), home_html)
+	}
 
-	posts_html := render_posts_html(pages)
+	// Render posts list page
+	posts_html := render_posts_html(pages, site_title)
 	write_page(output_dir, "/posts/", posts_html)
 
-	fmt.printfln("Rendered %d pages to %s", len(pages) + 2, output_dir)
+	total := len(pages) + 1
+	if !has_home {
+		total += 1
+	}
+	fmt.printfln("Rendered %d pages to %s", total, output_dir)
 }
 
-render_page_html :: proc(page: Page) -> string {
+render_page_html :: proc(page: Page, site_title: string) -> string {
 	body := fmt.aprintf(
 		`<main>
   <article class="prose">
@@ -55,15 +68,18 @@ render_page_html :: proc(page: Page) -> string {
 		render_date(page),
 		page.body_html,
 	)
-	title := fmt.tprintf("%s | %s", page.title, SITE_TITLE)
+	title := fmt.tprintf("%s | %s", page.title, site_title)
 	return render_chrome(title, body)
 }
 
-render_home_html :: proc(pages: []Page) -> string {
+render_home_html :: proc(home: Page, pages: []Page, site_title: string) -> string {
 	items: [dynamic]string
 	defer delete(items)
 
 	for page in pages {
+		if page.type == .Home {
+			continue
+		}
 		append(&items, render_post_item(page))
 	}
 
@@ -72,24 +88,20 @@ render_home_html :: proc(pages: []Page) -> string {
 	body := fmt.aprintf(
 		`<main>
   <header class="text-center mb-28">
-    <img class="mx-auto w-18 h-18 rounded-full" src="/avatar.jpg">
-    <h1 class="text-2xl/12 mt-2.5 mb-0 font-bold">%s</h1>
-    <p class="text-slate-400">%s</p>
-  </header>
+%s  </header>
   <ul>
 %s
   </ul>
 </main>
 `,
-		SITE_TITLE,
-		SITE_DESC,
+		home.body_html,
 		post_list,
 	)
 
-	return render_chrome(SITE_TITLE, body)
+	return render_chrome(site_title, body)
 }
 
-render_posts_html :: proc(pages: []Page) -> string {
+render_posts_html :: proc(pages: []Page, site_title: string) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 
@@ -123,7 +135,7 @@ render_posts_html :: proc(pages: []Page) -> string {
 	append(&parts, "</main>\n")
 
 	body := strings.join(parts[:], "")
-	title := fmt.tprintf("Posts | %s", SITE_TITLE)
+	title := fmt.tprintf("Posts | %s", site_title)
 	return render_chrome(title, body)
 }
 
@@ -152,6 +164,18 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 		body,
 	)
 }
+
+HEADER :: `
+<header>
+  <nav>
+    <ul>
+      <li class="mr-auto"><a href="/">Home</a></li>
+      <li><a href="/ideas/">Ideas</a></li>
+      <li><a href="/posts/">Posts</a></li>
+    </ul>
+  </nav>
+</header>
+`
 
 render_post_item :: proc(page: Page) -> string {
 	date_html := ""

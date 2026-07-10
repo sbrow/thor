@@ -20,7 +20,7 @@ main :: proc() {
 
 	pages := walk_content(opt.content_dir, opt.drafts)
 
-	render_site(pages, opt.output_dir)
+	render_site(pages, opt.content_dir, opt.output_dir)
 }
 
 load_default_options :: proc(opt: ^Options) {
