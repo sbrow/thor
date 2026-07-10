@@ -5,10 +5,10 @@ import "core:fmt"
 import "core:os"
 
 Options :: struct {
-	base_url:    string `args:"name=base-url"`,
-	content_dir: string `args:"name=content"`,
-	output_dir:  string `args:"name=output"`,
-	drafts:      bool `args:"name=drafts"`,
+	base_url:    string `args:"name=base-url" usage:"hostname (and path) to the root, e.g. https://example.com/"`,
+	content_dir: string `args:"name=content" usage:"where to look for content files"`,
+	output_dir:  string `args:"name=output" usage:"where to export the completed site"`,
+	drafts:      bool `args:"name=drafts" usage:"Whether to render draft posts"`,
 }
 
 main :: proc() {
@@ -55,12 +55,13 @@ print_summary :: proc(pages: []Page) {
 		}
 
 		fmt.printfln(
-			"  [%-11s] %-30s %s  %s%s",
+			"  [%-11s] %-30s %s  %s%s  (%d bytes html)",
 			type_label,
 			page.title,
 			date_short,
 			page.permalink,
 			badge,
+			len(page.body_html),
 		)
 	}
 }

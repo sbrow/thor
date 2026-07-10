@@ -80,6 +80,7 @@
 
             buildInputs = [
               pkgs.git
+              pkgs.cmark
             ];
 
             doCheck = true;
@@ -109,6 +110,7 @@
               buildInputs = with pkgs; [
                 odin
                 ols
+                cmark
 
                 # IDE
                 unstable.helix

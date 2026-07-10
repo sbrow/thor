@@ -1,5 +1,7 @@
 package main
 
+import cm "vendor:commonmark"
+
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -19,6 +21,7 @@ Page :: struct {
 	is_starred: bool,
 	menu:       string,
 	body:       string,
+	body_html:  string,
 	bundle_dir: string,
 }
 
@@ -135,7 +138,8 @@ load_page :: proc(
 	page.draft = fm.draft
 	page.is_starred = fm.isStarred
 	page.menu = fm.menu
-	page.body = strings.clone(body)
+	page.body      = strings.clone(body)
+	page.body_html = cm.markdown_to_html_from_string(body, {.Unsafe})
 
 	switch page_type {
 	case .Post:
