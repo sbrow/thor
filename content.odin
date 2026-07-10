@@ -173,7 +173,9 @@ load_page :: proc(
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)
 	} else {
-		page.body_html = cm.markdown_to_html_from_string(body, {.Unsafe})
+		clean_body, defs := strip_definitions(body)
+		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
+		page.body_html = inject_sidenotes(html, defs)
 	}
 
 	switch page_type {

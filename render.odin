@@ -148,6 +148,7 @@ render_chrome :: proc(page_title: string, body: string) -> string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>%s</title>
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="/js/main.js" defer></script>
 </head>
 <body>
@@ -157,6 +158,8 @@ render_chrome :: proc(page_title: string, body: string) -> string {
   <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a></p>
   <p><small>&copy;</small> 2026</p>
 </footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 </body>
 </html>
 `,
