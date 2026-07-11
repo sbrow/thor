@@ -8,3 +8,15 @@
 - [ ] RSS
 - [ ] sitemap
 - [ ] robots.txt?
+- [ ] Evaluate Tufte CSS — borrow sidenote CSS or replace TailwindCSS entirely
+  - Option B: Steal Tufte's sidenote/margin-note CSS (adapt for dark theme), keep TailwindCSS
+  - Option C: Full Tufte CSS — drop TailwindCSS, no build step, semantic HTML, customize for dark theme + Roboto
+  - Our sidenote HTML pattern already matches Tufte's exactly
+- [ ] GitHub alerts (`> [!CAUTION]` → styled blockquote) — 2 posts
+- [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
+- [ ] Emoji shortcodes (`:shrug:` etc.) — 2 instances
+- [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
+- [ ] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
+- [ ] Copy-to-clipboard button on code blocks (was in Hugo's custom-head.html)
+- [ ] OpenGraph meta tags
+- [ ] utteranc.es comments on posts
