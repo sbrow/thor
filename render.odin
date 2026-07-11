@@ -26,9 +26,6 @@ render_site :: proc(pages: []Page, content_path: string, output_dir: string, bas
 		}
 	}
 
-	// Copy static assets (avatar, favicon, etc.)
-	copy_static_assets(content_path, output_dir)
-
 	// Render individual content pages (skip home)
 	for page in pages {
 		if page.type == .Home {
@@ -57,6 +54,9 @@ render_site :: proc(pages: []Page, content_path: string, output_dir: string, bas
 	// Generate sitemap
 	sitemap := generate_sitemap(pages, base_url)
 	write_file(fmt.tprintf("%s/sitemap.xml", output_dir), sitemap)
+
+	// Copy static assets (avatar, favicon, etc.)
+	copy_static_assets(content_path, output_dir)
 
 	total := len(pages) + 1
 	if !has_home {
