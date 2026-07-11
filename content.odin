@@ -175,7 +175,7 @@ load_page :: proc(
 	} else {
 		clean_body, defs := strip_definitions(body)
 		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
-		page.body_html = inject_sidenotes(html, defs)
+		page.body_html = inject_alerts(inject_sidenotes(html, defs))
 	}
 
 	switch page_type {
