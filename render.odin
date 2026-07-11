@@ -150,6 +150,7 @@ render_posts_html :: proc(pages: []Page, site_title: string) -> string {
 }
 
 render_chrome :: proc(page_title: string, body: string) -> string {
+	header := fmt.aprintf(HEADER, ICON_HOME)
 	return fmt.aprintf(
 		`<!DOCTYPE html>
 <html lang="en">
@@ -163,8 +164,9 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 </head>
 <body>
 %s%s<footer>
-  <a href="https://github.com/sbrow" target="_blank" rel="noopener noreferrer me" title="Github">GitHub</a>
-  <a href="/index.xml" target="_blank" rel="noopener noreferrer me" title="Rss">RSS</a>
+  <a class="goto-top opacity-0" href="#">%s</a>
+  <a href="https://github.com/sbrow" target="_blank" rel="noopener noreferrer me" title="Github">%s</a>
+  <a href="/index.xml" target="_blank" rel="noopener noreferrer me" title="Rss">%s</a>
   <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a> and <a href="https://tailwindcss.com/">Tailwindcss</a></p>
   <p><small>&copy;</small> 2026</p>
 </footer>
@@ -174,8 +176,11 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 </html>
 `,
 		page_title,
-		HEADER,
+		header,
 		body,
+		ICON_CHEVRON_UP,
+		ICON_GITHUB,
+		ICON_RSS,
 	)
 }
 
@@ -183,7 +188,7 @@ HEADER :: `
 <header>
   <nav>
     <ul>
-      <li class="mr-auto"><a href="/">Home</a></li>
+      <li class="mr-auto"><a href="/">%s</a></li>
       <li><a href="/ideas/">Ideas</a></li>
       <li><a href="/posts/">Posts</a></li>
     </ul>
@@ -202,7 +207,7 @@ render_post_item :: proc(page: Page) -> string {
 	}
 	star := ""
 	if page.is_starred {
-		star = `<span class="text-yellow-500 mr-2">★</span>`
+		star = ICON_STAR
 	}
 	return fmt.aprintf(
 		`      <li class="flex justify-between"><a href="%s">%s</a><span>%s%s</span></li>`,
