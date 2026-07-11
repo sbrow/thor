@@ -165,7 +165,7 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 %s%s<footer>
   <a href="https://github.com/sbrow" target="_blank" rel="noopener noreferrer me" title="Github">GitHub</a>
   <a href="/index.xml" target="_blank" rel="noopener noreferrer me" title="Rss">RSS</a>
-  <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a></p>
+  <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a> and <a href="https://tailwindcss.com/">Tailwindcss</a></p>
   <p><small>&copy;</small> 2026</p>
 </footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
