@@ -20,7 +20,7 @@ main :: proc() {
 
 	pages := walk_content(opt.content_dir, opt.drafts)
 
-	render_site(pages, opt.content_dir, opt.output_dir)
+	render_site(pages, opt.content_dir, opt.output_dir, opt.base_url)
 }
 
 load_default_options :: proc(opt: ^Options) {
@@ -30,6 +30,10 @@ load_default_options :: proc(opt: ^Options) {
 
 	if opt.output_dir == "" {
 		opt.output_dir = "./public"
+	}
+
+	if opt.base_url == "" {
+		opt.base_url = "http://localhost:8080"
 	}
 }
 

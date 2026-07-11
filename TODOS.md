@@ -5,8 +5,6 @@
   should be Hugo / go.
 - [ ] Deal with the favicon
 - [ ] Icon support.
-- [ ] RSS
-- [ ] sitemap
 - [ ] robots.txt?
 - [ ] Evaluate Tufte CSS — borrow sidenote CSS or replace TailwindCSS entirely
   - Option B: Steal Tufte's sidenote/margin-note CSS (adapt for dark theme), keep TailwindCSS

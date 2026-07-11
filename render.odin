@@ -9,7 +9,7 @@ MONTHS: [12]string = {
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 }
 
-render_site :: proc(pages: []Page, content_path: string, output_dir: string) {
+render_site :: proc(pages: []Page, content_path: string, output_dir: string, base_url: string) {
 	sort_pages_by_date(pages)
 
 	// Find home page and extract site title
@@ -47,6 +47,16 @@ render_site :: proc(pages: []Page, content_path: string, output_dir: string) {
 	// Render posts list page
 	posts_html := render_posts_html(pages, site_title)
 	write_page(output_dir, "/posts/", posts_html)
+
+	// Generate RSS feed
+	if has_home {
+		rss := generate_rss(pages, site_title, home.description, base_url)
+		write_file(fmt.tprintf("%s/index.xml", output_dir), rss)
+	}
+
+	// Generate sitemap
+	sitemap := generate_sitemap(pages, base_url)
+	write_file(fmt.tprintf("%s/sitemap.xml", output_dir), sitemap)
 
 	total := len(pages) + 1
 	if !has_home {
