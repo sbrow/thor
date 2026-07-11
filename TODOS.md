@@ -15,4 +15,3 @@
 - [ ] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
 - [ ] Copy-to-clipboard button on code blocks (was in Hugo's custom-head.html)
 - [ ] OpenGraph meta tags
-- [ ] utteranc.es comments on posts

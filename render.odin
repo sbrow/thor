@@ -66,17 +66,30 @@ render_site :: proc(pages: []Page, content_path: string, output_dir: string, bas
 }
 
 render_page_html :: proc(page: Page, site_title: string) -> string {
+	comments := ""
+	if page.type == .Post {
+		comments = `
+  <script src="https://utteranc.es/client.js"
+          repo="sbrow/sbrow.github.io"
+          issue-term="pathname"
+          label="Comment"
+          theme="github-dark"
+          crossorigin="anonymous"
+          async></script>`
+	}
+
 	body := fmt.aprintf(
 		`<main>
   <article class="prose">
     <h1>%s</h1>
 %s    %s
-  </article>
+  </article>%s
 </main>
 `,
 		page.title,
 		render_date(page),
 		page.body_html,
+		comments,
 	)
 	title := fmt.tprintf("%s | %s", page.title, site_title)
 	return render_chrome(title, body)
