@@ -58,6 +58,10 @@ render_site :: proc(pages: []Page, content_path: string, output_dir: string, bas
 	// Copy static assets (avatar, favicon, etc.)
 	copy_static_assets(content_path, output_dir)
 
+	// Generate robots.txt
+	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", base_url)
+	write_file(fmt.tprintf("%s/robots.txt", output_dir), robots)
+
 	total := len(pages) + 1
 	if !has_home {
 		total += 1
