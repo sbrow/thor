@@ -12,5 +12,6 @@
   - [ ] Backslash in shrug not visible.
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
-- [ ] Copy-to-clipboard button on code blocks (was in Hugo's custom-head.html)
+- [ ] Fix copy-to-clipboard button x-axis positioning inside code blocks
+- [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] OpenGraph meta tags
