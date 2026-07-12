@@ -3,70 +3,41 @@ package main
 import "core:flags"
 import "core:fmt"
 import "core:os"
-
-Options :: struct {
-	base_url:    string `args:"name=base-url" usage:"hostname (and path) to the root, e.g. https://example.com/"`,
-	content_dir: string `args:"name=content" usage:"where to look for content files"`,
-	output_dir:  string `args:"name=output" usage:"where to export the completed site"`,
-	drafts:      bool `args:"name=drafts" usage:"Whether to render draft posts"`,
-}
+import "core:strings"
 
 main :: proc() {
-	opt: Options
+	// Phase 1: parse flags on empty config to get config_path
+	phase1: Site_Config
+	flags.parse_or_exit(&phase1, os.args, .Odin)
 
-	flags.parse_or_exit(&opt, os.args, .Odin)
+	path := phase1.config_path
+	if path == "" {
+		path = "./thor.json"
+	}
 
-	load_default_options(&opt)
+	// Phase 2: load config file
+	config, _ := load_config(path)
 
-	pages := walk_content(opt.content_dir, opt.drafts)
+	// Phase 3: re-parse flags on loaded config (CLI overrides file values)
+	flags.parse_or_exit(&config, os.args, .Odin)
 
-	render_site(pages, opt.content_dir, opt.output_dir, opt.base_url)
+	// Defaults relative to config file's directory
+	config_dir := "./"
+	if idx := strings.last_index(path, "/"); idx >= 0 {
+		config_dir = path[:idx]
+	}
+
+	if config.content_dir == "" {
+		config.content_dir = fmt.tprintf("%s/content", config_dir)
+	}
+	if config.output_dir == "" {
+		config.output_dir = fmt.tprintf("%s/public", config_dir)
+	}
+	if config.base_url == "" {
+		config.base_url = "http://localhost:8080"
+	}
+
+	pages := walk_content(config.content_dir, config.drafts)
+
+	render_site(pages, config)
 }
-
-load_default_options :: proc(opt: ^Options) {
-	if opt.content_dir == "" {
-		opt.content_dir = "./content"
-	}
-
-	if opt.output_dir == "" {
-		opt.output_dir = "./public"
-	}
-
-	if opt.base_url == "" {
-		opt.base_url = "http://localhost:8080"
-	}
-}
-
-print_summary :: proc(pages: []Page) {
-	fmt.printfln("Pages: %d\n", len(pages))
-
-	for page in pages {
-		type_label := "post"
-		if page.type == .Standalone {
-			type_label = "standalone"
-		}
-
-		date_short := page.date
-		if len(date_short) > 10 {
-			date_short = date_short[:10]
-		}
-
-		badge := ""
-		if page.draft {
-			badge = " (draft)"
-		} else if page.is_starred {
-			badge = " *"
-		}
-
-		fmt.printfln(
-			"  [%-11s] %-30s %s  %s%s  (%d bytes html)",
-			type_label,
-			page.title,
-			date_short,
-			page.permalink,
-			badge,
-			len(page.body_html),
-		)
-	}
-}
-

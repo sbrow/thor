@@ -15,3 +15,4 @@
 - [ ] Fix copy-to-clipboard button x-axis positioning inside code blocks
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] OpenGraph meta tags
+- [ ] Search up for `thor.json` files.

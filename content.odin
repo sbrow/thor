@@ -156,8 +156,7 @@ load_page :: proc(
 	content := string(data)
 	fm, body, parsed := parse_frontmatter(content)
 	if !parsed {
-		fmt.eprintfln("thor: no frontmatter in %s", file_path)
-		return
+		body = strings.trim_left(content, " \t\r\n")
 	}
 
 	page.type        = page_type

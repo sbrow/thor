@@ -9,19 +9,16 @@ MONTHS: [12]string = {
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 }
 
-render_site :: proc(pages: []Page, content_path: string, output_dir: string, base_url: string) {
+render_site :: proc(pages: []Page, config: Site_Config) {
 	sort_pages_by_date(pages)
 
-	// Find home page and extract site title
+	// Find home page
 	home: Page
 	has_home := false
-	site_title := "Site"
-
 	for page in pages {
 		if page.type == .Home {
 			home = page
 			has_home = true
-			site_title = page.title
 			break
 		}
 	}
@@ -31,45 +28,43 @@ render_site :: proc(pages: []Page, content_path: string, output_dir: string, bas
 		if page.type == .Home {
 			continue
 		}
-		html := render_page_html(page, site_title)
-		write_page(output_dir, page.permalink, html)
+		html := render_page_html(page, config)
+		write_page(config.output_dir, page.permalink, html)
 	}
 
 	// Render home page
 	if has_home {
-		home_html := render_home_html(home, pages, site_title)
-		write_file(fmt.tprintf("%s/index.html", output_dir), home_html)
+		home_html := render_home_html(home, pages, config)
+		write_file(fmt.tprintf("%s/index.html", config.output_dir), home_html)
 	}
 
 	// Render posts list page
-	posts_html := render_posts_html(pages, site_title)
-	write_page(output_dir, "/posts/", posts_html)
+	posts_html := render_posts_html(pages, config)
+	write_page(config.output_dir, "/posts/", posts_html)
 
 	// Generate RSS feed
-	if has_home {
-		rss := generate_rss(pages, site_title, home.description, base_url)
-		write_file(fmt.tprintf("%s/index.xml", output_dir), rss)
-	}
+	rss := generate_rss(pages, config)
+	write_file(fmt.tprintf("%s/index.xml", config.output_dir), rss)
 
 	// Generate sitemap
-	sitemap := generate_sitemap(pages, base_url)
-	write_file(fmt.tprintf("%s/sitemap.xml", output_dir), sitemap)
+	sitemap := generate_sitemap(pages, config.base_url)
+	write_file(fmt.tprintf("%s/sitemap.xml", config.output_dir), sitemap)
 
 	// Copy static assets (avatar, favicon, etc.)
-	copy_static_assets(content_path, output_dir)
+	copy_static_assets(config.content_dir, config.output_dir)
 
 	// Generate robots.txt
-	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", base_url)
-	write_file(fmt.tprintf("%s/robots.txt", output_dir), robots)
+	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", config.base_url)
+	write_file(fmt.tprintf("%s/robots.txt", config.output_dir), robots)
 
 	total := len(pages) + 1
 	if !has_home {
 		total += 1
 	}
-	fmt.printfln("Rendered %d pages to %s", total, output_dir)
+	fmt.printfln("Rendered %d pages to %s", total, config.output_dir)
 }
 
-render_page_html :: proc(page: Page, site_title: string) -> string {
+render_page_html :: proc(page: Page, config: Site_Config) -> string {
 	comments := ""
 	if page.type == .Post {
 		comments = `
@@ -95,11 +90,11 @@ render_page_html :: proc(page: Page, site_title: string) -> string {
 		page.body_html,
 		comments,
 	)
-	title := fmt.tprintf("%s | %s", page.title, site_title)
-	return render_chrome(title, body)
+	title := fmt.tprintf("%s | %s", page.title, config.title)
+	return render_chrome(title, body, config)
 }
 
-render_home_html :: proc(home: Page, pages: []Page, site_title: string) -> string {
+render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> string {
 	items: [dynamic]string
 	defer delete(items)
 
@@ -125,10 +120,10 @@ render_home_html :: proc(home: Page, pages: []Page, site_title: string) -> strin
 		post_list,
 	)
 
-	return render_chrome(site_title, body)
+	return render_chrome(config.title, body, config)
 }
 
-render_posts_html :: proc(pages: []Page, site_title: string) -> string {
+render_posts_html :: proc(pages: []Page, config: Site_Config) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 
@@ -162,12 +157,34 @@ render_posts_html :: proc(pages: []Page, site_title: string) -> string {
 	append(&parts, "</main>\n")
 
 	body := strings.join(parts[:], "")
-	title := fmt.tprintf("Posts | %s", site_title)
-	return render_chrome(title, body)
+	title := fmt.tprintf("Posts | %s", config.title)
+	return render_chrome(title, body, config)
 }
 
-render_chrome :: proc(page_title: string, body: string) -> string {
+render_chrome :: proc(page_title: string, body: string, config: Site_Config) -> string {
 	header := fmt.aprintf(HEADER, ICON_HOME)
+
+	// Build social links from config
+	social_parts: [dynamic]string
+	defer delete(social_parts)
+	for link in config.social {
+		append(
+			&social_parts,
+			fmt.aprintf(
+				`\n  <a href="%s" target="_blank" rel="noopener noreferrer me" title="%s">%s</a>`,
+				link.url,
+				link.name,
+				social_icon(link.name),
+			),
+		)
+	}
+	social_html := strings.join(social_parts[:], "")
+
+	copyright := "<p><small>&copy;</small> 2026</p>"
+	if config.author != "" {
+		copyright = fmt.aprintf("<p><small>&copy;</small> 2026 %s</p>", config.author)
+	}
+
 	return fmt.aprintf(
 		`<!DOCTYPE html>
 <html lang="en">
@@ -181,12 +198,9 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 </head>
 <body>
 %s%s<footer>
-  <a class="goto-top opacity-0" href="#">%s</a>
-  <a href="https://github.com/sbrow" target="_blank" rel="noopener noreferrer me" title="Github">%s</a>
-  <a href="/index.xml" target="_blank" rel="noopener noreferrer me" title="Rss">%s</a>
+  <a class="goto-top opacity-0" href="#">%s</a>%s
   <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a> and <a href="https://tailwindcss.com/">Tailwindcss</a></p>
-  <p><small>&copy;</small> 2026</p>
-</footer>
+%s</footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 </body>
@@ -196,9 +210,19 @@ render_chrome :: proc(page_title: string, body: string) -> string {
 		header,
 		body,
 		ICON_CHEVRON_UP,
-		ICON_GITHUB,
-		ICON_RSS,
+		social_html,
+		copyright,
 	)
+}
+
+social_icon :: proc(name: string) -> string {
+	switch strings.to_lower(name) {
+	case "github":
+		return ICON_GITHUB
+	case "rss":
+		return ICON_RSS
+	}
+	return name
 }
 
 HEADER :: `

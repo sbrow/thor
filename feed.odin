@@ -5,12 +5,7 @@ import "core:strings"
 
 WEEKDAYS: [7]string = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 
-generate_rss :: proc(
-	pages: []Page,
-	site_title: string,
-	site_desc: string,
-	base_url: string,
-) -> string {
+generate_rss :: proc(pages: []Page, config: Site_Config) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 
@@ -23,10 +18,10 @@ generate_rss :: proc(
 <description>%s</description>
 <language>en-us</language>
 <atom:link href="%s/index.xml" rel="self" type="application/rss+xml"/>`,
-		xml_escape(site_title),
-		base_url,
-		xml_escape(site_desc),
-		base_url,
+		xml_escape(config.title),
+		config.base_url,
+		xml_escape(config.description),
+		config.base_url,
 	))
 
 	for page in pages {
@@ -49,10 +44,10 @@ generate_rss :: proc(
 </item>
 `,
 			xml_escape(page.title),
-			base_url,
+			config.base_url,
 			page.permalink,
 			pub_date,
-			base_url,
+			config.base_url,
 			page.permalink,
 			xml_escape(page.body_html),
 		))
