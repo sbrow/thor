@@ -33,6 +33,9 @@ main :: proc() {
 	if config.output_dir == "" {
 		config.output_dir = fmt.tprintf("%s/public", config_dir)
 	}
+	if config.layouts_dir == "" {
+		config.layouts_dir = fmt.tprintf("%s/layouts", config_dir)
+	}
 	if config.base_url == "" {
 		config.base_url = "http://localhost:8080"
 	}

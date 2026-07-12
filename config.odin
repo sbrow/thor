@@ -17,6 +17,7 @@ Site_Config :: struct {
 	base_url:    string `args:"name=base-url"`,
 	content_dir: string `args:"name=content"`,
 	output_dir:  string `args:"name=output"`,
+	layouts_dir: string,
 	author:      string,
 	social:      []Social_Link,
 	drafts:      bool   `args:"name=drafts"`,

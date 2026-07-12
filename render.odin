@@ -1,4 +1,7 @@
+#+feature dynamic-literals
 package main
+
+import mustache "mustache"
 
 import "core:fmt"
 import "core:os"
@@ -7,6 +10,55 @@ import "core:strings"
 MONTHS: [12]string = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+}
+
+Page_Context :: struct {
+	permalink:    string,
+	title:        string,
+	star:         string,
+	has_date:     bool,
+	date_iso:     string,
+	date_display: string,
+}
+
+Year_Section :: struct {
+	year:  string,
+	posts: [dynamic]Page_Context,
+}
+
+Year_Slice :: struct {
+	year:  string,
+	posts: []Page_Context,
+}
+
+build_page_context :: proc(page: Page) -> Page_Context {
+	star := ""
+	if page.is_starred {
+		star = ICON_STAR
+	}
+	return Page_Context{
+		permalink = page.permalink,
+		title = page.title,
+		star = star,
+		has_date = page.date != "",
+		date_iso = page.date,
+		date_display = format_date(page.date),
+	}
+}
+
+build_social_context :: proc(config: Site_Config) -> [dynamic]map[string]string {
+	social_ctx := make([dynamic]map[string]string)
+	for link in config.social {
+		append(
+			&social_ctx,
+			map[string]string{
+				"name" = link.name,
+				"url"  = link.url,
+				"icon" = social_icon(link.name),
+			},
+		)
+	}
+	return social_ctx
 }
 
 render_site :: proc(pages: []Page, config: Site_Config) {
@@ -65,154 +117,148 @@ render_site :: proc(pages: []Page, config: Site_Config) {
 }
 
 render_page_html :: proc(page: Page, config: Site_Config) -> string {
-	comments := ""
-	if page.type == .Post {
-		comments = `
-  <script src="https://utteranc.es/client.js"
-          repo="sbrow/sbrow.github.io"
-          issue-term="pathname"
-          label="Comment"
-          theme="github-dark"
-          crossorigin="anonymous"
-          async></script>`
+	social_ctx := build_social_context(config)
+	defer delete(social_ctx)
+
+	data := map[string]any{
+		"title"        = fmt.tprintf("%s | %s", page.title, config.title),
+		"page_title"   = page.title,
+		"body_html"    = page.body_html,
+		"has_date"     = page.date != "",
+		"date_iso"     = page.date,
+		"date_display" = format_date(page.date),
+		"is_post"      = page.type == .Post,
+		"home_icon"    = ICON_HOME,
+		"chevron_up"   = ICON_CHEVRON_UP,
+		"year"         = "2026",
+		"author"       = config.author,
+		"social"       = social_ctx[:],
 	}
 
-	body := fmt.aprintf(
-		`<main>
-  <article class="prose">
-    <h1>%s</h1>
-%s    %s
-  </article>%s
-</main>
-`,
-		page.title,
-		render_date(page),
-		page.body_html,
-		comments,
+	partials := load_partials(config.layouts_dir)
+
+	post_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/post.html", config.layouts_dir), context.allocator)
+	base_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/base.html", config.layouts_dir), context.allocator)
+
+	result, err := mustache.render_in_layout(
+		string(post_tpl),
+		data,
+		string(base_tpl),
+		partials,
 	)
-	title := fmt.tprintf("%s | %s", page.title, config.title)
-	return render_chrome(title, body, config)
+	if err != nil {
+		fmt.eprintfln("thor: mustache error rendering page: %v", err)
+		return ""
+	}
+	return result
+}
+
+load_partials :: proc(layouts_dir: string) -> map[string]string {
+	partials: map[string]string
+
+	nav, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/partials/nav.html", layouts_dir), context.allocator)
+	partials["nav"] = string(nav)
+
+	footer, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/partials/footer.html", layouts_dir), context.allocator)
+	partials["footer"] = string(footer)
+
+	return partials
 }
 
 render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> string {
-	items: [dynamic]string
-	defer delete(items)
-
+	list_pages := make([dynamic]Page_Context)
+	defer delete(list_pages)
 	for page in pages {
 		if page.type == .Home {
 			continue
 		}
-		append(&items, render_post_item(page))
+		append(&list_pages, build_page_context(page))
 	}
 
-	post_list := strings.join(items[:], "\n")
+	social_ctx := build_social_context(config)
+	defer delete(social_ctx)
 
-	body := fmt.aprintf(
-		`<main>
-  <header class="text-center mb-28">
-%s  </header>
-  <ul>
-%s
-  </ul>
-</main>
-`,
-		home.body_html,
-		post_list,
+	data := map[string]any{
+		"title"      = config.title,
+		"home_body"  = home.body_html,
+		"list_pages" = list_pages[:],
+		"home_icon"  = ICON_HOME,
+		"chevron_up" = ICON_CHEVRON_UP,
+		"year"       = "2026",
+		"author"     = config.author,
+		"social"     = social_ctx[:],
+	}
+
+	partials := load_partials(config.layouts_dir)
+
+	home_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/home.html", config.layouts_dir), context.allocator)
+	base_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/base.html", config.layouts_dir), context.allocator)
+
+	result, err := mustache.render_in_layout(
+		string(home_tpl),
+		data,
+		string(base_tpl),
+		partials,
 	)
-
-	return render_chrome(config.title, body, config)
+	if err != nil {
+		fmt.eprintfln("thor: mustache error: %v", err)
+		return ""
+	}
+	return result
 }
 
 render_posts_html :: proc(pages: []Page, config: Site_Config) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
-
-	append(&parts, "<main>\n")
-	append(&parts, `  <h1 class="text-center">Posts</h1>` + "\n")
-
+	// Group posts by year
+	year_sections := make([dynamic]Year_Section)
+	defer delete(year_sections)
 	current_year := ""
-	open := false
 	for page in pages {
 		if page.type != .Post {
 			continue
 		}
 		year := get_year(page.date)
 		if year != current_year {
-			if open {
-				append(&parts, "    </ul>\n  </section>\n")
-			}
-			open = true
+			append(&year_sections, Year_Section{year = year})
 			current_year = year
-			append(
-				&parts,
-				fmt.aprintf("  <section>\n    <h2>%s</h2>\n    <hr class=\"text-slate-800 mb-1\">\n    <ul>\n", year),
-			)
 		}
-		append(&parts, render_post_item(page))
-		append(&parts, "\n")
+		append(&year_sections[len(year_sections) - 1].posts, build_page_context(page))
 	}
-	if open {
-		append(&parts, "    </ul>\n  </section>\n")
-	}
-	append(&parts, "</main>\n")
-
-	body := strings.join(parts[:], "")
-	title := fmt.tprintf("Posts | %s", config.title)
-	return render_chrome(title, body, config)
-}
-
-render_chrome :: proc(page_title: string, body: string, config: Site_Config) -> string {
-	header := fmt.aprintf(HEADER, ICON_HOME)
-
-	// Build social links from config
-	social_parts: [dynamic]string
-	defer delete(social_parts)
-	for link in config.social {
-		append(
-			&social_parts,
-			fmt.aprintf(
-				`\n  <a href="%s" target="_blank" rel="noopener noreferrer me" title="%s">%s</a>`,
-				link.url,
-				link.name,
-				social_icon(link.name),
-			),
-		)
-	}
-	social_html := strings.join(social_parts[:], "")
-
-	copyright := "<p><small>&copy;</small> 2026</p>"
-	if config.author != "" {
-		copyright = fmt.aprintf("<p><small>&copy;</small> 2026 %s</p>", config.author)
+	// Convert [dynamic]Page_Context slices to []Page_Context for mustache
+	year_slices := make([dynamic]Year_Slice)
+	defer delete(year_slices)
+	for section in year_sections {
+		append(&year_slices, Year_Slice{year = section.year, posts = section.posts[:]})
 	}
 
-	return fmt.aprintf(
-		`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>%s</title>
-  <link rel="stylesheet" href="/css/main.css?v=2">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-  <script src="/js/main.js?v=2" defer></script>
-</head>
-<body>
-%s%s<footer>
-  <a class="goto-top opacity-0" href="#">%s</a>%s
-  <p class="pt-5 prose">Proudly built with <a href="https://odin-lang.org/">Odin</a> and <a href="https://tailwindcss.com/">Tailwindcss</a></p>
-%s</footer>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script>hljs.highlightAll();</script>
-</body>
-</html>
-`,
-		page_title,
-		header,
-		body,
-		ICON_CHEVRON_UP,
-		social_html,
-		copyright,
+	social_ctx := build_social_context(config)
+	defer delete(social_ctx)
+
+	data := map[string]any{
+		"title"          = fmt.tprintf("Posts | %s", config.title),
+		"year_sections"  = year_slices[:],
+		"home_icon"      = ICON_HOME,
+		"chevron_up"     = ICON_CHEVRON_UP,
+		"year"           = "2026",
+		"author"         = config.author,
+		"social"         = social_ctx[:],
+	}
+
+	partials := load_partials(config.layouts_dir)
+
+	posts_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/posts_list.html", config.layouts_dir), context.allocator)
+	base_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/base.html", config.layouts_dir), context.allocator)
+
+	result, err := mustache.render_in_layout(
+		string(posts_tpl),
+		data,
+		string(base_tpl),
+		partials,
 	)
+	if err != nil {
+		fmt.eprintfln("thor: mustache error: %v", err)
+		return ""
+	}
+	return result
 }
 
 social_icon :: proc(name: string) -> string {
@@ -223,47 +269,6 @@ social_icon :: proc(name: string) -> string {
 		return ICON_RSS
 	}
 	return name
-}
-
-HEADER :: `
-<header>
-  <nav>
-    <ul>
-      <li class="mr-auto"><a href="/">%s</a></li>
-      <li><a href="/ideas/">Ideas</a></li>
-      <li><a href="/posts/">Posts</a></li>
-    </ul>
-  </nav>
-</header>
-`
-
-render_post_item :: proc(page: Page) -> string {
-	date_html := ""
-	if page.date != "" {
-		date_html = fmt.aprintf(
-			"<time datetime=\"%s\">%s</time>",
-			page.date,
-			format_date(page.date),
-		)
-	}
-	star := ""
-	if page.is_starred {
-		star = ICON_STAR
-	}
-	return fmt.aprintf(
-		`      <li class="flex justify-between"><a href="%s">%s</a><span>%s%s</span></li>`,
-		page.permalink,
-		page.title,
-		star,
-		date_html,
-	)
-}
-
-render_date :: proc(page: Page) -> string {
-	if page.date == "" {
-		return ""
-	}
-	return fmt.aprintf(`    <time datetime="%s">%s</time>` + "\n", page.date, format_date(page.date))
 }
 
 format_date :: proc(iso: string) -> string {
