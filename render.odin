@@ -61,6 +61,38 @@ build_social_context :: proc(config: Site_Config) -> [dynamic]map[string]string 
 	return social_ctx
 }
 
+strip_html_tags :: proc(s: string) -> string {
+	parts: [dynamic]string
+	defer delete(parts)
+	in_tag := false
+	start := 0
+	for i in 0..<len(s) {
+		if s[i] == '<' && !in_tag {
+			if i > start {
+				append(&parts, s[start:i])
+			}
+			in_tag = true
+		} else if s[i] == '>' && in_tag {
+			in_tag = false
+			start = i + 1
+		}
+	}
+	if !in_tag && start < len(s) {
+		append(&parts, s[start:])
+	}
+	if len(parts) == 0 {
+		return s
+	}
+	return strings.join(parts[:], "")
+}
+
+og_type :: proc(is_article: bool) -> string {
+	if is_article {
+		return "article"
+	}
+	return "website"
+}
+
 render_site :: proc(pages: []Page, config: Site_Config) {
 	sort_pages_by_date(pages)
 
@@ -120,19 +152,30 @@ render_page_html :: proc(page: Page, config: Site_Config) -> string {
 	social_ctx := build_social_context(config)
 	defer delete(social_ctx)
 
+	is_article := page.type == .Post
+
 	data := map[string]any{
-		"title"        = fmt.tprintf("%s | %s", page.title, config.title),
-		"page_title"   = page.title,
-		"body_html"    = page.body_html,
-		"has_date"     = page.date != "",
-		"date_iso"     = page.date,
-		"date_display" = format_date(page.date),
-		"is_post"      = page.type == .Post,
-		"home_icon"    = ICON_HOME,
-		"chevron_up"   = ICON_CHEVRON_UP,
-		"year"         = "2026",
-		"author"       = config.author,
-		"social"       = social_ctx[:],
+		"title"         = fmt.tprintf("%s | %s", page.title, config.title),
+		"page_title"    = page.title,
+		"body_html"     = page.body_html,
+		"has_date"      = page.date != "",
+		"date_iso"      = page.date,
+		"date_display"  = format_date(page.date),
+		"is_post"       = is_article,
+		"home_icon"     = ICON_HOME,
+		"chevron_up"    = ICON_CHEVRON_UP,
+		"year"          = "2026",
+		"author"        = config.author,
+		"social"        = social_ctx[:],
+		"og_url"        = fmt.tprintf("%s%s", config.base_url, page.permalink),
+		"og_site_name"  = config.title,
+		"og_title"      = strip_html_tags(page.title),
+		"og_description" = config.description,
+		"og_type"       = og_type(is_article),
+		"is_article"    = is_article,
+		"og_section"    = "posts",
+		"og_published"  = page.date,
+		"og_image"      = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)
@@ -156,11 +199,14 @@ render_page_html :: proc(page: Page, config: Site_Config) -> string {
 load_partials :: proc(layouts_dir: string) -> map[string]string {
 	partials: map[string]string
 
-	nav, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/partials/nav.html", layouts_dir), context.allocator)
+	nav, _ := os.read_entire_file_from_path(fmt.tprintf("%s/partials/nav.html", layouts_dir), context.allocator)
 	partials["nav"] = string(nav)
 
-	footer, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/partials/footer.html", layouts_dir), context.allocator)
+	footer, _ := os.read_entire_file_from_path(fmt.tprintf("%s/partials/footer.html", layouts_dir), context.allocator)
 	partials["footer"] = string(footer)
+
+	head, _ := os.read_entire_file_from_path(fmt.tprintf("%s/partials/head.html", layouts_dir), context.allocator)
+	partials["head"] = string(head)
 
 	return partials
 }
@@ -179,14 +225,21 @@ render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> stri
 	defer delete(social_ctx)
 
 	data := map[string]any{
-		"title"      = config.title,
-		"home_body"  = home.body_html,
-		"list_pages" = list_pages[:],
-		"home_icon"  = ICON_HOME,
-		"chevron_up" = ICON_CHEVRON_UP,
-		"year"       = "2026",
-		"author"     = config.author,
-		"social"     = social_ctx[:],
+		"title"          = config.title,
+		"home_body"      = home.body_html,
+		"list_pages"     = list_pages[:],
+		"home_icon"      = ICON_HOME,
+		"chevron_up"     = ICON_CHEVRON_UP,
+		"year"           = "2026",
+		"author"         = config.author,
+		"social"         = social_ctx[:],
+		"og_url"         = fmt.tprintf("%s/", config.base_url),
+		"og_site_name"   = config.title,
+		"og_title"       = config.title,
+		"og_description" = config.description,
+		"og_type"        = "website",
+		"is_article"     = false,
+		"og_image"       = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)
@@ -241,6 +294,13 @@ render_posts_html :: proc(pages: []Page, config: Site_Config) -> string {
 		"year"           = "2026",
 		"author"         = config.author,
 		"social"         = social_ctx[:],
+		"og_url"         = fmt.tprintf("%s/posts/", config.base_url),
+		"og_site_name"   = config.title,
+		"og_title"       = "Posts",
+		"og_description" = config.description,
+		"og_type"        = "website",
+		"is_article"     = false,
+		"og_image"       = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)
