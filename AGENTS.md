@@ -8,7 +8,7 @@ Thor is a static site generator written in [Odin](https://odin-lang.org), replac
 thor.json          ← site config (title, base_url, author, params)
 content/           ← markdown and HTML content files
 layouts/           ← Mustache templates + partials
-assets/            ← CSS (TailwindCSS source) and JS
+assets/            ← CSS (Tufte-based) and JS
 public/            ← build output (generated)
 ```
 
@@ -90,15 +90,17 @@ raw markdown
 nix develop
 # From blog root:
 odin run ./thor -- -drafts
-tailwindcss --input assets/css/main.css --output public/css/main.css --minify
+cp assets/css/tufte.css public/css/tufte.css
 cp assets/js/main.js public/js/main.js
 caddy run  # serves public/ on blog.localhost
 ```
 
+No CSS build step — `tufte.css` is static CSS, no preprocessor or compiler needed.
+
 ### Production build
 
 ```bash
-nix build  # runs thor + tailwindcss + cp js, outputs to ./result/
+nix build  # runs thor + copies CSS/JS, outputs to ./result/
 ```
 
 ### Tests
