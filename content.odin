@@ -3,6 +3,7 @@ package main
 import cm "vendor:commonmark"
 
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:strings"
 
@@ -29,6 +30,8 @@ Page :: struct {
 
 // walk_content reads the content directory and returns all non-draft pages
 // (or all pages if include_drafts is true).
+//
+// TODO: What is the lifetime of pages?
 walk_content :: proc(content_path: string, include_drafts: bool) -> []Page {
 	pages: [dynamic]Page
 
@@ -40,7 +43,9 @@ walk_content :: proc(content_path: string, include_drafts: bool) -> []Page {
 		collect_posts(&pages, posts_path)
 	}
 
-	if !include_drafts {
+	if include_drafts {
+		return pages[:]
+	} else {
 		filtered: [dynamic]Page
 		for &page in pages {
 			if !page.draft {
@@ -50,8 +55,6 @@ walk_content :: proc(content_path: string, include_drafts: bool) -> []Page {
 		delete(pages)
 		return filtered[:]
 	}
-
-	return pages[:]
 }
 
 collect_home :: proc(pages: ^[dynamic]Page, content_path: string) {
@@ -78,7 +81,7 @@ collect_home :: proc(pages: ^[dynamic]Page, content_path: string) {
 collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string) {
 	entries, err := os.read_all_directory_by_path(content_path, context.allocator)
 	if err != nil {
-		fmt.eprintfln("thor: cannot read %s: %v", content_path, err)
+		log.warnf("thor: cannot read %s: %v", content_path, err)
 		return
 	}
 	defer os.file_info_slice_delete(entries, context.allocator)
@@ -105,7 +108,7 @@ collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string) {
 collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string) {
 	entries, err := os.read_all_directory_by_path(posts_path, context.allocator)
 	if err != nil {
-		fmt.eprintfln("thor: cannot read %s: %v", posts_path, err)
+		log.warnf("thor: cannot read %s: %v", posts_path, err)
 		return
 	}
 	defer os.file_info_slice_delete(entries, context.allocator)
@@ -149,7 +152,7 @@ load_page :: proc(
 ) {
 	data, err := os.read_entire_file_from_path(file_path, context.allocator)
 	if err != nil {
-		fmt.eprintfln("thor: cannot read %s: %v", file_path, err)
+		log.warnf("thor: cannot read %s: %v", file_path, err)
 		return
 	}
 
@@ -159,15 +162,15 @@ load_page :: proc(
 		body = strings.trim_left(content, " \t\r\n")
 	}
 
-	page.type        = page_type
-	page.slug        = slug
-	page.title       = fm.title
+	page.type = page_type
+	page.slug = slug
+	page.title = fm.title
 	page.description = fm.description
-	page.date        = fm.date
-	page.draft       = fm.draft
-	page.is_starred  = fm.isStarred
-	page.menu        = fm.menu
-	page.body        = strings.clone(body)
+	page.date = fm.date
+	page.draft = fm.draft
+	page.is_starred = fm.isStarred
+	page.menu = fm.menu
+	page.body = strings.clone(body)
 
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)
@@ -221,7 +224,8 @@ copy_static_assets :: proc(content_path: string, output_dir: string) {
 
 		dest := fmt.tprintf("%s/%s", output_dir, entry.name)
 		if err := os.copy_file(dest, entry.fullpath); err != nil {
-			fmt.eprintfln("thor: cannot copy %s: %v", entry.name, err)
+			log.warnf("thor: cannot copy %s: %v", entry.name, err)
 		}
 	}
 }
+

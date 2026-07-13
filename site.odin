@@ -3,6 +3,7 @@ package main
 import "core:encoding/json"
 import "core:flags"
 import "core:fmt"
+import "core:log"
 import "core:mem"
 import "core:os"
 import "core:strings"
@@ -46,6 +47,7 @@ init_site :: proc(site: ^Site, args: []string) {
 	}
 
 	// Hardcoded defaults (lowest precedence)
+	// TODO: Probably shouldn't use temp allocator here?
 	if site.content_dir == "" {
 		site.content_dir = fmt.tprintf("%s/content", config_dir)
 	}
@@ -74,7 +76,7 @@ load_site_config :: proc(
 
 	unmarshal_err := json.unmarshal_string(string(data), config, allocator = allocator)
 	if unmarshal_err != nil {
-		fmt.eprintfln("thor: failed to parse %s: %v", path, unmarshal_err)
+		log.warnf("thor: failed to parse %s: %v", path, unmarshal_err)
 		return
 	}
 
