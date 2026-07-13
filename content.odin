@@ -178,7 +178,7 @@ load_page :: proc(
 		expanded := expand_emoji(body)
 		clean_body, defs := strip_definitions(expanded)
 		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
-		page.body_html = inject_alerts(inject_sidenotes(html, defs))
+		page.body_html = highlight_code(inject_alerts(inject_sidenotes(html, defs)), file_path)
 	}
 
 	switch page_type {

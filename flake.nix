@@ -81,6 +81,7 @@
             buildInputs = [
               pkgs.git
               pkgs.cmark
+              pkgs.tree-sitter
             ];
 
             doCheck = true;
@@ -111,6 +112,7 @@
                 odin
                 ols
                 cmark
+                tree-sitter
 
                 # IDE
                 unstable.helix

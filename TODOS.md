@@ -1,19 +1,22 @@
-- [ ] add content-hash fingerprinting for tailwind cache busting.
-- [ ] Evaluate Tufte CSS — borrow sidenote CSS or replace TailwindCSS entirely
-  - Option B: Steal Tufte's sidenote/margin-note CSS (adapt for dark theme), keep TailwindCSS
-  - Option C: Full Tufte CSS — drop TailwindCSS, no build step, semantic HTML, customize for dark theme + Roboto
-  - Our sidenote HTML pattern already matches Tufte's exactly
+- README.md
+  - [ ] "Zero is beautiful"
+- [ ] Content-hash fingerprinting for CSS and JS cache busting
+- [ ] proper date/time/now object.
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [x] Emoji shortcodes (`:shrug:` etc.) — 2 instances
   - [ ] Backslash in shrug not visible.
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
-- [ ] Fix copy-to-clipboard button x-axis positioning inside code blocks
-- [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [x] OpenGraph meta tags
 - [ ] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
+- [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
+- [ ] Theme selector for syntax highlighting.
+  - use http://github.com/helix-editor/helix/tree/master/runtime/themes) as a
+    guide
+- [ ] Search for grammars in multiple places
+- [ ] Download missing grammars.
 - [ ] Review every file in thor
   - [ ] Review alerts.odin
   - [ ] Review content.odin
