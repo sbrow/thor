@@ -2,8 +2,8 @@
 #+test
 package main
 
+import "core:encoding/json"
 import "core:fmt"
-import "core:mem"
 import "core:os"
 import "core:testing"
 
@@ -20,7 +20,17 @@ write_temp_config :: proc(name: string, content: string) -> string {
 test_load_site_config :: proc(t: ^testing.T) {
 	path := write_temp_config(
 		"valid",
-		`{"title":"Test Site","description":"Test desc","base_url":"https://example.com","author":"Tester","social":[{"name":"github","url":"https://github.com/test"},{"name":"rss","url":"/index.xml"}]}`,
+		`{
+			"title":"Test Site",
+			"description":"Test desc",
+			"base_url":"https://example.com",
+			"author":"Tester",
+			"params":{
+				"social":[
+					{"name":"github","url":"https://github.com/test"},
+					{"name":"rss","url":"/index.xml"}]
+			}
+		}`,
 	)
 	defer os.remove(path)
 
@@ -32,11 +42,23 @@ test_load_site_config :: proc(t: ^testing.T) {
 	testing.expect_value(t, site.description, "Test desc")
 	testing.expect_value(t, site.base_url, "https://example.com")
 	testing.expect_value(t, site.author, "Tester")
-	testing.expect_value(t, len(site.social), 2)
-	testing.expect_value(t, site.social[0].name, "github")
-	testing.expect_value(t, site.social[0].url, "https://github.com/test")
-	testing.expect_value(t, site.social[1].name, "rss")
-	testing.expect_value(t, site.social[1].url, "/index.xml")
+
+	params, has_params := site.params.(json.Object)
+	testing.expect(t, has_params)
+
+	social_val := params["social"]
+	social, has_social := social_val.(json.Array)
+	testing.expect(t, has_social)
+	testing.expect_value(t, len(social), 2)
+
+	link0, has_link0 := social[0].(json.Object)
+	testing.expect(t, has_link0)
+	testing.expect_value(t, link0["name"].(string), "github")
+	testing.expect_value(t, link0["url"].(string), "https://github.com/test")
+
+	link1, _ := social[1].(json.Object)
+	testing.expect_value(t, link1["name"].(string), "rss")
+	testing.expect_value(t, link1["url"].(string), "/index.xml")
 }
 
 @(test)
@@ -68,7 +90,7 @@ test_load_site_config_partial :: proc(t: ^testing.T) {
 	testing.expect_value(t, site.title, "Partial")
 	testing.expect_value(t, site.description, "")
 	testing.expect_value(t, site.author, "")
-	testing.expect_value(t, len(site.social), 0)
+	testing.expect(t, site.params == nil)
 }
 
 @(test)

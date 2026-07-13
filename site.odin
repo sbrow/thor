@@ -17,18 +17,13 @@ Site :: struct {
 	output_dir:  string `args:"name=output"`,
 	layouts_dir: string,
 	author:      string,
-	social:      []Social_Link,
+	params:      json.Value,
 	drafts:      bool `args:"name=drafts"`,
-}
-
-Social_Link :: struct {
-	name: string,
-	url:  string,
 }
 
 init_site :: proc(site: ^Site, args: []string) {
 	_flags: Site
-	mem.dynamic_arena_init(&site.arena)
+	mem.dynamic_arena_init(&site.arena, alignment = 64) // FIXME: This is a hack
 	alloc := site_allocator(site)
 	flags.parse_or_exit(&_flags, args, .Odin, alloc)
 

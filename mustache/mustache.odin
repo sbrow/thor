@@ -964,56 +964,90 @@ token_is_tag :: proc(t: Token) -> bool {
 	return false
 }
 
-// When a .Partial token is encountered, we need to inject the contents
-// of the partial into the current list of tokens.
-template_insert_partial :: proc(
+template_render_partial :: proc(
 	tmpl: ^Template,
 	token: Token,
 	offset: int,
+	sb: ^strings.Builder,
 	allocator := context.allocator,
-) -> (err: Lexer_Error) {
-	partial_name := token.value
+) {
+	partial_name := strings.trim_space(token.value)
+
+	// Dynamic Names: {{>*key}} — resolve key from context to get partial name.
+	if len(partial_name) > 0 && partial_name[0] == '*' {
+		dynamic_key := strings.trim_space(partial_name[1:])
+		resolved := template_get_data_for_stack(tmpl, dynamic_key, allocator)
+		if resolved == nil || reflect.is_nil(resolved) {
+			return
+		}
+		resolved_str, _ := any_to_string(resolved)
+		if resolved_str == "" {
+			return
+		}
+		partial_name = strings.trim_space(resolved_str)
+	}
+
+	// Look up partial content.
 	partial_content := dig(tmpl.partials, []string{partial_name})
 	partial_str, _ := any_to_string(partial_content)
+	if partial_str == "" {
+		return
+	}
 
-	lexer := lexer_make(allocator)
-	lexer.src = partial_str
-	lexer.line = token.pos.line
-	lexer.delim = CORE_DEF
-	lexer_parse(lexer, allocator = allocator) or_return
-
-	// Performs any indentation on the .Partial that we are inserting.
-	//
-	// Example: use the first Token as the indentation for the .Partial Token.
-	// [Token{type=.Text, value="  "}, Token{type=.Partial, value="to_add"}]
-	//
+	// Handle standalone indentation — indent each line of the partial source
+	// (except the first line, which follows the preceding whitespace, and
+	// trailing empty lines).
 	standalone := lexer_token_is_standalone_partial(tmpl.lexer, token)
-	if offset > 0 && standalone {
-		prev_token := tmpl.lexer.tokens[offset-1]
+	indent := ""
+	if standalone && offset > 0 {
+		prev_token := tmpl.lexer.tokens[offset - 1]
 		if prev_token.type == .Text && is_text_blank(prev_token.value) {
-			cur_line := lexer.tokens[len(lexer.tokens)-1].pos.line
-			#reverse for t, i in lexer.tokens {
-				// Do not indent the top line.
-				if cur_line == 0 {
-					break
-				}
-
-				// When moving back up a line, insert the indentation.
-				if cur_line != t.pos.line {
-					inject_at(&lexer.tokens, i+1, prev_token)
-				}
-
-				cur_line = t.pos.line
-			}
+			indent = prev_token.value
 		}
 	}
 
-	// Inject tokens from the partial into the primary template.
-	#reverse for t in lexer.tokens {
-		inject_at(&tmpl.lexer.tokens, offset+1, t)
+	if indent != "" {
+		lines := strings.split(partial_str, "\n", allocator)
+		defer delete(lines)
+
+		indented := strings.builder_make(allocator)
+		for line, i in lines {
+			if i > 0 {
+				strings.write_string(&indented, "\n")
+				if i < len(lines) - 1 || line != "" {
+					strings.write_string(&indented, indent)
+				}
+			}
+			strings.write_string(&indented, line)
+		}
+		partial_str = strings.to_string(indented)
 	}
 
-	return nil
+	// Lex the partial (after applying indentation).
+	partial_lexer := lexer_make(allocator)
+	partial_lexer.src = partial_str
+	partial_lexer.line = token.pos.line
+	partial_lexer.delim = CORE_DEF
+	err := lexer_parse(partial_lexer, allocator = allocator)
+	if err != nil {
+		return
+	}
+
+	// Apply skip rules to partial tokens.
+	for &pt in partial_lexer.tokens {
+		if lexer_token_should_skip(partial_lexer, pt) {
+			pt.type = .Skip
+		}
+	}
+
+	// Swap lexer to process partial tokens with shared context stack.
+	saved_lexer := tmpl.lexer
+	tmpl.lexer = partial_lexer
+
+	template_process_tokens(tmpl, sb, allocator)
+
+	// Restore original lexer.
+	tmpl.lexer = saved_lexer
 }
 
 // Inject a chunk of text into the token list of the larger layout template.
@@ -1070,15 +1104,20 @@ template_eat_tokens :: proc(
 	inject_at(&tmpl.context_stack, 0, root)
 
 	// First pass to find all the whitespace/newline elements that should be skipped.
-	// This is performed up-front due to partial templates -- we cannot check for the
-	// whitespace logic *after* the partials have been injected into the template.
 	for &t in tmpl.lexer.tokens {
 		if lexer_token_should_skip(tmpl.lexer, t) {
 			t.type = .Skip
 		}
 	}
 
-	// Second pass to render the template.
+	template_process_tokens(tmpl, sb, allocator)
+}
+
+template_process_tokens :: proc(
+	tmpl: ^Template,
+	sb: ^strings.Builder,
+	allocator := context.allocator,
+) {
 	i := 0
 	for i < len(tmpl.lexer.tokens) {
 		defer { i += 1 }
@@ -1101,7 +1140,7 @@ template_eat_tokens :: proc(
 				i = t.start_i
 			}
 		case .Partial:
-			template_insert_partial(tmpl, t, i, allocator)
+			template_render_partial(tmpl, t, i, sb, allocator)
 		// Do nothing for these tags.
 		case .Comment, .Skip, .EOF:
 		}

@@ -25,7 +25,7 @@ MONTHS: [12]string = {
 Page_Context :: struct {
 	permalink:    string,
 	title:        string,
-	star:         string,
+	starred:      bool,
 	has_date:     bool,
 	date_iso:     string,
 	date_display: string,
@@ -42,33 +42,14 @@ Year_Slice :: struct {
 }
 
 build_page_context :: proc(page: Page) -> Page_Context {
-	star := ""
-	if page.is_starred {
-		star = ICON_STAR
-	}
 	return Page_Context {
 		permalink = page.permalink,
 		title = page.title,
-		star = star,
+		starred = page.is_starred,
 		has_date = page.date != "",
 		date_iso = page.date,
 		date_display = format_date(page.date),
 	}
-}
-
-build_social_context :: proc(config: Site) -> [dynamic]map[string]string {
-	social_ctx := make([dynamic]map[string]string)
-	for link in config.social {
-		append(
-			&social_ctx,
-			map[string]string {
-				"name" = link.name,
-				"url" = link.url,
-				"icon" = social_icon(link.name),
-			},
-		)
-	}
-	return social_ctx
 }
 
 strip_html_tags :: proc(s: string) -> string {
@@ -159,9 +140,6 @@ render_site :: proc(pages: []Page, config: Site) {
 }
 
 render_page_html :: proc(page: Page, config: Site) -> string {
-	social_ctx := build_social_context(config)
-	defer delete(social_ctx)
-
 	is_article := page.type == .Post
 
 	data := map[string]any {
@@ -172,11 +150,9 @@ render_page_html :: proc(page: Page, config: Site) -> string {
 		"date_iso"       = page.date,
 		"date_display"   = format_date(page.date),
 		"is_post"        = is_article,
-		"home_icon"      = ICON_HOME,
-		"chevron_up"     = ICON_CHEVRON_UP,
 		"year"           = "2026",
 		"author"         = config.author,
-		"social"         = social_ctx[:],
+		"params"         = config.params,
 		"og_url"         = fmt.tprintf("%s%s", config.base_url, page.permalink),
 		"og_site_name"   = config.title,
 		"og_title"       = strip_html_tags(page.title),
@@ -209,26 +185,42 @@ render_page_html :: proc(page: Page, config: Site) -> string {
 
 load_partials :: proc(layouts_dir: string) -> map[string]string {
 	partials: map[string]string
-
-	nav, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/partials/nav.html", layouts_dir),
-		context.allocator,
-	)
-	partials["nav"] = string(nav)
-
-	footer, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/partials/footer.html", layouts_dir),
-		context.allocator,
-	)
-	partials["footer"] = string(footer)
-
-	head, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/partials/head.html", layouts_dir),
-		context.allocator,
-	)
-	partials["head"] = string(head)
-
+	partials_dir := fmt.tprintf("%s/partials", layouts_dir)
+	load_partials_recursive(&partials, partials_dir, "")
 	return partials
+}
+
+load_partials_recursive :: proc(partials: ^map[string]string, base_dir: string, rel_prefix: string) {
+	entries, err := os.read_all_directory_by_path(base_dir, context.allocator)
+	if err != nil {
+		return
+	}
+	defer os.file_info_slice_delete(entries, context.allocator)
+
+	for entry in entries {
+		#partial switch entry.type {
+		case .Regular:
+			name := entry.name
+			if !strings.has_suffix(name, ".html") {
+				continue
+			}
+			stripped := name[:len(name) - len(".html")]
+			key := stripped
+			if rel_prefix != "" {
+				key = fmt.tprintf("%s/%s", rel_prefix, stripped)
+			}
+			data, ok := os.read_entire_file_from_path(entry.fullpath, context.allocator)
+			if ok == nil {
+				partials[key] = string(data)
+			}
+		case .Directory:
+			sub_prefix := entry.name
+			if rel_prefix != "" {
+				sub_prefix = fmt.tprintf("%s/%s", rel_prefix, entry.name)
+			}
+			load_partials_recursive(partials, entry.fullpath, sub_prefix)
+		}
+	}
 }
 
 render_home_html :: proc(home: Page, pages: []Page, config: Site) -> string {
@@ -241,18 +233,13 @@ render_home_html :: proc(home: Page, pages: []Page, config: Site) -> string {
 		append(&list_pages, build_page_context(page))
 	}
 
-	social_ctx := build_social_context(config)
-	defer delete(social_ctx)
-
 	data := map[string]any {
 		"title"          = config.title,
 		"home_body"      = home.body_html,
 		"list_pages"     = list_pages[:],
-		"home_icon"      = ICON_HOME,
-		"chevron_up"     = ICON_CHEVRON_UP,
 		"year"           = "2026",
 		"author"         = config.author,
-		"social"         = social_ctx[:],
+		"params"         = config.params,
 		"og_url"         = fmt.tprintf("%s/", config.base_url),
 		"og_site_name"   = config.title,
 		"og_title"       = config.title,
@@ -304,17 +291,12 @@ render_posts_html :: proc(pages: []Page, config: Site) -> string {
 		append(&year_slices, Year_Slice{year = section.year, posts = section.posts[:]})
 	}
 
-	social_ctx := build_social_context(config)
-	defer delete(social_ctx)
-
 	data := map[string]any {
 		"title"          = fmt.tprintf("Posts | %s", config.title),
 		"year_sections"  = year_slices[:],
-		"home_icon"      = ICON_HOME,
-		"chevron_up"     = ICON_CHEVRON_UP,
 		"year"           = "2026",
 		"author"         = config.author,
-		"social"         = social_ctx[:],
+		"params"         = config.params,
 		"og_url"         = fmt.tprintf("%s/posts/", config.base_url),
 		"og_site_name"   = config.title,
 		"og_title"       = "Posts",
@@ -341,16 +323,6 @@ render_posts_html :: proc(pages: []Page, config: Site) -> string {
 		return ""
 	}
 	return result
-}
-
-social_icon :: proc(name: string) -> string {
-	switch strings.to_lower(name) {
-	case "github":
-		return ICON_GITHUB
-	case "rss":
-		return ICON_RSS
-	}
-	return name
 }
 
 format_date :: proc(iso: string) -> string {

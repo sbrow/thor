@@ -11,6 +11,7 @@ import "core:testing"
 
 COMMENTS_SPEC :: "mustache/spec/specs/comments.json"
 DELIMITERS_SPEC :: "mustache/spec/specs/delimiters.json"
+DYNAMIC_NAMES_SPEC :: "mustache/spec/specs/dynamic-names.json"
 INTERPOLATION_SPEC :: "mustache/spec/specs/interpolation.json"
 INVERTED_SPEC :: "mustache/spec/specs/inverted.json"
 PARTIALS_SPEC :: "mustache/spec/specs/partials.json"
@@ -498,6 +499,29 @@ test_partials_spec :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_dynamic_names_spec :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+
+	spec := load_spec(DYNAMIC_NAMES_SPEC)
+	defer json.destroy_value(spec)
+
+	root := spec.(json.Object)
+	tests := root["tests"].(json.Array)
+
+	for test in tests {
+		test_obj := test.(json.Object)
+		template := test_obj["template"].(string)
+		exp_output := test_obj["expected"].(string)
+		data := test_obj["data"]
+		input := load_json(data)
+		partials := test_obj["partials"]
+		partials_input := load_json(partials).(JSON_Map)
+
+		assert_mustache(t, template, input, exp_output, partials_input)
+	}
+}
+
 // TODO: Someday.
 // @(test)
 // test_delimiters_spec :: proc(t: ^testing.T) {
@@ -957,4 +981,65 @@ test_dig :: proc(t: ^testing.T) {
 	output = dig(d11, keys[:])
 	assert(t, reflect.is_nil(output), "Map without a matching field should be nil")
 	delete(keys)
+}
+
+@(test)
+test_partial_in_section :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+
+	template := "{{#items}}{{> item }}{{/items}}"
+
+	data := make(map[string][dynamic]string, 1, context.temp_allocator)
+	items := make([dynamic]string, 0, context.temp_allocator)
+	append(&items, "A", "B", "C")
+	data["items"] = items
+
+	partials := map[string]string{
+		"item" = "[{{.}}]",
+	}
+
+	assert_mustache(t, template, data, "[A][B][C]", partials)
+}
+
+@(test)
+test_dynamic_partial_in_section :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+
+	template := "{{#items}}{{>*tpl}}{{/items}}"
+
+	items := make([dynamic]Test_Map, 0, context.temp_allocator)
+	item1 := make(Test_Map)
+	item1["tpl"] = "a"
+	item1["v"] = "1"
+	append(&items, item1)
+	item2 := make(Test_Map)
+	item2["tpl"] = "b"
+	item2["v"] = "2"
+	append(&items, item2)
+
+	data := make(map[string][dynamic]Test_Map, 1, context.temp_allocator)
+	data["items"] = items
+
+	partials := map[string]string{
+		"a" = "A:{{v}}",
+		"b" = "B:{{v}}",
+	}
+
+	assert_mustache(t, template, data, "A:1B:2", partials)
+}
+
+@(test)
+test_nested_partials :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+
+	template := "{{> outer }}"
+	data := make(Test_Map)
+	data["x"] = "hello"
+
+	partials := map[string]string{
+		"outer" = "[{{> inner }}]",
+		"inner" = "{{x}}",
+	}
+
+	assert_mustache(t, template, data, "[hello]", partials)
 }

@@ -10,10 +10,10 @@
 - [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
 - [ ] Fix copy-to-clipboard button x-axis positioning inside code blocks
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
-- [ ] OpenGraph meta tags
+- [x] OpenGraph meta tags
 - [ ] Search up for `thor.json` files.
-- [ ] Partials inside sections still produce duplicate items — a fundamental issue with the mustache library's token handling. 
 - [ ] OpenGraph meta tags — verify all fields match production site
+- [ ] Nav items should be active when the current page is selected.
 - [ ] Review every file in thor
   - [ ] Review alerts.odin
   - [ ] Review content.odin
@@ -21,7 +21,6 @@
   - [ ] Review feed.odin
   - [ ] Review footnotes.odin
   - [ ] Review frontmatter.odin
-  - [ ] Review icons.odin
   - [ ] Review main.odin
   - [ ] Review main_test.odin
   - [ ] Review mustache_test.odin
