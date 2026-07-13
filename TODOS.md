@@ -13,3 +13,18 @@
 - [ ] OpenGraph meta tags
 - [ ] Search up for `thor.json` files.
 - [ ] Partials inside sections still produce duplicate items — a fundamental issue with the mustache library's token handling. 
+- [ ] OpenGraph meta tags — verify all fields match production site
+- [ ] Review every file in thor
+  - [ ] Review alerts.odin
+  - [ ] Review config.odin
+  - [ ] Review content.odin
+  - [ ] Review emoji.odin
+  - [ ] Review feed.odin
+  - [ ] Review footnotes.odin
+  - [ ] Review frontmatter.odin
+  - [ ] Review icons.odin
+  - [ ] Review main.odin
+  - [ ] Review main_test.odin
+  - [ ] Review mustache_test.odin
+  - [ ] Review render.odin
+  - [ ] Review site.odin
