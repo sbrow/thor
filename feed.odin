@@ -5,12 +5,14 @@ import "core:strings"
 
 WEEKDAYS: [7]string = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 
-generate_rss :: proc(pages: []Page, config: Site_Config) -> string {
+generate_rss :: proc(pages: []Page, config: Site) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 
-	append(&parts, fmt.aprintf(
-		`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+	append(
+		&parts,
+		fmt.aprintf(
+			`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 <title>%s</title>
@@ -18,11 +20,12 @@ generate_rss :: proc(pages: []Page, config: Site_Config) -> string {
 <description>%s</description>
 <language>en-us</language>
 <atom:link href="%s/index.xml" rel="self" type="application/rss+xml"/>`,
-		xml_escape(config.title),
-		config.base_url,
-		xml_escape(config.description),
-		config.base_url,
-	))
+			xml_escape(config.title),
+			config.base_url,
+			xml_escape(config.description),
+			config.base_url,
+		),
+	)
 
 	for page in pages {
 		if page.type == .Home {
@@ -34,8 +37,10 @@ generate_rss :: proc(pages: []Page, config: Site_Config) -> string {
 			pub_date = format_rfc822(page.date)
 		}
 
-		append(&parts, fmt.aprintf(
-			`<item>
+		append(
+			&parts,
+			fmt.aprintf(
+				`<item>
 <title>%s</title>
 <link>%s%s</link>
 <pubDate>%s</pubDate>
@@ -43,14 +48,15 @@ generate_rss :: proc(pages: []Page, config: Site_Config) -> string {
 <description>%s</description>
 </item>
 `,
-			xml_escape(page.title),
-			config.base_url,
-			page.permalink,
-			pub_date,
-			config.base_url,
-			page.permalink,
-			xml_escape(page.body_html),
-		))
+				xml_escape(page.title),
+				config.base_url,
+				page.permalink,
+				pub_date,
+				config.base_url,
+				page.permalink,
+				xml_escape(page.body_html),
+			),
+		)
 	}
 
 	append(&parts, "</channel>\n</rss>")
@@ -74,12 +80,10 @@ generate_sitemap :: proc(pages: []Page, base_url: string) -> string {
 		if page.date != "" {
 			lastmod = fmt.aprintf("<lastmod>%s</lastmod>", page.date)
 		}
-		append(&parts, fmt.aprintf(
-			"<url><loc>%s%s</loc>%s</url>\n",
-			base_url,
-			page.permalink,
-			lastmod,
-		))
+		append(
+			&parts,
+			fmt.aprintf("<url><loc>%s%s</loc>%s</url>\n", base_url, page.permalink, lastmod),
+		)
 	}
 
 	// Posts list page
@@ -105,8 +109,11 @@ format_rfc822 :: proc(iso: string) -> string {
 		return iso
 	}
 
-	year := (int(iso[0]) - 0x30) * 1000 + (int(iso[1]) - 0x30) * 100 +
-		(int(iso[2]) - 0x30) * 10 + (int(iso[3]) - 0x30)
+	year :=
+		(int(iso[0]) - 0x30) * 1000 +
+		(int(iso[1]) - 0x30) * 100 +
+		(int(iso[2]) - 0x30) * 10 +
+		(int(iso[3]) - 0x30)
 	month := (int(iso[5]) - 0x30) * 10 + (int(iso[6]) - 0x30)
 	day := (int(iso[8]) - 0x30) * 10 + (int(iso[9]) - 0x30)
 	time := iso[11:19]
@@ -125,15 +132,7 @@ format_rfc822 :: proc(iso: string) -> string {
 	}
 	dow := (y + y / 4 - y / 100 + y / 400 + t[month - 1] + day) % 7
 
-	return fmt.aprintf(
-		"%s, %d %s %d %s %s",
-		WEEKDAYS[dow],
-		day,
-		MONTHS[month - 1],
-		year,
-		time,
-		tz,
-	)
+	return fmt.aprintf("%s, %d %s %d %s %s", WEEKDAYS[dow], day, MONTHS[month - 1], year, time, tz)
 }
 
 xml_escape :: proc(s: string) -> string {
@@ -142,3 +141,4 @@ xml_escape :: proc(s: string) -> string {
 	r, _ = strings.replace_all(r, ">", "&gt;")
 	return r
 }
+

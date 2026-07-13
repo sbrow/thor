@@ -8,8 +8,18 @@ import "core:os"
 import "core:strings"
 
 MONTHS: [12]string = {
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
 }
 
 Page_Context :: struct {
@@ -36,7 +46,7 @@ build_page_context :: proc(page: Page) -> Page_Context {
 	if page.is_starred {
 		star = ICON_STAR
 	}
-	return Page_Context{
+	return Page_Context {
 		permalink = page.permalink,
 		title = page.title,
 		star = star,
@@ -46,14 +56,14 @@ build_page_context :: proc(page: Page) -> Page_Context {
 	}
 }
 
-build_social_context :: proc(config: Site_Config) -> [dynamic]map[string]string {
+build_social_context :: proc(config: Site) -> [dynamic]map[string]string {
 	social_ctx := make([dynamic]map[string]string)
 	for link in config.social {
 		append(
 			&social_ctx,
-			map[string]string{
+			map[string]string {
 				"name" = link.name,
-				"url"  = link.url,
+				"url" = link.url,
 				"icon" = social_icon(link.name),
 			},
 		)
@@ -66,7 +76,7 @@ strip_html_tags :: proc(s: string) -> string {
 	defer delete(parts)
 	in_tag := false
 	start := 0
-	for i in 0..<len(s) {
+	for i in 0 ..< len(s) {
 		if s[i] == '<' && !in_tag {
 			if i > start {
 				append(&parts, s[start:i])
@@ -93,7 +103,7 @@ og_type :: proc(is_article: bool) -> string {
 	return "website"
 }
 
-render_site :: proc(pages: []Page, config: Site_Config) {
+render_site :: proc(pages: []Page, config: Site) {
 	sort_pages_by_date(pages)
 
 	// Find home page
@@ -148,47 +158,48 @@ render_site :: proc(pages: []Page, config: Site_Config) {
 	fmt.printfln("Rendered %d pages to %s", total, config.output_dir)
 }
 
-render_page_html :: proc(page: Page, config: Site_Config) -> string {
+render_page_html :: proc(page: Page, config: Site) -> string {
 	social_ctx := build_social_context(config)
 	defer delete(social_ctx)
 
 	is_article := page.type == .Post
 
-	data := map[string]any{
-		"title"         = fmt.tprintf("%s | %s", page.title, config.title),
-		"page_title"    = page.title,
-		"body_html"     = page.body_html,
-		"has_date"      = page.date != "",
-		"date_iso"      = page.date,
-		"date_display"  = format_date(page.date),
-		"is_post"       = is_article,
-		"home_icon"     = ICON_HOME,
-		"chevron_up"    = ICON_CHEVRON_UP,
-		"year"          = "2026",
-		"author"        = config.author,
-		"social"        = social_ctx[:],
-		"og_url"        = fmt.tprintf("%s%s", config.base_url, page.permalink),
-		"og_site_name"  = config.title,
-		"og_title"      = strip_html_tags(page.title),
+	data := map[string]any {
+		"title"          = fmt.tprintf("%s | %s", page.title, config.title),
+		"page_title"     = page.title,
+		"body_html"      = page.body_html,
+		"has_date"       = page.date != "",
+		"date_iso"       = page.date,
+		"date_display"   = format_date(page.date),
+		"is_post"        = is_article,
+		"home_icon"      = ICON_HOME,
+		"chevron_up"     = ICON_CHEVRON_UP,
+		"year"           = "2026",
+		"author"         = config.author,
+		"social"         = social_ctx[:],
+		"og_url"         = fmt.tprintf("%s%s", config.base_url, page.permalink),
+		"og_site_name"   = config.title,
+		"og_title"       = strip_html_tags(page.title),
 		"og_description" = config.description,
-		"og_type"       = og_type(is_article),
-		"is_article"    = is_article,
-		"og_section"    = "posts",
-		"og_published"  = page.date,
-		"og_image"      = fmt.tprintf("%s/avatar.jpg", config.base_url),
+		"og_type"        = og_type(is_article),
+		"is_article"     = is_article,
+		"og_section"     = "posts",
+		"og_published"   = page.date,
+		"og_image"       = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)
 
-	post_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/post.html", config.layouts_dir), context.allocator)
-	base_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/base.html", config.layouts_dir), context.allocator)
-
-	result, err := mustache.render_in_layout(
-		string(post_tpl),
-		data,
-		string(base_tpl),
-		partials,
+	post_tpl, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/post.html", config.layouts_dir),
+		context.allocator,
 	)
+	base_tpl, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/base.html", config.layouts_dir),
+		context.allocator,
+	)
+
+	result, err := mustache.render_in_layout(string(post_tpl), data, string(base_tpl), partials)
 	if err != nil {
 		fmt.eprintfln("thor: mustache error rendering page: %v", err)
 		return ""
@@ -199,19 +210,28 @@ render_page_html :: proc(page: Page, config: Site_Config) -> string {
 load_partials :: proc(layouts_dir: string) -> map[string]string {
 	partials: map[string]string
 
-	nav, _ := os.read_entire_file_from_path(fmt.tprintf("%s/partials/nav.html", layouts_dir), context.allocator)
+	nav, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/partials/nav.html", layouts_dir),
+		context.allocator,
+	)
 	partials["nav"] = string(nav)
 
-	footer, _ := os.read_entire_file_from_path(fmt.tprintf("%s/partials/footer.html", layouts_dir), context.allocator)
+	footer, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/partials/footer.html", layouts_dir),
+		context.allocator,
+	)
 	partials["footer"] = string(footer)
 
-	head, _ := os.read_entire_file_from_path(fmt.tprintf("%s/partials/head.html", layouts_dir), context.allocator)
+	head, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/partials/head.html", layouts_dir),
+		context.allocator,
+	)
 	partials["head"] = string(head)
 
 	return partials
 }
 
-render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> string {
+render_home_html :: proc(home: Page, pages: []Page, config: Site) -> string {
 	list_pages := make([dynamic]Page_Context)
 	defer delete(list_pages)
 	for page in pages {
@@ -224,7 +244,7 @@ render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> stri
 	social_ctx := build_social_context(config)
 	defer delete(social_ctx)
 
-	data := map[string]any{
+	data := map[string]any {
 		"title"          = config.title,
 		"home_body"      = home.body_html,
 		"list_pages"     = list_pages[:],
@@ -244,15 +264,16 @@ render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> stri
 
 	partials := load_partials(config.layouts_dir)
 
-	home_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/home.html", config.layouts_dir), context.allocator)
-	base_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/base.html", config.layouts_dir), context.allocator)
-
-	result, err := mustache.render_in_layout(
-		string(home_tpl),
-		data,
-		string(base_tpl),
-		partials,
+	home_tpl, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/home.html", config.layouts_dir),
+		context.allocator,
 	)
+	base_tpl, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/base.html", config.layouts_dir),
+		context.allocator,
+	)
+
+	result, err := mustache.render_in_layout(string(home_tpl), data, string(base_tpl), partials)
 	if err != nil {
 		fmt.eprintfln("thor: mustache error: %v", err)
 		return ""
@@ -260,7 +281,7 @@ render_home_html :: proc(home: Page, pages: []Page, config: Site_Config) -> stri
 	return result
 }
 
-render_posts_html :: proc(pages: []Page, config: Site_Config) -> string {
+render_posts_html :: proc(pages: []Page, config: Site) -> string {
 	// Group posts by year
 	year_sections := make([dynamic]Year_Section)
 	defer delete(year_sections)
@@ -286,7 +307,7 @@ render_posts_html :: proc(pages: []Page, config: Site_Config) -> string {
 	social_ctx := build_social_context(config)
 	defer delete(social_ctx)
 
-	data := map[string]any{
+	data := map[string]any {
 		"title"          = fmt.tprintf("Posts | %s", config.title),
 		"year_sections"  = year_slices[:],
 		"home_icon"      = ICON_HOME,
@@ -305,15 +326,16 @@ render_posts_html :: proc(pages: []Page, config: Site_Config) -> string {
 
 	partials := load_partials(config.layouts_dir)
 
-	posts_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/posts_list.html", config.layouts_dir), context.allocator)
-	base_tpl, _ := os.read_entire_file_from_path(	fmt.tprintf("%s/base.html", config.layouts_dir), context.allocator)
-
-	result, err := mustache.render_in_layout(
-		string(posts_tpl),
-		data,
-		string(base_tpl),
-		partials,
+	posts_tpl, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/posts_list.html", config.layouts_dir),
+		context.allocator,
 	)
+	base_tpl, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/base.html", config.layouts_dir),
+		context.allocator,
+	)
+
+	result, err := mustache.render_in_layout(string(posts_tpl), data, string(base_tpl), partials)
 	if err != nil {
 		fmt.eprintfln("thor: mustache error: %v", err)
 		return ""
@@ -354,7 +376,7 @@ get_year :: proc(iso: string) -> string {
 }
 
 sort_pages_by_date :: proc(pages: []Page) {
-	for i in 1..<len(pages) {
+	for i in 1 ..< len(pages) {
 		key := pages[i]
 		j := i - 1
 		for j >= 0 && pages[j].date < key.date {
@@ -386,3 +408,4 @@ write_file :: proc(path: string, html: string) {
 		fmt.eprintfln("thor: cannot write %s: %v", path, err)
 	}
 }
+

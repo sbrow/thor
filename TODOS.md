@@ -16,7 +16,6 @@
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Review every file in thor
   - [ ] Review alerts.odin
-  - [ ] Review config.odin
   - [ ] Review content.odin
   - [ ] Review emoji.odin
   - [ ] Review feed.odin
@@ -27,4 +26,4 @@
   - [ ] Review main_test.odin
   - [ ] Review mustache_test.odin
   - [ ] Review render.odin
-  - [ ] Review site.odin
+  - [x] Review site.odin
