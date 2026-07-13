@@ -8,9 +8,9 @@ import "core:os"
 import "core:strings"
 
 Page_Type :: enum {
-	Home,
-	Post,
 	Standalone,
+	Post,
+	Home,
 }
 
 Page :: struct {

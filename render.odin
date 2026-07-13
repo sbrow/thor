@@ -1,7 +1,7 @@
 #+feature dynamic-literals
 package main
 
-import mustache "mustache"
+import "mustache"
 
 import "core:fmt"
 import "core:os"
