@@ -27,6 +27,10 @@
 - [ ] `<pre><code>` blocks need to set background to theme background,
   regardless of prefers-dark. (or use a different theme)
 - [ ] `-watch` flag
+  - [x] basic poll loop
+  - [ ] filesystem poll loop
+  - [ ] event based
+- [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
 - [ ] commands
 - [ ] Review every file in thor
   - [ ] Review alerts.odin

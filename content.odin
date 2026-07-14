@@ -32,8 +32,14 @@ Page :: struct {
 // (or all pages if include_drafts is true).
 //
 // TODO: What is the lifetime of pages?
-walk_content :: proc(content_path: string, include_drafts: bool, sectionate: bool) -> []Page {
-	pages: [dynamic]Page
+walk_content :: proc(site: ^Site) -> []Page {
+	content_path := site.content_dir
+	include_drafts := site.drafts
+	sectionate := site.sectionate
+
+	allocator := site_allocator(site)
+
+	pages := make([dynamic]Page, allocator)
 
 	collect_home(&pages, content_path, sectionate)
 	collect_standalone(&pages, content_path, sectionate)
@@ -46,7 +52,7 @@ walk_content :: proc(content_path: string, include_drafts: bool, sectionate: boo
 	if include_drafts {
 		return pages[:]
 	} else {
-		filtered: [dynamic]Page
+		filtered := make([dynamic]Page, allocator)
 		for &page in pages {
 			if !page.draft {
 				append(&filtered, page)

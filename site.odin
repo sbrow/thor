@@ -21,6 +21,7 @@ Site :: struct {
 	params:      json.Value,
 	sectionate:  bool,
 	drafts:      bool `args:"name=drafts"`,
+	watch:       bool
 }
 
 init_site :: proc(site: ^Site, args: []string) {
@@ -97,6 +98,9 @@ site_merge :: proc(config: ^Site, flags: Site) {
 	}
 	if flags.drafts {
 		config.drafts = true
+	}
+	if flags.watch {
+		config.watch = true
 	}
 	config.config_path = flags.config_path
 }
