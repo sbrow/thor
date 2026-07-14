@@ -20,7 +20,7 @@ main :: proc() {
 		pages := walk_content(&site)
 		render_site(pages, site)
 
-		if !site.watch {
+		if !(.Watch in site.features) {
 			break
 		}
 		time.sleep(5 * time.Second)

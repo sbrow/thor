@@ -8,9 +8,29 @@ import "core:mem"
 import "core:os"
 import "core:strings"
 
+
 Site :: struct {
-	// TODO: User can still technically try to set this
-	arena:       mem.Dynamic_Arena `args:"hidden"`,
+	arena:       mem.Dynamic_Arena,
+	title:       string,
+	description: string,
+	author:      string,
+	base_url:    string,
+	config_path: string,
+	content_dir: string,
+	static_dir:  string,
+	output_dir:  string,
+	layouts_dir: string,
+	params:      json.Value,
+	features:    bit_set[Feature],
+}
+
+Feature :: enum {
+	Sections,
+	Drafts,
+	Watch,
+}
+
+Flags :: struct {
 	config_path: string `args:"name=config"`,
 	title:       string,
 	description: string,
@@ -21,13 +41,13 @@ Site :: struct {
 	layouts_dir: string,
 	author:      string,
 	params:      json.Value,
-	sectionate:  bool,
+	sectionate:  bool `args:"name=sections"`,
 	drafts:      bool `args:"name=drafts"`,
 	watch:       bool,
 }
 
 init_site :: proc(site: ^Site, args: []string) {
-	_flags: Site
+	_flags: Flags
 	mem.dynamic_arena_init(&site.arena, alignment = 64) // FIXME: This is a hack
 	alloc := site_allocator(site)
 	flags.parse_or_exit(&_flags, args, .Odin, alloc)
@@ -43,12 +63,14 @@ init_site :: proc(site: ^Site, args: []string) {
 		}
 	}
 
-	if load_site_config(site, path, alloc) {
-		site_merge(site, _flags)
+	cfg, cfg_ok := load_site_config(path, alloc)
+	if cfg_ok {
+		merge_flags(&cfg, _flags)
 	} else {
-		_flags.arena = site.arena
-		site^ = _flags
+		cfg = _flags
 	}
+
+	site_apply_flags(site, cfg)
 
 	// Determine config file's directory for relative defaults
 	config_dir := "./"
@@ -76,10 +98,10 @@ init_site :: proc(site: ^Site, args: []string) {
 }
 
 load_site_config :: proc(
-	config: ^Site,
 	path: string,
 	allocator := context.allocator,
 ) -> (
+	config: Flags,
 	ok: bool,
 ) {
 	data, err := os.read_entire_file_from_path(path, allocator)
@@ -87,7 +109,7 @@ load_site_config :: proc(
 		return
 	}
 
-	unmarshal_err := json.unmarshal_string(string(data), config, allocator = allocator)
+	unmarshal_err := json.unmarshal_string(string(data), &config, allocator = allocator)
 	if unmarshal_err != nil {
 		log.warnf("thor: failed to parse %s: %v", path, unmarshal_err)
 		return
@@ -97,7 +119,7 @@ load_site_config :: proc(
 	return
 }
 
-site_merge :: proc(config: ^Site, flags: Site) {
+merge_flags :: proc(config: ^Flags, flags: Flags) {
 	if flags.base_url != "" {
 		config.base_url = flags.base_url
 	}
@@ -116,7 +138,27 @@ site_merge :: proc(config: ^Site, flags: Site) {
 	if flags.watch {
 		config.watch = true
 	}
+	if flags.sectionate {
+		config.sectionate = true
+	}
 	config.config_path = flags.config_path
+}
+
+site_apply_flags :: proc(site: ^Site, flags: Flags) {
+	site.title = flags.title
+	site.description = flags.description
+	site.author = flags.author
+	site.base_url = flags.base_url
+	site.config_path = flags.config_path
+	site.content_dir = flags.content_dir
+	site.static_dir = flags.static_dir
+	site.output_dir = flags.output_dir
+	site.layouts_dir = flags.layouts_dir
+	site.params = flags.params
+
+	if flags.sectionate {site.features += {.Sections}}
+	if flags.drafts {site.features += {.Drafts}}
+	if flags.watch {site.features += {.Watch}}
 }
 
 site_allocator :: proc(site: ^Site) -> mem.Allocator {

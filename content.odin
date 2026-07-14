@@ -34,8 +34,8 @@ Page :: struct {
 // TODO: What is the lifetime of pages?
 walk_content :: proc(site: ^Site) -> []Page {
 	content_path := site.content_dir
-	include_drafts := site.drafts
-	sectionate := site.sectionate
+	include_drafts := .Drafts in site.features
+	sectionate := .Sections in site.features
 
 	allocator := site_allocator(site)
 
