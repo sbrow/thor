@@ -125,8 +125,8 @@ render_site :: proc(pages: []Page, config: Site) {
 	sitemap := generate_sitemap(pages, config.base_url)
 	write_file(fmt.tprintf("%s/sitemap.xml", config.output_dir), sitemap)
 
-	// Copy static assets (avatar, favicon, etc.)
-	copy_static_assets(config.content_dir, config.output_dir)
+	// Copy static directory (favicon, CSS, images, etc.)
+	copy_static_dir(config.static_dir, config.output_dir)
 
 	// Generate robots.txt
 	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", config.base_url)

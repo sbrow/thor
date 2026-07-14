@@ -15,6 +15,7 @@ Site :: struct {
 	description: string,
 	base_url:    string `args:"name=base-url"`,
 	content_dir: string `args:"name=content"`,
+	static_dir:  string `args:"name=static"`,
 	output_dir:  string `args:"name=output"`,
 	layouts_dir: string,
 	author:      string,
@@ -52,6 +53,9 @@ init_site :: proc(site: ^Site, args: []string) {
 	// TODO: Probably shouldn't use temp allocator here?
 	if site.content_dir == "" {
 		site.content_dir = fmt.tprintf("%s/content", config_dir)
+	}
+	if site.static_dir == "" {
+		site.static_dir = fmt.tprintf("%s/static", config_dir)
 	}
 	if site.output_dir == "" {
 		site.output_dir = fmt.tprintf("%s/public", config_dir)
@@ -92,6 +96,9 @@ site_merge :: proc(config: ^Site, flags: Site) {
 	}
 	if flags.content_dir != "" {
 		config.content_dir = flags.content_dir
+	}
+	if flags.static_dir != "" {
+		config.static_dir = flags.static_dir
 	}
 	if flags.output_dir != "" {
 		config.output_dir = flags.output_dir

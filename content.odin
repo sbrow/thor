@@ -217,25 +217,40 @@ strip_extension :: proc(name: string) -> string {
 	return name[:dot]
 }
 
-// copy_static_assets copies non-content files from the content root to the output directory.
-copy_static_assets :: proc(content_path: string, output_dir: string) {
-	entries, err := os.read_all_directory_by_path(content_path, context.allocator)
+// copy_static_dir recursively copies all files from static_dir to output_dir.
+// Silently skips if static_dir doesn't exist.
+copy_static_dir :: proc(static_dir: string, output_dir: string) {
+	if !os.exists(static_dir) {
+		return
+	}
+	copy_static_recursive(static_dir, "", output_dir)
+}
+
+copy_static_recursive :: proc(current: string, rel_prefix: string, output_dir: string) {
+	entries, err := os.read_all_directory_by_path(current, context.allocator)
 	if err != nil {
+		log.warnf("thor: cannot read %s: %v", current, err)
 		return
 	}
 	defer os.file_info_slice_delete(entries, context.allocator)
 
 	for entry in entries {
-		if entry.type != .Regular {
-			continue
-		}
-		if is_content_file(entry.name) {
-			continue
-		}
-
-		dest := fmt.tprintf("%s/%s", output_dir, entry.name)
-		if err := os.copy_file(dest, entry.fullpath); err != nil {
-			log.warnf("thor: cannot copy %s: %v", entry.name, err)
+		rel := rel_prefix == "" ? entry.name : fmt.tprintf("%s/%s", rel_prefix, entry.name)
+		switch entry.type {
+		case .Regular:
+			dest := fmt.tprintf("%s/%s", output_dir, rel)
+			if idx := strings.last_index(dest, "/"); idx >= 0 {
+				if err := os.make_directory_all(dest[:idx]); err != nil && err != .Exist {
+					log.warnf("thor: cannot create %s: %v", dest[:idx], err)
+					continue
+				}
+			}
+			if err := os.copy_file(dest, entry.fullpath); err != nil {
+				log.warnf("thor: cannot copy %s: %v", entry.fullpath, err)
+			}
+		case .Directory:
+			copy_static_recursive(entry.fullpath, rel, output_dir)
+		case .Undetermined, .Symlink, .Named_Pipe, .Socket, .Block_Device, .Character_Device:
 		}
 	}
 }
