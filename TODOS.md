@@ -12,7 +12,7 @@
 - [x] OpenGraph meta tags
 - [x] copy all files from `static` to `public`.
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
-- [ ] Search up for `thor.json` files.
+- [x] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.

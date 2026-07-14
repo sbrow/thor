@@ -9,7 +9,8 @@ import "core:os"
 import "core:strings"
 
 Site :: struct {
-	arena:       mem.Dynamic_Arena,
+	// TODO: User can still technically try to set this
+	arena:       mem.Dynamic_Arena `args:"hidden"`,
 	config_path: string `args:"name=config"`,
 	title:       string,
 	description: string,
@@ -22,7 +23,7 @@ Site :: struct {
 	params:      json.Value,
 	sectionate:  bool,
 	drafts:      bool `args:"name=drafts"`,
-	watch:       bool
+	watch:       bool,
 }
 
 init_site :: proc(site: ^Site, args: []string) {
@@ -33,7 +34,13 @@ init_site :: proc(site: ^Site, args: []string) {
 
 	path := _flags.config_path
 	if path == "" {
-		path = "./thor.json"
+		found, ok := find_config("thor.json")
+		if ok {
+			path = found
+			log.debugf("thor: using config %s", path)
+		} else {
+			path = "./thor.json"
+		}
 	}
 
 	if load_site_config(site, path, alloc) {
@@ -118,5 +125,24 @@ site_allocator :: proc(site: ^Site) -> mem.Allocator {
 
 destroy_site :: proc(site: ^Site) {
 	mem.dynamic_arena_destroy(&site.arena)
+}
+
+find_config :: proc(filename: string) -> (path: string, ok: bool) {
+	dir, _ := os.get_working_directory(context.temp_allocator)
+
+	for {
+		candidate := fmt.tprintf("%s/%s", dir, filename)
+		if os.exists(candidate) {
+			path = candidate
+			ok = true
+			return
+		}
+
+		idx := strings.last_index(dir, "/")
+		if idx <= 0 {
+			return
+		}
+		dir = dir[:idx]
+	}
 }
 
