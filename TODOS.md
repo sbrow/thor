@@ -3,6 +3,7 @@
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Enable configuration to  opt-out of features, particular pre/post processors.
 - [ ] proper date/time/now object.
+- [ ] Footer isn't centered properly.
 - [ ] mustache data keys for opengraph, etc.
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [x] Emoji shortcodes (`:shrug:` etc.) — 2 instances
