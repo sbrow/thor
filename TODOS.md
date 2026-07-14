@@ -10,7 +10,7 @@
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
 - [x] OpenGraph meta tags
-- [ ] copy all files from `static` to `public`.
+- [x] copy all files from `static` to `public`.
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [ ] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
