@@ -6,16 +6,29 @@ import "core:os"
 import "core:strings"
 
 Grammar_Cache :: struct {
-	language: TSLanguage,
-	parser:   TSParser,
-	query:    TSQuery,
+	language:     TSLanguage,
+	parser:       TSParser,
+	query:        TSQuery,
+	query_failed: bool,
 }
 
 Get_Language_Proc :: #type proc() -> TSLanguage
 
 grammar_cache: map[string]^Grammar_Cache
 
-load_grammar :: proc(lang: string) -> ^Grammar_Cache {
+builtin_language :: proc(lang: string) -> (language: TSLanguage, ok: bool) {
+	switch lang {
+	case "html":
+		language = tree_sitter_html()
+		ok = true
+	case "css":
+		language = tree_sitter_css()
+		ok = true
+	}
+	return
+}
+
+ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 	if grammar_cache == nil {
 		grammar_cache = make(map[string]^Grammar_Cache)
 	}
@@ -23,33 +36,38 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 		return cached
 	}
 
-	// Cache nil by default so failures aren't retried.
 	grammar_cache[lang] = nil
 
-	if GRAPHS_PATH == "" {
-		log.warnf("highlight: no grammars path set, skipping %s", lang)
-		return nil
-	}
+	language: TSLanguage
 
-	so_path := fmt.tprintf("%s/%s.so", GRAPHS_PATH, lang)
-	so_c := strings.clone_to_cstring(so_path)
-	defer delete(so_c)
-	handle := dlopen(so_c, RTLD_LAZY)
-	if handle == nil {
-		log.warnf("highlight: cannot load grammar %s (%s)", lang, so_path)
-		return nil
-	}
+	if builtin, ok := builtin_language(lang); ok {
+		language = builtin
+	} else {
+		if GRAPHS_PATH == "" {
+			log.warnf("highlight: no grammars path set, skipping %s", lang)
+			return nil
+		}
 
-	sym_name := fmt.tprintf("tree_sitter_%s", lang)
-	sym_c := strings.clone_to_cstring(sym_name)
-	defer delete(sym_c)
-	sym := dlsym(handle, sym_c)
-	if sym == nil {
-		log.errorf("highlight: cannot find symbol %s in %s", sym_name, so_path)
-		return nil
+		so_path := fmt.tprintf("%s/%s.so", GRAPHS_PATH, lang)
+		so_c := strings.clone_to_cstring(so_path)
+		defer delete(so_c)
+		handle := dlopen(so_c, RTLD_LAZY)
+		if handle == nil {
+			log.warnf("highlight: cannot load grammar %s (%s)", lang, so_path)
+			return nil
+		}
+
+		sym_name := fmt.tprintf("tree_sitter_%s", lang)
+		sym_c := strings.clone_to_cstring(sym_name)
+		defer delete(sym_c)
+		sym := dlsym(handle, sym_c)
+		if sym == nil {
+			log.errorf("highlight: cannot find symbol %s in %s", sym_name, so_path)
+			return nil
+		}
+		get_language := transmute(Get_Language_Proc)(sym)
+		language = get_language()
 	}
-	get_language := transmute(Get_Language_Proc)(sym)
-	language := get_language()
 
 	parser := ts_parser_new()
 	if parser == nil {
@@ -62,9 +80,28 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 		return nil
 	}
 
+	gc := new(Grammar_Cache)
+	gc.language = language
+	gc.parser = parser
+	grammar_cache[lang] = gc
+	return gc
+}
+
+load_grammar :: proc(lang: string) -> ^Grammar_Cache {
+	gc := ensure_parser(lang)
+	if gc == nil {
+		return nil
+	}
+	if gc.query != nil {
+		return gc
+	}
+	if gc.query_failed {
+		return nil
+	}
+
 	if QUERIES_PATH == "" {
 		log.warnf("highlight: no queries path set, skipping %s", lang)
-		ts_parser_delete(parser)
+		gc.query_failed = true
 		return nil
 	}
 
@@ -72,7 +109,7 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 	query_src, err := os.read_entire_file_from_path(query_path, context.allocator)
 	if err != nil {
 		log.warnf("highlight: cannot load query %s", query_path)
-		ts_parser_delete(parser)
+		gc.query_failed = true
 		return nil
 	}
 	query_str := string(query_src)
@@ -82,7 +119,7 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 	err_offset: u32
 	err_type: TSQueryError
 	query := ts_query_new(
-		language,
+		gc.language,
 		query_c,
 		u32(len(query_src)),
 		&err_offset,
@@ -111,27 +148,27 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 		}
 		log.errorf("highlight: %s query failed: %s", lang, cause)
 
-		gram_v := helix_version_from_path(so_path)
-		query_v := helix_version_from_path(query_path)
-		gram_note := "(version unknown)"
-		if gram_v != "" do gram_note = fmt.tprintf("helix %s", gram_v)
-		query_note := "(version unknown)"
-		if query_v != "" do query_note = fmt.tprintf("helix %s", query_v)
-		log.errorf("  grammar: %s [%s]", so_path, gram_note)
-		log.errorf("  query:   %s [%s]", query_path, query_note)
-		if gram_v != "" && query_v != "" && gram_v != query_v {
-			log.errorf("  >> helix VERSION MISMATCH: grammar %s vs query %s", gram_v, query_v)
+		_, is_builtin := builtin_language(lang)
+		if !is_builtin {
+			so_path := fmt.tprintf("%s/%s.so", GRAPHS_PATH, lang)
+			gram_v := helix_version_from_path(so_path)
+			query_v := helix_version_from_path(query_path)
+			gram_note := "(version unknown)"
+			if gram_v != "" do gram_note = fmt.tprintf("helix %s", gram_v)
+			query_note := "(version unknown)"
+			if query_v != "" do query_note = fmt.tprintf("helix %s", query_v)
+			log.errorf("  grammar: %s [%s]", so_path, gram_note)
+			log.errorf("  query:   %s [%s]", query_path, query_note)
+			if gram_v != "" && query_v != "" && gram_v != query_v {
+				log.errorf("  >> helix VERSION MISMATCH: grammar %s vs query %s", gram_v, query_v)
+			}
 		}
 
-		ts_parser_delete(parser)
+		gc.query_failed = true
 		return nil
 	}
 
-	gc := new(Grammar_Cache)
-	gc.language = language
-	gc.parser = parser
 	gc.query = query
-	grammar_cache[lang] = gc
 	return gc
 }
 

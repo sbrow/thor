@@ -49,6 +49,8 @@ RTLD_LAZY :: c.int(1)
 
 foreign import lib "system:tree-sitter"
 foreign import libdl "system:dl"
+foreign import html_grammar "system:tree-sitter-html"
+foreign import css_grammar "system:tree-sitter-css"
 
 foreign lib {
 	ts_parser_new :: proc() -> TSParser ---
@@ -74,7 +76,11 @@ foreign lib {
 	ts_node_is_error :: proc(self: TSNode) -> bool ---
 	ts_node_child_count :: proc(self: TSNode) -> u32 ---
 	ts_node_child :: proc(self: TSNode, child_index: u32) -> TSNode ---
+	ts_node_named_child_count :: proc(self: TSNode) -> u32 ---
+	ts_node_named_child :: proc(self: TSNode, child_index: u32) -> TSNode ---
 	ts_node_start_point :: proc(self: TSNode) -> TSPoint ---
+	ts_node_type :: proc(self: TSNode) -> cstring ---
+	ts_node_parent :: proc(self: TSNode) -> TSNode ---
 }
 
 foreign lib {
@@ -112,4 +118,12 @@ foreign libdl {
 	dlopen :: proc(filename: cstring, flags: c.int) -> rawptr ---
 	dlsym :: proc(handle: rawptr, symbol: cstring) -> rawptr ---
 	dlclose :: proc(handle: rawptr) -> c.int ---
+}
+
+foreign html_grammar {
+	tree_sitter_html :: proc() -> TSLanguage ---
+}
+
+foreign css_grammar {
+	tree_sitter_css :: proc() -> TSLanguage ---
 }

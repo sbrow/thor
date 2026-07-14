@@ -14,6 +14,7 @@
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [x] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
+- [ ] set opengraph tags / description automatically if unset. (Like hugo does)
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
 - [ ] Theme selector for syntax highlighting.
@@ -32,6 +33,7 @@
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
 - [ ] commands
+- [ ] Add spall and find ways to reduce run time. (Getting close to 1/2sec here.)
 - [ ] Review every file in thor
   - [ ] Review alerts.odin
   - [ ] Review content.odin

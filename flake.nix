@@ -12,12 +12,13 @@
   };
 
   outputs =
-    inputs@{ self
-    , flake-parts
-    , nixpkgs
-    , nixpkgs-unstable
-    # , process-compose-flake
-    , treefmt-nix
+    inputs@{
+      self,
+      flake-parts,
+      nixpkgs,
+      nixpkgs-unstable,
+      # , process-compose-flake
+      treefmt-nix,
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
@@ -27,7 +28,42 @@
       systems = [ "x86_64-linux" ];
 
       perSystem =
-        { pkgs, system, inputs', ... }: {
+        {
+          pkgs,
+          system,
+          inputs',
+          ...
+        }:
+        let
+          mkGrammarStaticLib = name: src: pkgs.stdenv.mkDerivation {
+            inherit name src;
+            dontConfigure = true;
+
+            buildPhase = ''
+              runHook preBuild
+              if [ -f src/scanner.cc ]; then
+                $CXX -fPIC -c src/scanner.cc -o scanner.o
+              elif [ -f src/scanner.c ]; then
+                $CC -fPIC -c src/scanner.c -o scanner.o
+              fi
+              $CC -fPIC -c src/parser.c -o parser.o
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/lib
+              ar rcs $out/lib/lib${name}.a *.o
+              runHook postInstall
+            '';
+          };
+
+          html-grammar = mkGrammarStaticLib "tree-sitter-html"
+            pkgs.tree-sitter-grammars.tree-sitter-html.src;
+          css-grammar = mkGrammarStaticLib "tree-sitter-css"
+            pkgs.tree-sitter-grammars.tree-sitter-css.src;
+        in
+        {
           _module.args.pkgs = import nixpkgs {
             inherit system;
             config.allowUnfree = true;
@@ -48,22 +84,20 @@
               ".env.local"
             ];
 
-
             # Format nix files
             programs.nixpkgs-fmt.enable = true;
             programs.deadnix.enable = true;
 
             # Format js, json, and yaml files
             programs.prettier.enable = true;
-            settings.formatter.prettier =
-              {
-                excludes = [
-                  "public/**"
-                  "resources/js/modernizr.js"
-                  "storage/app/caniuse.json"
-                  "*.md"
-                ];
-              };
+            settings.formatter.prettier = {
+              excludes = [
+                "public/**"
+                "resources/js/modernizr.js"
+                "storage/app/caniuse.json"
+                "*.md"
+              ];
+            };
           };
 
           #process-compose.default.settings.processes = { };
@@ -82,7 +116,11 @@
               pkgs.git
               pkgs.cmark
               pkgs.tree-sitter
+              html-grammar
+              css-grammar
             ];
+
+            LIBRARY_PATH = "${html-grammar}/lib:${css-grammar}/lib";
 
             doCheck = true;
             checkPhase = ''
@@ -94,8 +132,6 @@
             buildPhase = ''
               runHook preBuild
               odin build . -o:speed -out:${pname}-keep
-              echo "Listing filles..."
-              ls .
               runHook postBuild
             '';
 
@@ -106,20 +142,23 @@
             '';
           };
 
-          devShells.default = pkgs.mkShell
-            {
-              buildInputs = with pkgs; [
-                odin
-                ols
-                cmark
-                tree-sitter
+          devShells.default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              odin
+              ols
+              cmark
+              tree-sitter
 
-                # IDE
-                unstable.helix
-                typescript-language-server
-                vscode-langservers-extracted
-              ];
-            };
+              # IDE
+              unstable.helix
+              typescript-language-server
+              vscode-langservers-extracted
+            ];
+
+            shellHook = ''
+              export LIBRARY_PATH="${html-grammar}/lib:${css-grammar}/lib:$LIBRARY_PATH"
+            '';
+          };
         };
     };
 }

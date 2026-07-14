@@ -104,17 +104,26 @@ render_site :: proc(pages: []Page, config: Site) {
 			continue
 		}
 		html := render_page_html(page, config)
+		if .Minify in config.features {
+			html = minify_html(html)
+		}
 		write_page(config.output_dir, page.permalink, html)
 	}
 
 	// Render home page
 	if has_home {
 		home_html := render_home_html(home, pages, config)
+		if .Minify in config.features {
+			home_html = minify_html(home_html)
+		}
 		write_file(fmt.tprintf("%s/index.html", config.output_dir), home_html)
 	}
 
 	// Render posts list page
 	posts_html := render_posts_html(pages, config)
+	if .Minify in config.features {
+		posts_html = minify_html(posts_html)
+	}
 	write_page(config.output_dir, "/posts/", posts_html)
 
 	// Generate RSS feed
@@ -127,6 +136,9 @@ render_site :: proc(pages: []Page, config: Site) {
 
 	// Copy static directory (favicon, CSS, images, etc.)
 	copy_static_dir(config.static_dir, config.output_dir)
+
+	// Copy and maybe minify assets directory
+	copy_assets_dir(config.assets_dir, config.output_dir, config.features)
 
 	// Generate robots.txt
 	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", config.base_url)

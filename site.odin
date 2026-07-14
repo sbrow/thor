@@ -18,6 +18,7 @@ Site :: struct {
 	config_path: string,
 	content_dir: string,
 	static_dir:  string,
+	assets_dir:  string,
 	output_dir:  string,
 	layouts_dir: string,
 	params:      json.Value,
@@ -27,6 +28,7 @@ Site :: struct {
 Feature :: enum {
 	Sections,
 	Drafts,
+	Minify,
 	Watch,
 }
 
@@ -37,6 +39,7 @@ Flags :: struct {
 	base_url:    string `args:"name=base-url"`,
 	content_dir: string `args:"name=content"`,
 	static_dir:  string `args:"name=static"`,
+	assets_dir:  string `args:"name=assets"`,
 	output_dir:  string `args:"name=output"`,
 	layouts_dir: string,
 	author:      string,
@@ -44,6 +47,7 @@ Flags :: struct {
 	sectionate:  bool `args:"name=sections"`,
 	drafts:      bool `args:"name=drafts"`,
 	watch:       bool,
+	minify:      bool `args:"name=minify"`,
 }
 
 init_site :: proc(site: ^Site, args: []string) {
@@ -85,6 +89,9 @@ init_site :: proc(site: ^Site, args: []string) {
 	}
 	if site.static_dir == "" {
 		site.static_dir = fmt.tprintf("%s/static", config_dir)
+	}
+	if site.assets_dir == "" {
+		site.assets_dir = fmt.tprintf("%s/assets", config_dir)
 	}
 	if site.output_dir == "" {
 		site.output_dir = fmt.tprintf("%s/public", config_dir)
@@ -129,6 +136,9 @@ merge_flags :: proc(config: ^Flags, flags: Flags) {
 	if flags.static_dir != "" {
 		config.static_dir = flags.static_dir
 	}
+	if flags.assets_dir != "" {
+		config.assets_dir = flags.assets_dir
+	}
 	if flags.output_dir != "" {
 		config.output_dir = flags.output_dir
 	}
@@ -141,6 +151,9 @@ merge_flags :: proc(config: ^Flags, flags: Flags) {
 	if flags.sectionate {
 		config.sectionate = true
 	}
+	if flags.minify {
+		config.minify = true
+	}
 	config.config_path = flags.config_path
 }
 
@@ -152,6 +165,7 @@ site_apply_flags :: proc(site: ^Site, flags: Flags) {
 	site.config_path = flags.config_path
 	site.content_dir = flags.content_dir
 	site.static_dir = flags.static_dir
+	site.assets_dir = flags.assets_dir
 	site.output_dir = flags.output_dir
 	site.layouts_dir = flags.layouts_dir
 	site.params = flags.params
@@ -159,6 +173,7 @@ site_apply_flags :: proc(site: ^Site, flags: Flags) {
 	if flags.sectionate {site.features += {.Sections}}
 	if flags.drafts {site.features += {.Drafts}}
 	if flags.watch {site.features += {.Watch}}
+	if flags.minify {site.features += {.Minify}}
 }
 
 site_allocator :: proc(site: ^Site) -> mem.Allocator {
