@@ -6,7 +6,7 @@
 - [ ] mustache data keys for opengraph, etc.
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [x] Emoji shortcodes (`:shrug:` etc.) — 2 instances
-  - [ ] Backslash in shrug not visible.
+  - [x] Backslash in shrug not visible.
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
 - [x] OpenGraph meta tags

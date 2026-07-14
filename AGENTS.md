@@ -22,7 +22,7 @@ public/            ← build output (generated)
 | `content.odin` | `Page` struct, content walker, page loader, cmark integration, full markdown pipeline |
 | `footnotes.odin` | Note definition stripping (pre-cmark) + sidenote/marginnote injection (post-cmark) |
 | `alerts.odin` | GitHub alert post-processor (`> [!CAUTION]` → styled blockquote) |
-| `emoji.odin` | Emoji shortcode expander (`:shrug:` → `¯\_(ツ)_/¯`) |
+| `emoji.odin` | Emoji shortcode expander (`:shrug:` → `¯\_(ツ)_/¯`), post-cmark |
 | `highlight.odin` | Post-cmark Tree-sitter syntax highlighter; loads grammars/queries from Helix, caches loaded grammars, reports syntax errors with file/line |
 | `tree_sitter.odin` | C FFI bindings for Tree-sitter (TSParser, TSQuery, TSQueryCursor, node traversal, dlopen/dlsym) |
 | `sectionate.odin` | `wrap_sections` proc — splits HTML at `<h2` into `<section>` wrappers |
@@ -71,6 +71,7 @@ raw markdown
   → expand_emoji          (pre-cmark: :shortcode: → unicode)
   → strip_definitions     (pre-cmark: extract [^id]: definitions)
   → cmark markdown_to_html (Unsafe mode for HTML passthrough)
+  → expand_emoji          (post-cmark: :shortcode: → unicode, avoids cmark escape issues)
   → inject_sidenotes      (post-cmark: [^id] → <label><input><span> markup)
   → inject_alerts         (post-cmark: [!TYPE] blockquotes → styled alerts)
   → highlight_code        (post-cmark: tree-sitter per code block, with error reporting)
@@ -148,7 +149,6 @@ Extracted `template_process_tokens` from `template_eat_tokens` to separate ROOT 
 
 - cmark allocates via C malloc, not the arena. HTML output leaks until process exit.
 - CSS/JS cache busting uses manual `?v=N` query params instead of content hashing.
-- The `shrug` emoji has a backslash that may not display correctly.
 - `json.Value` params require 64-byte aligned arena (workaround for `dynamic_arena_allocator_proc` ignoring per-allocation alignment).
 - Tree-sitter grammar/query paths hardcoded in `tree_sitter.odin` (Nix store hashes, Helix-version-dependent).
 - `TSQueryCapture` needs explicit `_padding: u32` field for C ABI compatibility (40-byte sizeof).

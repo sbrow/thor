@@ -182,9 +182,9 @@ load_page :: proc(
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)
 	} else {
-		expanded := expand_emoji(body)
-		clean_body, sn_defs, mn_defs := strip_definitions(expanded)
+		clean_body, sn_defs, mn_defs := strip_definitions(body)
 		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
+		html = expand_emoji(html)
 		html = highlight_code(inject_alerts(inject_notes(html, sn_defs, mn_defs)), file_path)
 		if sectionate {
 			html = wrap_sections(html)
