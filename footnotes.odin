@@ -5,11 +5,18 @@ import cm "vendor:commonmark"
 import "core:fmt"
 import "core:strings"
 
-// strip_definitions scans markdown text for footnote definitions ([^id]: text),
-// removes them, and returns the cleaned text plus a map of id→definition.
+Note_Kind :: enum {
+	Sidenote,
+	Marginnote,
+}
+
+// strip_definitions scans markdown text for note definitions ([^id]: text for
+// sidenotes, [*id]: text for marginnotes), removes them, and returns the cleaned
+// text plus separate maps of id->definition for each kind.
 // Handles multi-line definitions with indented continuation lines.
-strip_definitions :: proc(body: string) -> (clean_body: string, defs: map[string]string) {
-	defs = make(map[string]string)
+strip_definitions :: proc(body: string) -> (clean_body: string, sn_defs, mn_defs: map[string]string) {
+	sn_defs = make(map[string]string)
+	mn_defs = make(map[string]string)
 
 	lines := strings.split(body, "\n")
 	output_lines: [dynamic]string
@@ -19,7 +26,7 @@ strip_definitions :: proc(body: string) -> (clean_body: string, defs: map[string
 	for i < len(lines) {
 		line := lines[i]
 
-		id, def_text, is_def := parse_def_line(line)
+		id, def_text, kind, is_def := parse_def_line(line)
 		if !is_def {
 			append(&output_lines, line)
 			i += 1
@@ -39,8 +46,8 @@ strip_definitions :: proc(body: string) -> (clean_body: string, defs: map[string
 			if len(next) == 0 {
 				break
 			}
-			// Stop at new footnote definitions
-			_, _, is_new_def := parse_def_line(next)
+			// Stop at new note definitions
+			_, _, _, is_new_def := parse_def_line(next)
 			if is_new_def {
 				break
 			}
@@ -53,7 +60,12 @@ strip_definitions :: proc(body: string) -> (clean_body: string, defs: map[string
 			i += 1
 		}
 
-		defs[id] = strings.join(def_parts[:], "\n")
+		joined := strings.join(def_parts[:], "\n")
+		if kind == .Marginnote {
+			mn_defs[id] = joined
+		} else {
+			sn_defs[id] = joined
+		}
 		delete(def_parts)
 	}
 
@@ -61,9 +73,18 @@ strip_definitions :: proc(body: string) -> (clean_body: string, defs: map[string
 	return
 }
 
-// parse_def_line checks if a line is a footnote definition: [^id]: text
-parse_def_line :: proc(line: string) -> (id: string, text: string, ok: bool) {
-	if len(line) < 5 || line[0] != '[' || line[1] != '^' {
+// parse_def_line checks if a line is a note definition: [^id]: text (sidenote)
+// or [*id]: text (marginnote).
+parse_def_line :: proc(line: string) -> (id: string, text: string, kind: Note_Kind, ok: bool) {
+	if len(line) < 5 || line[0] != '[' {
+		return
+	}
+
+	if line[1] == '^' {
+		kind = .Sidenote
+	} else if line[1] == '*' {
+		kind = .Marginnote
+	} else {
 		return
 	}
 
@@ -90,10 +111,11 @@ is_indented :: proc(line: string) -> bool {
 	return line[0] == ' ' || line[0] == '\t'
 }
 
-// inject_sidenotes finds [^id] references in rendered HTML and replaces them
-// with sidenote markup. Each definition is rendered through cmark separately.
-inject_sidenotes :: proc(html: string, defs: map[string]string) -> string {
-	if len(defs) == 0 {
+// inject_notes finds [^id] (sidenote) and [*id] (marginnote) references in
+// rendered HTML and replaces them with the appropriate margin markup. Each
+// definition is rendered through cmark separately.
+inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> string {
+	if len(sn_defs) == 0 && len(mn_defs) == 0 {
 		return html
 	}
 
@@ -103,13 +125,20 @@ inject_sidenotes :: proc(html: string, defs: map[string]string) -> string {
 	remaining := html
 
 	for {
-		pos := strings.index(remaining, "[^")
+		sn_pos := strings.index(remaining, "[^")
+		mn_pos := strings.index(remaining, "[*")
+
+		is_margin := mn_pos >= 0 && (sn_pos < 0 || mn_pos < sn_pos)
+		pos := sn_pos
+		if is_margin {
+			pos = mn_pos
+		}
 		if pos < 0 {
 			append(&parts, remaining)
 			break
 		}
 
-		// Append text before [^
+		// Append text before the reference
 		append(&parts, remaining[:pos])
 
 		close := strings.index(remaining[pos + 2:], "]")
@@ -121,6 +150,10 @@ inject_sidenotes :: proc(html: string, defs: map[string]string) -> string {
 		id := remaining[pos + 2 : pos + 2 + close]
 		ref_end := pos + 2 + close + 1
 
+		defs := sn_defs
+		if is_margin {
+			defs = mn_defs
+		}
 		def_text, found := defs[id]
 		if !found {
 			// No definition found, leave as literal text
@@ -133,13 +166,23 @@ inject_sidenotes :: proc(html: string, defs: map[string]string) -> string {
 		def_html := cm.markdown_to_html_from_string(def_text, {.Unsafe})
 		def_html = strip_p_tags(def_html)
 
-		sidenote := fmt.aprintf(
-			`<label for="fn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="fn-%s" class="margin-toggle"><span class="sidenote">%s</span>`,
-			id,
-			id,
-			def_html,
-		)
-		append(&parts, sidenote)
+		note: string
+		if is_margin {
+			note = fmt.aprintf(
+				`<label for="mn-%s" class="margin-toggle"></label><input type="checkbox" id="mn-%s" class="margin-toggle"><span class="marginnote">%s</span>`,
+				id,
+				id,
+				def_html,
+			)
+		} else {
+			note = fmt.aprintf(
+				`<label for="fn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="fn-%s" class="margin-toggle"><span class="sidenote">%s</span>`,
+				id,
+				id,
+				def_html,
+			)
+		}
+		append(&parts, note)
 
 		remaining = remaining[ref_end:]
 	}

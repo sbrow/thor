@@ -3,12 +3,15 @@
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Enable configuration to  opt-out of features, particular pre/post processors.
 - [ ] proper date/time/now object.
+- [ ] mustache data keys for opengraph, etc.
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [x] Emoji shortcodes (`:shrug:` etc.) — 2 instances
   - [ ] Backslash in shrug not visible.
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
 - [x] OpenGraph meta tags
+- [ ] copy all files from `static` to `public`.
+- [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [ ] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Table of contents support.
