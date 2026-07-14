@@ -32,15 +32,15 @@ Page :: struct {
 // (or all pages if include_drafts is true).
 //
 // TODO: What is the lifetime of pages?
-walk_content :: proc(content_path: string, include_drafts: bool) -> []Page {
+walk_content :: proc(content_path: string, include_drafts: bool, sectionate: bool) -> []Page {
 	pages: [dynamic]Page
 
-	collect_home(&pages, content_path)
-	collect_standalone(&pages, content_path)
+	collect_home(&pages, content_path, sectionate)
+	collect_standalone(&pages, content_path, sectionate)
 
 	posts_path := fmt.tprintf("%s/posts", content_path)
 	if os.exists(posts_path) {
-		collect_posts(&pages, posts_path)
+		collect_posts(&pages, posts_path, sectionate)
 	}
 
 	if include_drafts {
@@ -57,10 +57,10 @@ walk_content :: proc(content_path: string, include_drafts: bool) -> []Page {
 	}
 }
 
-collect_home :: proc(pages: ^[dynamic]Page, content_path: string) {
+collect_home :: proc(pages: ^[dynamic]Page, content_path: string, sectionate: bool) {
 	html_path := fmt.tprintf("%s/index.html", content_path)
 	if os.exists(html_path) {
-		page, ok := load_page(html_path, .Home, "")
+		page, ok := load_page(html_path, .Home, "", sectionate)
 		if ok {
 			page.permalink = "/"
 			append(pages, page)
@@ -70,7 +70,7 @@ collect_home :: proc(pages: ^[dynamic]Page, content_path: string) {
 
 	md_path := fmt.tprintf("%s/index.md", content_path)
 	if os.exists(md_path) {
-		page, ok := load_page(md_path, .Home, "")
+		page, ok := load_page(md_path, .Home, "", sectionate)
 		if ok {
 			page.permalink = "/"
 			append(pages, page)
@@ -78,7 +78,7 @@ collect_home :: proc(pages: ^[dynamic]Page, content_path: string) {
 	}
 }
 
-collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string) {
+collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string, sectionate: bool) {
 	entries, err := os.read_all_directory_by_path(content_path, context.allocator)
 	if err != nil {
 		log.warnf("thor: cannot read %s: %v", content_path, err)
@@ -98,14 +98,14 @@ collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string) {
 		}
 
 		slug := strip_extension(entry.name)
-		page, ok := load_page(entry.fullpath, .Standalone, slug)
+		page, ok := load_page(entry.fullpath, .Standalone, slug, sectionate)
 		if ok {
 			append(pages, page)
 		}
 	}
 }
 
-collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string) {
+collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, sectionate: bool) {
 	entries, err := os.read_all_directory_by_path(posts_path, context.allocator)
 	if err != nil {
 		log.warnf("thor: cannot read %s: %v", posts_path, err)
@@ -120,7 +120,7 @@ collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string) {
 				continue
 			}
 			slug := strip_extension(entry.name)
-			page, ok := load_page(entry.fullpath, .Post, slug)
+			page, ok := load_page(entry.fullpath, .Post, slug, sectionate)
 			if ok {
 				append(pages, page)
 			}
@@ -132,7 +132,7 @@ collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string) {
 			if !os.exists(index_path) {
 				continue
 			}
-			page, ok := load_page(index_path, .Post, entry.name)
+			page, ok := load_page(index_path, .Post, entry.name, sectionate)
 			if ok {
 				page.bundle_dir = entry.fullpath
 				append(pages, page)
@@ -146,6 +146,7 @@ load_page :: proc(
 	file_path: string,
 	page_type: Page_Type,
 	slug: string,
+	sectionate: bool,
 ) -> (
 	page: Page,
 	ok: bool,
@@ -178,7 +179,11 @@ load_page :: proc(
 		expanded := expand_emoji(body)
 		clean_body, defs := strip_definitions(expanded)
 		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
-		page.body_html = highlight_code(inject_alerts(inject_sidenotes(html, defs)), file_path)
+		html = highlight_code(inject_alerts(inject_sidenotes(html, defs)), file_path)
+		if sectionate {
+			html = wrap_sections(html)
+		}
+		page.body_html = html
 	}
 
 	switch page_type {

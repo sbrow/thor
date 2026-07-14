@@ -187,14 +187,22 @@ find_first_error_line :: proc(root: TSNode) -> int {
 
 capture_name_to_css :: proc(name: string) -> string {
 	sb := strings.builder_make()
-	strings.write_string(&sb, "hl-")
+	seg := strings.builder_make()
+	first := true
 	for i in 0..<len(name) {
 		if name[i] == '.' {
-			strings.write_byte(&sb, '-')
+			if !first do strings.write_byte(&sb, ' ')
+			first = false
+			strings.write_string(&sb, "hl-")
+			strings.write_string(&sb, strings.to_string(seg))
+			strings.write_byte(&seg, '-')
 		} else {
-			strings.write_byte(&sb, name[i])
+			strings.write_byte(&seg, name[i])
 		}
 	}
+	if !first do strings.write_byte(&sb, ' ')
+	strings.write_string(&sb, "hl-")
+	strings.write_string(&sb, strings.to_string(seg))
 	return strings.to_string(sb)
 }
 

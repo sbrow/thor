@@ -19,6 +19,7 @@ Site :: struct {
 	layouts_dir: string,
 	author:      string,
 	params:      json.Value,
+	sectionate:  bool,
 	drafts:      bool `args:"name=drafts"`,
 }
 

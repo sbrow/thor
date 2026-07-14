@@ -12,7 +12,7 @@ main :: proc() {
 	init_site(&site, os.args)
 	defer destroy_site(&site)
 
-	pages := walk_content(site.content_dir, site.drafts)
+	pages := walk_content(site.content_dir, site.drafts, site.sectionate)
 
 	render_site(pages, site)
 }
