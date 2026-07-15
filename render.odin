@@ -134,10 +134,7 @@ render_site :: proc(pages: []Page, config: Site) {
 	sitemap := generate_sitemap(pages, config.base_url)
 	write_file(fmt.tprintf("%s/sitemap.xml", config.output_dir), sitemap)
 
-	// Copy static directory (favicon, CSS, images, etc.)
-	copy_static_dir(config.static_dir, config.output_dir)
-
-	// Copy and maybe minify assets directory
+	// Copy and optionally minify assets directory
 	copy_assets_dir(config.assets_dir, config.output_dir, config.features)
 
 	// Generate robots.txt

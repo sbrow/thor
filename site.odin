@@ -17,7 +17,6 @@ Site :: struct {
 	base_url:    string,
 	config_path: string,
 	content_dir: string,
-	static_dir:  string,
 	assets_dir:  string,
 	output_dir:  string,
 	layouts_dir: string,
@@ -38,7 +37,6 @@ Flags :: struct {
 	description: string,
 	base_url:    string `args:"name=base-url"`,
 	content_dir: string `args:"name=content"`,
-	static_dir:  string `args:"name=static"`,
 	assets_dir:  string `args:"name=assets"`,
 	output_dir:  string `args:"name=output"`,
 	layouts_dir: string,
@@ -87,9 +85,6 @@ init_site :: proc(site: ^Site, args: []string) {
 	if site.content_dir == "" {
 		site.content_dir = fmt.tprintf("%s/content", config_dir)
 	}
-	if site.static_dir == "" {
-		site.static_dir = fmt.tprintf("%s/static", config_dir)
-	}
 	if site.assets_dir == "" {
 		site.assets_dir = fmt.tprintf("%s/assets", config_dir)
 	}
@@ -133,9 +128,6 @@ merge_flags :: proc(config: ^Flags, flags: Flags) {
 	if flags.content_dir != "" {
 		config.content_dir = flags.content_dir
 	}
-	if flags.static_dir != "" {
-		config.static_dir = flags.static_dir
-	}
 	if flags.assets_dir != "" {
 		config.assets_dir = flags.assets_dir
 	}
@@ -164,7 +156,6 @@ site_apply_flags :: proc(site: ^Site, flags: Flags) {
 	site.base_url = flags.base_url
 	site.config_path = flags.config_path
 	site.content_dir = flags.content_dir
-	site.static_dir = flags.static_dir
 	site.assets_dir = flags.assets_dir
 	site.output_dir = flags.output_dir
 	site.layouts_dir = flags.layouts_dir

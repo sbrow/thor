@@ -15,6 +15,7 @@
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [x] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
+- [ ] Add Opt-in deflist support.
 - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
