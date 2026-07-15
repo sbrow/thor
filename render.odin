@@ -139,25 +139,25 @@ render_page_html :: proc(page: Page, config: Site) -> string {
 	is_article := page.type == .Post
 
 	data := map[string]any {
-		"title"          = fmt.tprintf("%s | %s", page.title, config.title),
-		"page_title"     = page.title,
-		"body_html"      = page.body_html,
-		"has_date"       = page.date != "",
-		"date_iso"       = page.date,
-		"date_display"   = format_date(page.date),
-		"is_post"        = is_article,
-		"year"           = "2026",
-		"author"         = config.author,
-		"params"         = config.params,
-		"og_url"         = fmt.tprintf("%s%s", config.base_url, page.permalink),
-		"og_site_name"   = config.title,
-		"og_title"       = strip_html_tags(page.title),
+		"title" = fmt.tprintf("%s | %s", page.title, config.title),
+		"page_title" = page.title,
+		"body_html" = page.body_html,
+		"has_date" = page.date != "",
+		"date_iso" = page.date,
+		"date_display" = format_date(page.date),
+		"is_post" = is_article,
+		"now" = map[string]any{"year" = fmt.tprintf("%d", time.year(time.now()))},
+		"author" = config.author,
+		"params" = config.params,
+		"og_url" = fmt.tprintf("%s%s", config.base_url, page.permalink),
+		"og_site_name" = config.title,
+		"og_title" = strip_html_tags(page.title),
 		"og_description" = config.description,
-		"og_type"        = og_type(is_article),
-		"is_article"     = is_article,
-		"og_section"     = "posts",
-		"og_published"   = page.date,
-		"og_image"       = fmt.tprintf("%s/avatar.jpg", config.base_url),
+		"og_type" = og_type(is_article),
+		"is_article" = is_article,
+		"og_section" = "posts",
+		"og_published" = page.date,
+		"og_image" = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)
@@ -234,19 +234,19 @@ render_home_html :: proc(home: Page, pages: []Page, config: Site) -> string {
 	}
 
 	data := map[string]any {
-		"title"          = config.title,
-		"home_body"      = home.body_html,
-		"list_pages"     = list_pages[:],
-		"year"           = "2026",
-		"author"         = config.author,
-		"params"         = config.params,
-		"og_url"         = fmt.tprintf("%s/", config.base_url),
-		"og_site_name"   = config.title,
-		"og_title"       = config.title,
+		"title" = config.title,
+		"home_body" = home.body_html,
+		"list_pages" = list_pages[:],
+		"now" = map[string]any{"year" = fmt.tprintf("%d", time.year(time.now()))},
+		"author" = config.author,
+		"params" = config.params,
+		"og_url" = fmt.tprintf("%s/", config.base_url),
+		"og_site_name" = config.title,
+		"og_title" = config.title,
 		"og_description" = config.description,
-		"og_type"        = "website",
-		"is_article"     = false,
-		"og_image"       = fmt.tprintf("%s/avatar.jpg", config.base_url),
+		"og_type" = "website",
+		"is_article" = false,
+		"og_image" = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)
@@ -292,18 +292,18 @@ render_posts_html :: proc(pages: []Page, config: Site) -> string {
 	}
 
 	data := map[string]any {
-		"title"          = fmt.tprintf("Posts | %s", config.title),
-		"year_sections"  = year_slices[:],
-		"year"           = "2026",
-		"author"         = config.author,
-		"params"         = config.params,
-		"og_url"         = fmt.tprintf("%s/posts/", config.base_url),
-		"og_site_name"   = config.title,
-		"og_title"       = "Posts",
+		"title" = fmt.tprintf("Posts | %s", config.title),
+		"year_sections" = year_slices[:],
+		"now" = map[string]any{"year" = fmt.tprintf("%d", time.year(time.now()))},
+		"author" = config.author,
+		"params" = config.params,
+		"og_url" = fmt.tprintf("%s/posts/", config.base_url),
+		"og_site_name" = config.title,
+		"og_title" = "Posts",
 		"og_description" = config.description,
-		"og_type"        = "website",
-		"is_article"     = false,
-		"og_image"       = fmt.tprintf("%s/avatar.jpg", config.base_url),
+		"og_type" = "website",
+		"is_article" = false,
+		"og_image" = fmt.tprintf("%s/avatar.jpg", config.base_url),
 	}
 
 	partials := load_partials(config.layouts_dir)

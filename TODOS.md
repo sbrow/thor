@@ -24,6 +24,7 @@
     guide
 - [ ] Search for grammars in multiple places
 - [ ] Download missing grammars.
+- [ ] Add reflection support to mustache / consider rewriting from scratch.
 - [ ] Syntax highlighting in production: CI (`nix build` on ubuntu-latest) has no grammar `.so`s and a machine-specific `QUERIES_PATH` nix store hash, so the deployed site renders unhighlighted. Provide grammars + queries as nix build inputs and pass paths to thor at runtime (env vars/flags).
 - [ ] Durable highlight paths: read `GRAPHS_PATH`/`QUERIES_PATH` from env vars set by the flake instead of hardcoded nix store hashes, so they survive `nix flake update` and let the grammar/query version-mismatch detector fire automatically.
 - [ ] Unit tests for highlighting helpers: `capture_name_to_css`, `escape_html`, `unescape_html`, `extract_query_token`, `helix_version_from_path`.
@@ -36,6 +37,7 @@
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
 - [ ] commands
 - [ ] Add spall and find ways to reduce run time. (Getting close to 1/2sec here.)
+- [ ] warn/error when unknown key used in mustache.
 - [ ] Review every file in thor
   - [ ] Review alerts.odin
   - [ ] Review content.odin
