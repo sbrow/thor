@@ -199,7 +199,23 @@ struct_get :: proc(obj: any, key: string) -> any {
 		obj = reflect.get_union_variant(obj)
 	}
 
-	return reflect.struct_field_value_by_name(obj, key)
+	val := reflect.struct_field_value_by_name(obj, key)
+	if !reflect.is_nil(val) {
+		return val
+	}
+
+	// Fallback: check using/embedded struct fields
+	for f in reflect.struct_field_names(obj.id) {
+		field_val := reflect.struct_field_value_by_name(obj, f)
+		if is_struct(field_val) {
+			nested := struct_get(field_val, key)
+			if !reflect.is_nil(nested) {
+				return nested
+			}
+		}
+	}
+
+	return val
 }
 
 // Retrieves a value from a map. In mustache.odin, all map keys must be

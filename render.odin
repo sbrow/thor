@@ -3,6 +3,7 @@ package main
 
 import "mustache"
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -23,9 +24,41 @@ Year_Section :: struct {
 	posts: [dynamic]Page_Context,
 }
 
-Year_Slice :: struct {
-	year:  string,
-	posts: []Page_Context,
+Base_Data :: struct {
+	now:            datetime.DateTime,
+	author:         string,
+	params:         json.Value,
+	title:          string,
+	og_site_name:   string,
+	og_description: string,
+	og_image:       string,
+	og_url:         string,
+	og_title:       string,
+	og_type:        string,
+	is_article:     bool,
+}
+
+Page_Data :: struct {
+	using base:   Base_Data,
+	page_title:   string,
+	body_html:    string,
+	has_date:     bool,
+	date_iso:     string,
+	date_display: string,
+	is_post:      bool,
+	og_section:   string,
+	og_published: string,
+}
+
+Home_Data :: struct {
+	using base: Base_Data,
+	home_body:  string,
+	list_pages: [dynamic]Page_Context,
+}
+
+Posts_Data :: struct {
+	using base:    Base_Data,
+	year_sections: [dynamic]Year_Section,
 }
 
 build_page_context :: proc(page: Page) -> Page_Context {
@@ -71,8 +104,48 @@ og_type :: proc(is_article: bool) -> string {
 	return "website"
 }
 
+load_template :: proc(layouts_dir: string, name: string) -> string {
+	data, _ := os.read_entire_file_from_path(
+		fmt.tprintf("%s/%s", layouts_dir, name),
+		context.allocator,
+	)
+	return string(data)
+}
+
+render_with_layout :: proc(
+	content_tpl: string,
+	data: any,
+	base_tpl: string,
+	partials: map[string]string,
+) -> string {
+	result, err := mustache.render_in_layout(content_tpl, data, base_tpl, partials)
+	if err != nil {
+		fmt.eprintfln("thor: mustache error: %v", err)
+		return ""
+	}
+	return result
+}
+
 render_site :: proc(pages: []Page, config: Site) {
 	sort_pages_by_date(pages)
+
+	// Load shared resources once
+	partials := load_partials(config.layouts_dir)
+	base_tpl := load_template(config.layouts_dir, "base.html")
+	post_tpl := load_template(config.layouts_dir, "post.html")
+
+	now, ok := time.time_to_datetime(time.now())
+	assert(ok)
+
+	// Build base data once
+	base := Base_Data {
+		now            = now,
+		author         = config.author,
+		params         = config.params,
+		og_site_name   = config.title,
+		og_description = config.description,
+		og_image       = fmt.tprintf("%s/avatar.jpg", config.base_url),
+	}
 
 	// Find home page
 	home: Page
@@ -90,7 +163,7 @@ render_site :: proc(pages: []Page, config: Site) {
 		if page.type == .Home {
 			continue
 		}
-		html := render_page_html(page, config)
+		html := render_page_html(page, config, post_tpl, base_tpl, partials, base)
 		if .Minify in config.features {
 			html = minify_html(html)
 		}
@@ -99,7 +172,8 @@ render_site :: proc(pages: []Page, config: Site) {
 
 	// Render home page
 	if has_home {
-		home_html := render_home_html(home, pages, config)
+		home_tpl := load_template(config.layouts_dir, "home.html")
+		home_html := render_home_html(home, pages, config, home_tpl, base_tpl, partials, base)
 		if .Minify in config.features {
 			home_html = minify_html(home_html)
 		}
@@ -107,7 +181,8 @@ render_site :: proc(pages: []Page, config: Site) {
 	}
 
 	// Render posts list page
-	posts_html := render_posts_html(pages, config)
+	posts_tpl := load_template(config.layouts_dir, "posts_list.html")
+	posts_html := render_posts_html(pages, config, posts_tpl, base_tpl, partials, base)
 	if .Minify in config.features {
 		posts_html = minify_html(posts_html)
 	}
@@ -135,48 +210,98 @@ render_site :: proc(pages: []Page, config: Site) {
 	fmt.printfln("Rendered %d pages to %s", total, config.output_dir)
 }
 
-render_page_html :: proc(page: Page, config: Site) -> string {
+render_page_html :: proc(
+	page: Page,
+	config: Site,
+	content_tpl: string,
+	base_tpl: string,
+	partials: map[string]string,
+	base: Base_Data,
+) -> string {
 	is_article := page.type == .Post
+	data := Page_Data {
+		base = base,
+	}
+	data.title = fmt.tprintf("%s | %s", page.title, config.title)
+	data.page_title = page.title
+	data.body_html = page.body_html
+	data.has_date = page.date != ""
+	data.date_iso = page.date
+	data.date_display = format_date(page.date)
+	data.is_post = is_article
+	data.og_url = fmt.tprintf("%s%s", config.base_url, page.permalink)
+	data.og_title = strip_html_tags(page.title)
+	data.og_type = og_type(is_article)
+	data.is_article = is_article
+	data.og_section = "posts"
+	data.og_published = page.date
+	return render_with_layout(content_tpl, data, base_tpl, partials)
+}
 
-	data := map[string]any {
-		"title" = fmt.tprintf("%s | %s", page.title, config.title),
-		"page_title" = page.title,
-		"body_html" = page.body_html,
-		"has_date" = page.date != "",
-		"date_iso" = page.date,
-		"date_display" = format_date(page.date),
-		"is_post" = is_article,
-		"now" = map[string]any{"year" = fmt.tprintf("%d", time.year(time.now()))},
-		"author" = config.author,
-		"params" = config.params,
-		"og_url" = fmt.tprintf("%s%s", config.base_url, page.permalink),
-		"og_site_name" = config.title,
-		"og_title" = strip_html_tags(page.title),
-		"og_description" = config.description,
-		"og_type" = og_type(is_article),
-		"is_article" = is_article,
-		"og_section" = "posts",
-		"og_published" = page.date,
-		"og_image" = fmt.tprintf("%s/avatar.jpg", config.base_url),
+render_home_html :: proc(
+	home: Page,
+	pages: []Page,
+	config: Site,
+	content_tpl: string,
+	base_tpl: string,
+	partials: map[string]string,
+	base: Base_Data,
+) -> string {
+	list_pages := make([dynamic]Page_Context)
+	defer delete(list_pages)
+	for page in pages {
+		if page.type == .Home {
+			continue
+		}
+		append(&list_pages, build_page_context(page))
 	}
 
-	partials := load_partials(config.layouts_dir)
-
-	post_tpl, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/post.html", config.layouts_dir),
-		context.allocator,
-	)
-	base_tpl, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/base.html", config.layouts_dir),
-		context.allocator,
-	)
-
-	result, err := mustache.render_in_layout(string(post_tpl), data, string(base_tpl), partials)
-	if err != nil {
-		fmt.eprintfln("thor: mustache error rendering page: %v", err)
-		return ""
+	data := Home_Data {
+		base = base,
 	}
-	return result
+	data.title = config.title
+	data.home_body = home.body_html
+	data.list_pages = list_pages
+	data.og_url = fmt.tprintf("%s/", config.base_url)
+	data.og_title = config.title
+	data.og_type = "website"
+	data.is_article = false
+	return render_with_layout(content_tpl, data, base_tpl, partials)
+}
+
+render_posts_html :: proc(
+	pages: []Page,
+	config: Site,
+	content_tpl: string,
+	base_tpl: string,
+	partials: map[string]string,
+	base: Base_Data,
+) -> string {
+	year_sections := make([dynamic]Year_Section)
+	defer delete(year_sections)
+	current_year := ""
+	for page in pages {
+		if page.type != .Post {
+			continue
+		}
+		year := get_year(page.date)
+		if year != current_year {
+			append(&year_sections, Year_Section{year = year})
+			current_year = year
+		}
+		append(&year_sections[len(year_sections) - 1].posts, build_page_context(page))
+	}
+
+	data := Posts_Data {
+		base = base,
+	}
+	data.title = fmt.tprintf("Posts | %s", config.title)
+	data.year_sections = year_sections
+	data.og_url = fmt.tprintf("%s/posts/", config.base_url)
+	data.og_title = "Posts"
+	data.og_type = "website"
+	data.is_article = false
+	return render_with_layout(content_tpl, data, base_tpl, partials)
 }
 
 load_partials :: proc(layouts_dir: string) -> map[string]string {
@@ -223,112 +348,11 @@ load_partials_recursive :: proc(
 	}
 }
 
-render_home_html :: proc(home: Page, pages: []Page, config: Site) -> string {
-	list_pages := make([dynamic]Page_Context)
-	defer delete(list_pages)
-	for page in pages {
-		if page.type == .Home {
-			continue
-		}
-		append(&list_pages, build_page_context(page))
-	}
-
-	data := map[string]any {
-		"title" = config.title,
-		"home_body" = home.body_html,
-		"list_pages" = list_pages[:],
-		"now" = map[string]any{"year" = fmt.tprintf("%d", time.year(time.now()))},
-		"author" = config.author,
-		"params" = config.params,
-		"og_url" = fmt.tprintf("%s/", config.base_url),
-		"og_site_name" = config.title,
-		"og_title" = config.title,
-		"og_description" = config.description,
-		"og_type" = "website",
-		"is_article" = false,
-		"og_image" = fmt.tprintf("%s/avatar.jpg", config.base_url),
-	}
-
-	partials := load_partials(config.layouts_dir)
-
-	home_tpl, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/home.html", config.layouts_dir),
-		context.allocator,
-	)
-	base_tpl, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/base.html", config.layouts_dir),
-		context.allocator,
-	)
-
-	result, err := mustache.render_in_layout(string(home_tpl), data, string(base_tpl), partials)
-	if err != nil {
-		fmt.eprintfln("thor: mustache error: %v", err)
-		return ""
-	}
-	return result
-}
-
-render_posts_html :: proc(pages: []Page, config: Site) -> string {
-	// Group posts by year
-	year_sections := make([dynamic]Year_Section)
-	defer delete(year_sections)
-	current_year := ""
-	for page in pages {
-		if page.type != .Post {
-			continue
-		}
-		year := get_year(page.date)
-		if year != current_year {
-			append(&year_sections, Year_Section{year = year})
-			current_year = year
-		}
-		append(&year_sections[len(year_sections) - 1].posts, build_page_context(page))
-	}
-	// Convert [dynamic]Page_Context slices to []Page_Context for mustache
-	year_slices := make([dynamic]Year_Slice)
-	defer delete(year_slices)
-	for section in year_sections {
-		append(&year_slices, Year_Slice{year = section.year, posts = section.posts[:]})
-	}
-
-	data := map[string]any {
-		"title" = fmt.tprintf("Posts | %s", config.title),
-		"year_sections" = year_slices[:],
-		"now" = map[string]any{"year" = fmt.tprintf("%d", time.year(time.now()))},
-		"author" = config.author,
-		"params" = config.params,
-		"og_url" = fmt.tprintf("%s/posts/", config.base_url),
-		"og_site_name" = config.title,
-		"og_title" = "Posts",
-		"og_description" = config.description,
-		"og_type" = "website",
-		"is_article" = false,
-		"og_image" = fmt.tprintf("%s/avatar.jpg", config.base_url),
-	}
-
-	partials := load_partials(config.layouts_dir)
-
-	posts_tpl, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/posts_list.html", config.layouts_dir),
-		context.allocator,
-	)
-	base_tpl, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/base.html", config.layouts_dir),
-		context.allocator,
-	)
-
-	result, err := mustache.render_in_layout(string(posts_tpl), data, string(base_tpl), partials)
-	if err != nil {
-		fmt.eprintfln("thor: mustache error: %v", err)
-		return ""
-	}
-	return result
-}
-
-// TODO: Leaks
 format_date :: proc(iso: string) -> string {
+	if len(iso) < 10 {
+		return ""
+	}
 	date, _, _, _ := time.iso8601_to_components(iso)
-
 	return fmt.aprintf("%s %d, %d", time.Month(date.month), date.day, date.year)
 }
 
