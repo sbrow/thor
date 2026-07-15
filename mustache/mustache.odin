@@ -48,6 +48,8 @@ Token_Delimiters :: struct {
 	otag_comment: string,
 	otag_inverted: string,
 	otag_partial: string,
+	otag_parent: string,
+	otag_block: string,
 	otag_delim: string,
 	ctag_delim: string,
 }
@@ -63,6 +65,8 @@ CORE_DEF :: Token_Delimiters {
 	otag_comment = "{{!",
 	otag_inverted = "{{^",
 	otag_partial = "{{>",
+	otag_parent = "{{<",
+	otag_block = "{{$",
 	otag_delim = "{{=",
 	ctag_delim = "=}}",
 }
@@ -85,6 +89,8 @@ Token_Type :: enum {
 	Section_Close,
 	Comment,
 	Partial,
+	Parent,
+	Block_Open,
 	Newline,
 	Skip,
 	EOF, // The last token parsed, caller should not call again.
@@ -123,6 +129,7 @@ Template :: struct {
 	partials: any,
 	context_stack: [dynamic]Context_Stack_Entry,
 	layout: string,
+	block_overrides: map[string][]Token,
 }
 
 Context_Stack_Entry :: struct {
@@ -485,6 +492,10 @@ lexer_start :: proc(l: ^Lexer, new_type: Token_Type) {
 			l.cur_token_start_pos = l.cursor + len(l.delim.otag_inverted)
 		case .Partial:
 			l.cur_token_start_pos = l.cursor + len(l.delim.otag_partial)
+		case .Parent:
+			l.cur_token_start_pos = l.cursor + len(l.delim.otag_parent)
+		case .Block_Open:
+			l.cur_token_start_pos = l.cursor + len(l.delim.otag_block)
 		case .Comment:
 			l.cur_token_start_pos = l.cursor + len(l.delim.otag_comment)
 		case .Tag_Literal:
@@ -500,7 +511,7 @@ lexer_start :: proc(l: ^Lexer, new_type: Token_Type) {
 		switch cur_type {
 		case .Newline:
 			l.cur_token_start_pos = l.cursor + len("\n")
-		case .Tag, .Section_Open_Inverted, .Tag_Literal, .Section_Close, .Section_Open, .Comment, .Partial:
+		case .Tag, .Section_Open_Inverted, .Tag_Literal, .Section_Close, .Section_Open, .Comment, .Partial, .Parent, .Block_Open:
 			l.cur_token_start_pos = l.cursor + len(l.delim.ctag)
 		case .Tag_Literal_Triple:
 			l.cur_token_start_pos = l.cursor + len(l.delim.ctag_lit)
@@ -519,7 +530,7 @@ lexer_append :: proc(l: ^Lexer, allocator := context.allocator) {
 		lexer_append_text(l)
 	case .Newline:
 		lexer_append_newline(l)
-	case .Tag, .Tag_Literal, .Tag_Literal_Triple, .Comment, .Partial, .Section_Open, .Section_Open_Inverted, .Section_Close:
+	case .Tag, .Tag_Literal, .Tag_Literal_Triple, .Comment, .Partial, .Section_Open, .Section_Open_Inverted, .Section_Close, .Parent, .Block_Open:
 		lexer_append_tag(l, l.cur_token_type, allocator)
 	case .EOF, .Skip:
 	}
@@ -601,6 +612,12 @@ lexer_parse :: proc(l: ^Lexer, allocator := context.allocator) -> (err: Lexer_Er
 		case lexer_peek(l, l.delim.otag_partial):
 			lexer_append(l, allocator = allocator)
 			lexer_start(l, .Partial)
+		case lexer_peek(l, l.delim.otag_parent):
+			lexer_append(l, allocator = allocator)
+			lexer_start(l, .Parent)
+		case lexer_peek(l, l.delim.otag_block):
+			lexer_append(l, allocator = allocator)
+			lexer_start(l, .Block_Open)
 		case lexer_peek(l, l.delim.otag_literal):
 			lexer_append(l, allocator = allocator)
 			lexer_start(l, .Tag_Literal)
@@ -635,7 +652,7 @@ lexer_token_should_skip :: proc(l: ^Lexer, t: Token) -> (skip: bool) {
 		skip = lexer_should_skip_newline_token(l, t)
 	case .Text:
 		skip = lexer_should_skip_text_token(l, t)
-	case .Tag, .Tag_Literal, .Tag_Literal_Triple, .Partial, .Section_Open, .Section_Close, .Section_Open_Inverted:
+	case .Tag, .Tag_Literal, .Tag_Literal_Triple, .Partial, .Section_Open, .Section_Close, .Section_Open_Inverted, .Parent, .Block_Open:
 		skip = false
 	case .EOF, .Skip, .Comment:
 		skip = true
@@ -692,7 +709,7 @@ lexer_should_skip_newline_token :: proc(l: ^Lexer, token: Token) -> bool {
 		case .Tag, .Tag_Literal, .Tag_Literal_Triple:
 			return false
 		case .Section_Open, .Section_Close, .Section_Open_Inverted, .Comment,
-				 .Partial, .Newline, .Skip, .EOF:
+				 .Partial, .Parent, .Block_Open, .Newline, .Skip, .EOF:
 		}
 	}
 
@@ -714,7 +731,7 @@ lexer_should_skip_text_token :: proc(l: ^Lexer, token: Token) -> bool {
 			}
 		case .Tag, .Tag_Literal, .Tag_Literal_Triple, .Partial:
 			return false
-		case .Section_Open, .Section_Open_Inverted, .Section_Close, .Comment:
+		case .Section_Open, .Section_Open_Inverted, .Section_Close, .Comment, .Parent, .Block_Open:
 			standalone_tag_count += 1
 		case .Newline, .Skip, .EOF:
 		}
@@ -739,7 +756,7 @@ lexer_token_is_standalone_partial :: proc(l: ^Lexer, token: Token) -> bool {
 			}
 		case .Tag, .Tag_Literal, .Tag_Literal_Triple:
 			return false
-		case .Section_Open, .Section_Open_Inverted, .Section_Close, .Comment, .Partial:
+		case .Section_Open, .Section_Open_Inverted, .Section_Close, .Comment, .Partial, .Parent, .Block_Open:
 			standalone_tag_count += 1
 		case .Newline, .Skip, .EOF:
 		}
@@ -962,7 +979,7 @@ token_content :: proc(tmpl: ^Template, t: Token, allocator := context.allocator)
 	case .Newline:
 		s = "\n"
 	case .Section_Open, .Section_Open_Inverted, .Section_Close,
-		 .Comment, .Skip, .EOF, .Partial:
+		 .Comment, .Skip, .EOF, .Partial, .Parent, .Block_Open:
 	}
 
 	return s
@@ -973,7 +990,7 @@ token_is_tag :: proc(t: Token) -> bool {
 	case .Tag, .Tag_Literal, .Tag_Literal_Triple:
 		return true
 	case .Text, .Newline, .Section_Open, .Section_Open_Inverted, .Section_Close,
-		 .Comment, .Skip, .EOF, .Partial:
+		 .Comment, .Skip, .EOF, .Partial, .Parent, .Block_Open:
 		return false
 	}
 
@@ -1109,6 +1126,112 @@ template_insert_content_into_layout :: proc(
 	return nil
 }
 
+// Find the index of a Section_Close token matching the given name,
+// respecting nesting depth across all open tag types.
+find_matching_close :: proc(tokens: []Token, start: int, name: string) -> int {
+	depth := 1
+	for i in start+1..<len(tokens) {
+		t := tokens[i]
+		if t.value == name && (t.type == .Section_Open || t.type == .Section_Open_Inverted ||
+		    t.type == .Block_Open || t.type == .Parent) {
+			depth += 1
+		}
+		if t.type == .Section_Close && t.value == name {
+			depth -= 1
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return start
+}
+
+// Handle {{<parent}} inheritance: collect block overrides, load parent template,
+// resolve blocks, and render the parent's structure.
+template_handle_parent :: proc(
+	tmpl: ^Template,
+	parent_token: Token,
+	start_i: int,
+	sb: ^strings.Builder,
+	allocator := context.allocator,
+) {
+	parent_name := parent_token.value
+	close_i := find_matching_close(tmpl.lexer.tokens[:], start_i, parent_name)
+
+	// Collect block overrides from child template
+	overrides := make(map[string][]Token, allocator)
+	j := start_i + 1
+	for j < close_i {
+		t := tmpl.lexer.tokens[j]
+		if t.type == .Block_Open {
+			block_close := find_matching_close(tmpl.lexer.tokens[:], j, t.value)
+			if block_close > j + 1 {
+				overrides[t.value] = tmpl.lexer.tokens[j+1:block_close]
+			} else {
+				overrides[t.value] = {}
+			}
+			j = block_close + 1
+		} else {
+			j += 1
+		}
+	}
+
+	// Load parent template from partials
+	partials_map, ok := tmpl.partials.(map[string]string)
+	if !ok {
+		return
+	}
+	parent_src, has_parent := partials_map[parent_name]
+	if !has_parent {
+		return
+	}
+
+	// Lex parent template
+	parent_lexer := lexer_make(allocator)
+	parent_lexer.src = parent_src
+	parent_lexer.delim = CORE_DEF
+	if lexer_parse(parent_lexer, allocator = allocator) != nil {
+		return
+	}
+
+	// Build resolved token list: replace blocks with overrides where applicable
+	resolved := make([dynamic]Token, allocator)
+	defer delete(resolved)
+	pi := 0
+	for pi < len(parent_lexer.tokens) {
+		pt := parent_lexer.tokens[pi]
+		if pt.type == .Block_Open {
+			block_close := find_matching_close(parent_lexer.tokens[:], pi, pt.value)
+			if override, has_override := overrides[pt.value]; has_override {
+				for ot in override {
+					append(&resolved, ot)
+				}
+			} else {
+				for di in pi+1..<block_close {
+					append(&resolved, parent_lexer.tokens[di])
+				}
+			}
+			pi = block_close + 1
+		} else {
+			append(&resolved, pt)
+			pi += 1
+		}
+	}
+
+	// Create template with resolved tokens and render
+	resolved_lexer := lexer_make(allocator)
+	for t in resolved {
+		append(&resolved_lexer.tokens, t)
+	}
+	resolved_lexer.src = parent_lexer.src
+
+	parent_tmpl := template_make(resolved_lexer, allocator)
+	parent_tmpl.data = tmpl.data
+	parent_tmpl.partials = tmpl.partials
+
+	template_eat_tokens(parent_tmpl, sb, allocator)
+}
+
 template_eat_tokens :: proc(
 	tmpl: ^Template,
 	sb: ^strings.Builder,
@@ -1157,6 +1280,13 @@ template_process_tokens :: proc(
 			}
 		case .Partial:
 			template_render_partial(tmpl, t, i, sb, allocator)
+		case .Parent:
+			template_handle_parent(tmpl, t, i, sb, allocator)
+			close_i := find_matching_close(tmpl.lexer.tokens[:], i, t.value)
+			i = close_i
+		case .Block_Open:
+			close_i := find_matching_close(tmpl.lexer.tokens[:], i, t.value)
+			i = close_i
 		// Do nothing for these tags.
 		case .Comment, .Skip, .EOF:
 		}
@@ -1170,24 +1300,20 @@ template_render :: proc(
 	sb := strings.builder_make(allocator)
 
 	template_eat_tokens(tmpl, &sb, allocator)
-	rendered := strings.to_string(sb) 
+	rendered := strings.to_string(sb)
 
 	if tmpl.layout != "" {
 		sbl := strings.builder_make(allocator)
 
-		// Parse the layout
 		layout_lexer := lexer_make(allocator)
 		layout_lexer.src = tmpl.layout
 		layout_lexer.delim = CORE_DEF
 		lexer_parse(layout_lexer, allocator = allocator) or_return
 
-		// The Layout template shares data and partials with the main template.
 		layout_template := template_make(layout_lexer, allocator)
 		layout_template.data = tmpl.data
 		layout_template.partials = tmpl.partials
 
-		// TODO: Could we directly index the special {{content}} tag so that
-		// we don't need to search it here by iterating and just get it?
 		for t, i in layout_lexer.tokens {
 			if token_is_tag(t) && t.value == "content" {
 				template_insert_content_into_layout(layout_template, t, i, rendered, allocator)

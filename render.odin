@@ -28,6 +28,7 @@ Base_Data :: struct {
 	now:            datetime.DateTime,
 	author:         string,
 	params:         json.Value,
+	body:           string,
 	title:          string,
 	og_site_name:   string,
 	og_description: string,
@@ -41,7 +42,6 @@ Base_Data :: struct {
 Page_Data :: struct {
 	using base:   Base_Data,
 	page_title:   string,
-	body_html:    string,
 	has_date:     bool,
 	date_iso:     string,
 	date_display: string,
@@ -52,7 +52,6 @@ Page_Data :: struct {
 
 Home_Data :: struct {
 	using base: Base_Data,
-	home_body:  string,
 	list_pages: [dynamic]Page_Context,
 }
 
@@ -112,13 +111,12 @@ load_template :: proc(layouts_dir: string, name: string) -> string {
 	return string(data)
 }
 
-render_with_layout :: proc(
+render_template :: proc(
 	content_tpl: string,
 	data: any,
-	base_tpl: string,
 	partials: map[string]string,
 ) -> string {
-	result, err := mustache.render_in_layout(content_tpl, data, base_tpl, partials)
+	result, err := mustache.render(content_tpl, data, partials)
 	if err != nil {
 		fmt.eprintfln("thor: mustache error: %v", err)
 		return ""
@@ -131,7 +129,7 @@ render_site :: proc(pages: []Page, config: Site) {
 
 	// Load shared resources once
 	partials := load_partials(config.layouts_dir)
-	base_tpl := load_template(config.layouts_dir, "base.html")
+	partials["base"] = load_template(config.layouts_dir, "base.html")
 	post_tpl := load_template(config.layouts_dir, "post.html")
 
 	now, ok := time.time_to_datetime(time.now())
@@ -163,7 +161,7 @@ render_site :: proc(pages: []Page, config: Site) {
 		if page.type == .Home {
 			continue
 		}
-		html := render_page_html(page, config, post_tpl, base_tpl, partials, base)
+		html := render_page_html(page, config, post_tpl, partials, base)
 		if .Minify in config.features {
 			html = minify_html(html)
 		}
@@ -173,7 +171,7 @@ render_site :: proc(pages: []Page, config: Site) {
 	// Render home page
 	if has_home {
 		home_tpl := load_template(config.layouts_dir, "home.html")
-		home_html := render_home_html(home, pages, config, home_tpl, base_tpl, partials, base)
+		home_html := render_home_html(home, pages, config, home_tpl, partials, base)
 		if .Minify in config.features {
 			home_html = minify_html(home_html)
 		}
@@ -182,7 +180,7 @@ render_site :: proc(pages: []Page, config: Site) {
 
 	// Render posts list page
 	posts_tpl := load_template(config.layouts_dir, "posts_list.html")
-	posts_html := render_posts_html(pages, config, posts_tpl, base_tpl, partials, base)
+	posts_html := render_posts_html(pages, config, posts_tpl, partials, base)
 	if .Minify in config.features {
 		posts_html = minify_html(posts_html)
 	}
@@ -214,7 +212,6 @@ render_page_html :: proc(
 	page: Page,
 	config: Site,
 	content_tpl: string,
-	base_tpl: string,
 	partials: map[string]string,
 	base: Base_Data,
 ) -> string {
@@ -224,7 +221,7 @@ render_page_html :: proc(
 	}
 	data.title = fmt.tprintf("%s | %s", page.title, config.title)
 	data.page_title = page.title
-	data.body_html = page.body_html
+	data.body = page.body_html
 	data.has_date = page.date != ""
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
@@ -235,7 +232,7 @@ render_page_html :: proc(
 	data.is_article = is_article
 	data.og_section = "posts"
 	data.og_published = page.date
-	return render_with_layout(content_tpl, data, base_tpl, partials)
+	return render_template(content_tpl, data, partials)
 }
 
 render_home_html :: proc(
@@ -243,7 +240,6 @@ render_home_html :: proc(
 	pages: []Page,
 	config: Site,
 	content_tpl: string,
-	base_tpl: string,
 	partials: map[string]string,
 	base: Base_Data,
 ) -> string {
@@ -260,20 +256,19 @@ render_home_html :: proc(
 		base = base,
 	}
 	data.title = config.title
-	data.home_body = home.body_html
+	data.body = home.body_html
 	data.list_pages = list_pages
 	data.og_url = fmt.tprintf("%s/", config.base_url)
 	data.og_title = config.title
 	data.og_type = "website"
 	data.is_article = false
-	return render_with_layout(content_tpl, data, base_tpl, partials)
+	return render_template(content_tpl, data, partials)
 }
 
 render_posts_html :: proc(
 	pages: []Page,
 	config: Site,
 	content_tpl: string,
-	base_tpl: string,
 	partials: map[string]string,
 	base: Base_Data,
 ) -> string {
@@ -301,7 +296,7 @@ render_posts_html :: proc(
 	data.og_title = "Posts"
 	data.og_type = "website"
 	data.is_article = false
-	return render_with_layout(content_tpl, data, base_tpl, partials)
+	return render_template(content_tpl, data, partials)
 }
 
 load_partials :: proc(layouts_dir: string) -> map[string]string {
