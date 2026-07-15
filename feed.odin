@@ -5,13 +5,10 @@ import "core:strings"
 import "core:time"
 
 generate_rss :: proc(pages: []Page, config: Site) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
 
-	append(
-		&parts,
-		fmt.aprintf(
-			`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+	strings.write_string(&sb, fmt.aprintf(
+		`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 <title>%s</title>
@@ -19,12 +16,11 @@ generate_rss :: proc(pages: []Page, config: Site) -> string {
 <description>%s</description>
 <language>en-us</language>
 <atom:link href="%s/index.xml" rel="self" type="application/rss+xml"/>`,
-			xml_escape(config.title),
-			config.base_url,
-			xml_escape(config.description),
-			config.base_url,
-		),
-	)
+		xml_escape(config.title),
+		config.base_url,
+		xml_escape(config.description),
+		config.base_url,
+	))
 
 	for page in pages {
 		if page.type == .Home {
@@ -36,10 +32,8 @@ generate_rss :: proc(pages: []Page, config: Site) -> string {
 			pub_date = format_rfc822(page.date)
 		}
 
-		append(
-			&parts,
-			fmt.aprintf(
-				`<item>
+		strings.write_string(&sb, fmt.aprintf(
+			`<item>
 <title>%s</title>
 <link>%s%s</link>
 <pubDate>%s</pubDate>
@@ -47,42 +41,35 @@ generate_rss :: proc(pages: []Page, config: Site) -> string {
 <description>%s</description>
 </item>
 `,
-				xml_escape(page.title),
-				config.base_url,
-				page.permalink,
-				pub_date,
-				config.base_url,
-				page.permalink,
-				xml_escape(page.body_html),
-			),
-		)
+			xml_escape(page.title),
+			config.base_url,
+			page.permalink,
+			pub_date,
+			config.base_url,
+			page.permalink,
+			xml_escape(page.body_html),
+		))
 	}
 
-	append(&parts, "</channel>\n</rss>")
-
-	return strings.join(parts[:], "")
+	strings.write_string(&sb, "</channel>\n</rss>")
+	return strings.to_string(sb)
 }
 
 generate_sitemap :: proc(pages: []Page, base_url: string) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
 
-	append(
-		&parts,
-		`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+	strings.write_string(&sb, `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-`,
-	)
+`)
 
 	for page in pages {
 		lastmod := ""
 		if page.date != "" {
 			lastmod = fmt.aprintf("<lastmod>%s</lastmod>", page.date)
 		}
-		append(
-			&parts,
-			fmt.aprintf("<url><loc>%s%s</loc>%s</url>\n", base_url, page.permalink, lastmod),
-		)
+		strings.write_string(&sb, fmt.aprintf(
+			"<url><loc>%s%s</loc>%s</url>\n", base_url, page.permalink, lastmod,
+		))
 	}
 
 	// Posts list page
@@ -96,11 +83,12 @@ generate_sitemap :: proc(pages: []Page, base_url: string) -> string {
 	if posts_lastmod != "" {
 		posts_lm = fmt.aprintf("<lastmod>%s</lastmod>", posts_lastmod)
 	}
-	append(&parts, fmt.aprintf("<url><loc>%s/posts/</loc>%s</url>\n", base_url, posts_lm))
+	strings.write_string(&sb, fmt.aprintf(
+		"<url><loc>%s/posts/</loc>%s</url>\n", base_url, posts_lm,
+	))
 
-	append(&parts, "</urlset>")
-
-	return strings.join(parts[:], "")
+	strings.write_string(&sb, "</urlset>")
+	return strings.to_string(sb)
 }
 
 // TODO: Leaks
