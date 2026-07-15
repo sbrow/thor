@@ -5,6 +5,7 @@ import "mustache"
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:strings"
 import "core:time"
@@ -103,18 +104,22 @@ og_type :: proc(is_article: bool) -> string {
 	return "website"
 }
 
-load_template :: proc(layouts_dir: string, name: string) -> string {
+load_template :: proc(layouts_dir: string, name: string) -> mustache.Template {
 	data, _ := os.read_entire_file_from_path(
 		fmt.tprintf("%s/%s", layouts_dir, name),
 		context.allocator,
 	)
-	return string(data)
+	tpl, err := mustache.parse(string(data))
+	if err != nil {
+		log.warnf("thor: failed to parse template %s: %v", name, err)
+	}
+	return tpl
 }
 
 render_template :: proc(
-	content_tpl: string,
+	content_tpl: mustache.Template,
 	data: any,
-	partials: map[string]string,
+	partials: map[string]mustache.Template,
 ) -> string {
 	result, err := mustache.render(content_tpl, data, partials)
 	if err != nil {
@@ -211,8 +216,8 @@ render_site :: proc(pages: []Page, config: Site) {
 render_page_html :: proc(
 	page: Page,
 	config: Site,
-	content_tpl: string,
-	partials: map[string]string,
+	content_tpl: mustache.Template,
+	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
 	is_article := page.type == .Post
@@ -239,8 +244,8 @@ render_home_html :: proc(
 	home: Page,
 	pages: []Page,
 	config: Site,
-	content_tpl: string,
-	partials: map[string]string,
+	content_tpl: mustache.Template,
+	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
 	list_pages := make([dynamic]Page_Context)
@@ -268,8 +273,8 @@ render_home_html :: proc(
 render_posts_html :: proc(
 	pages: []Page,
 	config: Site,
-	content_tpl: string,
-	partials: map[string]string,
+	content_tpl: mustache.Template,
+	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
 	year_sections := make([dynamic]Year_Section)
@@ -299,15 +304,15 @@ render_posts_html :: proc(
 	return render_template(content_tpl, data, partials)
 }
 
-load_partials :: proc(layouts_dir: string) -> map[string]string {
-	partials: map[string]string
+load_partials :: proc(layouts_dir: string) -> map[string]mustache.Template {
+	partials: map[string]mustache.Template
 	partials_dir := fmt.tprintf("%s/partials", layouts_dir)
 	load_partials_recursive(&partials, partials_dir, "")
 	return partials
 }
 
 load_partials_recursive :: proc(
-	partials: ^map[string]string,
+	partials: ^map[string]mustache.Template,
 	base_dir: string,
 	rel_prefix: string,
 ) {
@@ -331,7 +336,11 @@ load_partials_recursive :: proc(
 			}
 			data, ok := os.read_entire_file_from_path(entry.fullpath, context.allocator)
 			if ok == nil {
-				partials[key] = string(data)
+				tpl, perr := mustache.parse(string(data))
+				if perr != nil {
+					log.warnf("thor: failed to parse partial %s: %v", key, perr)
+				}
+				partials[key] = tpl
 			}
 		case .Directory:
 			sub_prefix := entry.name

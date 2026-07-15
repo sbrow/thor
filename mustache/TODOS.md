@@ -1,0 +1,2 @@
+- [ ] Initialize string builder size based on filesize?
+- [ ] Review [whitespace handling code](./tokenizer.odin)

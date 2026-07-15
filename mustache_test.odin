@@ -10,7 +10,8 @@ test_simple_substitution :: proc(t: ^testing.T) {
 	data := map[string]string {
 		"name" = "World",
 	}
-	result, err := mustache.render("Hello, {{name}}!", data)
+	tpl, _ := mustache.parse("Hello, {{name}}!")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "Hello, World!")
 }
@@ -20,7 +21,8 @@ test_bool_section :: proc(t: ^testing.T) {
 	data := map[string]bool {
 		"show" = true,
 	}
-	result, err := mustache.render("{{#show}}visible{{/show}}", data)
+	tpl, _ := mustache.parse("{{#show}}visible{{/show}}")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "visible")
 }
@@ -30,7 +32,8 @@ test_inverted_section :: proc(t: ^testing.T) {
 	data := map[string]bool {
 		"show" = false,
 	}
-	result, err := mustache.render("{{^show}}hidden{{/show}}", data)
+	tpl, _ := mustache.parse("{{^show}}hidden{{/show}}")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "hidden")
 }
@@ -40,7 +43,8 @@ test_unescaped :: proc(t: ^testing.T) {
 	data := map[string]string {
 		"html" = "<b>bold</b>",
 	}
-	result, err := mustache.render("{{{html}}}", data)
+	tpl, _ := mustache.parse("{{{html}}}")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "<b>bold</b>")
 }
@@ -55,7 +59,8 @@ test_array_iteration :: proc(t: ^testing.T) {
 	data := map[string][dynamic]map[string]string {
 		"items" = items,
 	}
-	result, err := mustache.render("{{#items}}{{name}} {{/items}}", data)
+	tpl, _ := mustache.parse("{{#items}}{{name}} {{/items}}")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "Alice Bob ")
 }
@@ -65,10 +70,12 @@ test_partial :: proc(t: ^testing.T) {
 	data := map[string]string {
 		"name" = "Test",
 	}
-	partials := map[string]string {
-		"greeting" = "Hello, {{name}}!",
+	greeting_tpl, _ := mustache.parse("Hello, {{name}}!")
+	partials := map[string]mustache.Template {
+		"greeting" = greeting_tpl,
 	}
-	result, err := mustache.render("{{>greeting}}", data, partials)
+	main_tpl, _ := mustache.parse("{{>greeting}}")
+	result, err := mustache.render(main_tpl, data, partials)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "Hello, Test!")
 }
@@ -81,7 +88,8 @@ test_mixed_types :: proc(t: ^testing.T) {
 		"date"       = "17 Jul 2025",
 	}
 
-	result, err := mustache.render("{{site_title}}: {{#has_date}}{{date}}{{/has_date}}", data)
+	tpl, _ := mustache.parse("{{site_title}}: {{#has_date}}{{date}}{{/has_date}}")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "One Idiot Developer: 17 Jul 2025")
 }
@@ -96,19 +104,8 @@ test_nested_context :: proc(t: ^testing.T) {
 		"page"       = page,
 	}
 
-	result, err := mustache.render("{{site_title}}: {{#page}}{{title}}{{/page}}", data)
+	tpl, _ := mustache.parse("{{site_title}}: {{#page}}{{title}}{{/page}}")
+	result, err := mustache.render(tpl, data)
 	testing.expect(t, err == nil)
 	testing.expect(t, result == "One Idiot Developer: My Post")
 }
-
-@(test)
-test_layout :: proc(t: ^testing.T) {
-	layout := `<html><body>{{{content}}}</body></html>`
-	template := "<p>Hello!</p>"
-	data := map[string]string{}
-
-	result, err := mustache.render_in_layout(template, data, layout)
-	testing.expect(t, err == nil)
-	testing.expect(t, result == "<html><body><p>Hello!</p></body></html>")
-}
-
