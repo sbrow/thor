@@ -6,21 +6,8 @@ import "mustache"
 import "core:fmt"
 import "core:os"
 import "core:strings"
-
-MONTHS: [12]string = {
-	"Jan",
-	"Feb",
-	"Mar",
-	"Apr",
-	"May",
-	"Jun",
-	"Jul",
-	"Aug",
-	"Sep",
-	"Oct",
-	"Nov",
-	"Dec",
-}
+import "core:time"
+import "core:time/datetime"
 
 Page_Context :: struct {
 	permalink:    string,
@@ -199,7 +186,11 @@ load_partials :: proc(layouts_dir: string) -> map[string]string {
 	return partials
 }
 
-load_partials_recursive :: proc(partials: ^map[string]string, base_dir: string, rel_prefix: string) {
+load_partials_recursive :: proc(
+	partials: ^map[string]string,
+	base_dir: string,
+	rel_prefix: string,
+) {
 	entries, err := os.read_all_directory_by_path(base_dir, context.allocator)
 	if err != nil {
 		return
@@ -334,19 +325,11 @@ render_posts_html :: proc(pages: []Page, config: Site) -> string {
 	return result
 }
 
+// TODO: Leaks
 format_date :: proc(iso: string) -> string {
-	if len(iso) < 10 {
-		return iso
-	}
-	year := iso[:4]
-	month_num := (int(iso[5]) - 0x30) * 10 + (int(iso[6]) - 0x30)
-	day_num := (int(iso[8]) - 0x30) * 10 + (int(iso[9]) - 0x30)
+	date, _, _, _ := time.iso8601_to_components(iso)
 
-	if month_num < 1 || month_num > 12 {
-		return iso[:10]
-	}
-
-	return fmt.aprintf("%d %s %s", day_num, MONTHS[month_num - 1], year)
+	return fmt.aprintf("%s %d, %d", time.Month(date.month), date.day, date.year)
 }
 
 get_year :: proc(iso: string) -> string {

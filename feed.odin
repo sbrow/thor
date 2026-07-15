@@ -2,8 +2,7 @@ package main
 
 import "core:fmt"
 import "core:strings"
-
-WEEKDAYS: [7]string = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+import "core:time"
 
 generate_rss :: proc(pages: []Page, config: Site) -> string {
 	parts: [dynamic]string
@@ -104,35 +103,30 @@ generate_sitemap :: proc(pages: []Page, base_url: string) -> string {
 	return strings.join(parts[:], "")
 }
 
+// TODO: Leaks
 format_rfc822 :: proc(iso: string) -> string {
 	if len(iso) < 19 {
+		// TODO: should indicate error somehow
 		return iso
 	}
 
-	year :=
-		(int(iso[0]) - 0x30) * 1000 +
-		(int(iso[1]) - 0x30) * 100 +
-		(int(iso[2]) - 0x30) * 10 +
-		(int(iso[3]) - 0x30)
-	month := (int(iso[5]) - 0x30) * 10 + (int(iso[6]) - 0x30)
-	day := (int(iso[8]) - 0x30) * 10 + (int(iso[9]) - 0x30)
-	time := iso[11:19]
+	date, offset, _ := time.iso8601_to_time_and_offset(iso)
 
-	// Timezone: -04:00 → -0400
-	tz := "+0000"
-	if len(iso) >= 25 && (iso[19] == '+' || iso[19] == '-') {
-		tz = fmt.tprintf("%c%s%s", iso[19], iso[20:22], iso[23:25])
-	}
+	weekday := fmt.tprintf("%s", time.weekday(date))
+	month := fmt.tprintf("%s", time.month(date))
+	buf: [8]byte
+	t := time.to_string_hms(date, buf[:])
 
-	// Sakamoto's method for day of week (0=Sunday)
-	t := [12]int{0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4}
-	y := year
-	if month < 3 {
-		y -= 1
-	}
-	dow := (y + y / 4 - y / 100 + y / 400 + t[month - 1] + day) % 7
-
-	return fmt.aprintf("%s, %d %s %d %s %s", WEEKDAYS[dow], day, MONTHS[month - 1], year, time, tz)
+	return fmt.aprintf(
+		"%s, %02d %s %d %s %3d%2d",
+		weekday[:3],
+		time.day(date),
+		month[:3],
+		time.year(date),
+		t,
+		offset / 60,
+		offset % 60,
+	)
 }
 
 xml_escape :: proc(s: string) -> string {
