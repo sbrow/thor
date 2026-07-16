@@ -244,37 +244,39 @@ capture_name_to_css :: proc(name: string) -> string {
 }
 
 escape_html :: proc(s: string) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
 	start := 0
 	for i in 0..<len(s) {
 		switch s[i] {
 		case '&':
-			if i > start do append(&parts, s[start:i])
-			append(&parts, "&amp;")
+			if i > start do strings.write_string(&sb, s[start:i])
+			strings.write_string(&sb, "&amp;")
 			start = i + 1
 		case '<':
-			if i > start do append(&parts, s[start:i])
-			append(&parts, "&lt;")
+			if i > start do strings.write_string(&sb, s[start:i])
+			strings.write_string(&sb, "&lt;")
 			start = i + 1
 		case '>':
-			if i > start do append(&parts, s[start:i])
-			append(&parts, "&gt;")
+			if i > start do strings.write_string(&sb, s[start:i])
+			strings.write_string(&sb, "&gt;")
 			start = i + 1
 		case '"':
-			if i > start do append(&parts, s[start:i])
-			append(&parts, "&quot;")
+			if i > start do strings.write_string(&sb, s[start:i])
+			strings.write_string(&sb, "&quot;")
 			start = i + 1
 		}
 	}
-	if start < len(s) do append(&parts, s[start:])
-	if len(parts) == 0 do return s
-	return strings.join(parts[:], "")
+	if start == 0 do return s
+	if start < len(s) do strings.write_string(&sb, s[start:])
+	return strings.to_string(sb)
 }
 
 unescape_html :: proc(s: string) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
 	start := 0
 	for i in 0..<len(s) {
 		if s[i] != '&' do continue
@@ -290,13 +292,13 @@ unescape_html :: proc(s: string) -> string {
 		case "&#39;", "&apos;": replacement = "'"
 		case: continue
 		}
-		if i > start do append(&parts, s[start:i])
-		append(&parts, replacement)
+		if i > start do strings.write_string(&sb, s[start:i])
+		strings.write_string(&sb, replacement)
 		start = i + semi + 1
 	}
-	if start < len(s) do append(&parts, s[start:])
-	if len(parts) == 0 do return s
-	return strings.join(parts[:], "")
+	if start == 0 do return s
+	if start < len(s) do strings.write_string(&sb, s[start:])
+	return strings.to_string(sb)
 }
 
 highlight_block :: proc(code: string, lang: string, file_path: string) -> string {
@@ -416,19 +418,22 @@ highlight_code :: proc(html: string, file_path: string) -> string {
 	PREFIX :: `<pre><code class="language-`
 	CODE_END :: `</code></pre>`
 
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
 	pos := 0
+	found := false
 
 	for {
 		rel := strings.index(html[pos:], PREFIX)
 		if rel < 0 {
 			break
 		}
+		found = true
 		idx := pos + rel
 
 		if idx > pos {
-			append(&parts, html[pos:idx])
+			strings.write_string(&sb, html[pos:idx])
 		}
 
 		lang_start := idx + len(PREFIX)
@@ -455,17 +460,17 @@ highlight_code :: proc(html: string, file_path: string) -> string {
 
 		code := html[code_start:end_idx]
 		highlighted := highlight_block(code, lang, file_path)
-		append(&parts, fmt.tprintf(`<pre><code class="language-%s">%s</code></pre>`, lang, highlighted))
+		strings.write_string(&sb, fmt.tprintf(`<pre><code class="language-%s">%s</code></pre>`, lang, highlighted))
 
 		pos = end_idx + len(CODE_END)
 	}
 
-	if pos < len(html) {
-		append(&parts, html[pos:])
+	if pos < len(html) && found {
+		strings.write_string(&sb, html[pos:])
 	}
 
-	if len(parts) == 0 {
+	if !found {
 		return html
 	}
-	return strings.join(parts[:], "")
+	return strings.to_string(sb)
 }

@@ -21,37 +21,34 @@ ALERT_EMOJIS: map[string]string = {
 }
 
 inject_alerts :: proc(html: string) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
 
 	remaining := html
 
 	for {
 		bq_start := strings.index(remaining, "<blockquote>")
 		if bq_start < 0 {
-			append(&parts, remaining)
+			strings.write_string(&sb, remaining)
 			break
 		}
 
 		bq_close := strings.index(remaining, "</blockquote>")
 		if bq_close < 0 {
-			append(&parts, remaining)
+			strings.write_string(&sb, remaining)
 			break
 		}
 
 		bq_end := bq_close + len("</blockquote>")
 		bq := remaining[bq_start:bq_end]
 
-		// Append text before this blockquote
-		append(&parts, remaining[:bq_start])
-
-		// Transform if it's an alert, otherwise keep as-is
-		append(&parts, transform_alert(bq))
+		strings.write_string(&sb, remaining[:bq_start])
+		strings.write_string(&sb, transform_alert(bq))
 
 		remaining = remaining[bq_end:]
 	}
 
-	return strings.join(parts[:], "")
+	return strings.to_string(sb)
 }
 
 transform_alert :: proc(bq: string) -> string {

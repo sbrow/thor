@@ -5,10 +5,12 @@ import "core:strings"
 wrap_sections :: proc(html: string) -> string {
 	H2 :: "<h2"
 
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
 	pos := 0
 	search_pos := 0
+	found := false
 
 	for {
 		rel := strings.index(html[search_pos:], H2)
@@ -16,11 +18,12 @@ wrap_sections :: proc(html: string) -> string {
 			break
 		}
 		idx := search_pos + rel
+		found = true
 
 		if idx > pos {
-			append(&parts, "<section>")
-			append(&parts, html[pos:idx])
-			append(&parts, "</section>")
+			strings.write_string(&sb, "<section>")
+			strings.write_string(&sb, html[pos:idx])
+			strings.write_string(&sb, "</section>")
 		}
 
 		pos = idx
@@ -28,13 +31,14 @@ wrap_sections :: proc(html: string) -> string {
 	}
 
 	if pos < len(html) {
-		append(&parts, "<section>")
-		append(&parts, html[pos:])
-		append(&parts, "</section>")
+		strings.write_string(&sb, "<section>")
+		strings.write_string(&sb, html[pos:])
+		strings.write_string(&sb, "</section>")
+		found = true
 	}
 
-	if len(parts) == 0 {
+	if !found {
 		return html
 	}
-	return strings.join(parts[:], "")
+	return strings.to_string(sb)
 }

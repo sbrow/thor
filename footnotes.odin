@@ -20,11 +20,11 @@ strip_definitions :: proc(
 	clean_body: string,
 	sn_defs, mn_defs: map[string]string,
 ) {
-	// TODO: Should this be temp allocated?
 	lines := strings.split(body, "\n")
 	defer delete(lines)
-	output_lines: [dynamic]string
-	defer delete(output_lines)
+
+	out_sb := strings.builder_make()
+	defer strings.builder_destroy(&out_sb)
 
 	i := 0
 	for i < len(lines) {
@@ -32,48 +32,51 @@ strip_definitions :: proc(
 
 		id, def_text, kind, is_def := parse_def_line(line)
 		if !is_def {
-			append(&output_lines, line)
+			if strings.builder_len(out_sb) > 0 {
+				strings.write_string(&out_sb, "\n")
+			}
+			strings.write_string(&out_sb, line)
 			i += 1
 			continue
 		}
 
-		// Collect definition text (initial line + multi-line continuations)
-		def_parts: [dynamic]string
+		def_sb := strings.builder_make()
 		if def_text != "" {
-			append(&def_parts, def_text)
+			strings.write_string(&def_sb, def_text)
 		}
 
 		i += 1
 		for i < len(lines) {
 			next := lines[i]
-			// Stop at blank lines
 			if len(next) == 0 {
 				break
 			}
-			// Stop at new note definitions
 			_, _, _, is_new_def := parse_def_line(next)
 			if is_new_def {
 				break
 			}
-			// Include as continuation (trim indented lines)
+			if strings.builder_len(def_sb) > 0 {
+				strings.write_string(&def_sb, "\n")
+			}
 			if is_indented(next) {
-				append(&def_parts, strings.trim_left(next, " \t"))
+				strings.write_string(&def_sb, strings.trim_left(next, " \t"))
 			} else {
-				append(&def_parts, next)
+				strings.write_string(&def_sb, next)
 			}
 			i += 1
 		}
 
-		joined := strings.join(def_parts[:], "\n")
+		joined := strings.clone(strings.to_string(def_sb))
+		strings.builder_destroy(&def_sb)
+
 		if kind == .Marginnote {
 			mn_defs[id] = joined
 		} else {
 			sn_defs[id] = joined
 		}
-		delete(def_parts)
 	}
 
-	clean_body = strings.join(output_lines[:], "\n")
+	clean_body = strings.clone(strings.to_string(out_sb))
 	return
 }
 

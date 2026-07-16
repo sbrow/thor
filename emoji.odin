@@ -384,30 +384,27 @@ expand_emoji :: proc(text: string) -> string {
 		return text
 	}
 
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
 
 	remaining := text
 
 	for {
 		colon := strings.index(remaining, ":")
 		if colon < 0 {
-			append(&parts, remaining)
+			strings.write_string(&sb, remaining)
 			break
 		}
 
-		// Find the closing colon
 		after := remaining[colon + 1:]
 		end := strings.index(after, ":")
 		if end < 0 {
-			append(&parts, remaining)
+			strings.write_string(&sb, remaining)
 			break
 		}
 
 		shortcode := remaining[colon + 1 : colon + 1 + end]
 
-		// Validate: shortcode must be all lowercase letters, digits, or underscores
-		// and must not contain whitespace
 		valid := true
 		for c in shortcode {
 			if !(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '_' && c != '+' && c != '-' {
@@ -416,23 +413,22 @@ expand_emoji :: proc(text: string) -> string {
 			}
 		}
 		if !valid || len(shortcode) == 0 {
-			append(&parts, remaining[:colon + 1])
+			strings.write_string(&sb, remaining[:colon + 1])
 			remaining = remaining[colon + 1:]
 			continue
 		}
 
 		emoji, found := EMOJIS[shortcode]
 		if !found {
-			append(&parts, remaining[:colon + 1])
+			strings.write_string(&sb, remaining[:colon + 1])
 			remaining = remaining[colon + 1:]
 			continue
 		}
 
-		// Replace :shortcode: with emoji
-		append(&parts, remaining[:colon])
-		append(&parts, emoji)
+		strings.write_string(&sb, remaining[:colon])
+		strings.write_string(&sb, emoji)
 		remaining = remaining[colon + 1 + end + 1:]
 	}
 
-	return strings.join(parts[:], "")
+	return strings.to_string(sb)
 }

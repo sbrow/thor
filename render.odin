@@ -70,14 +70,15 @@ Posts_Data :: struct {
 }
 
 strip_html_tags :: proc(s: string) -> string {
-	parts: [dynamic]string
-	defer delete(parts)
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
 	in_tag := false
 	start := 0
 	for i in 0 ..< len(s) {
 		if s[i] == '<' && !in_tag {
 			if i > start {
-				append(&parts, s[start:i])
+				strings.write_string(&sb, s[start:i])
 			}
 			in_tag = true
 		} else if s[i] == '>' && in_tag {
@@ -85,13 +86,13 @@ strip_html_tags :: proc(s: string) -> string {
 			start = i + 1
 		}
 	}
-	if !in_tag && start < len(s) {
-		append(&parts, s[start:])
-	}
-	if len(parts) == 0 {
+	if start == 0 {
 		return s
 	}
-	return strings.join(parts[:], "")
+	if !in_tag && start < len(s) {
+		strings.write_string(&sb, s[start:])
+	}
+	return strings.to_string(sb)
 }
 
 og_type :: proc(is_article: bool) -> string {
