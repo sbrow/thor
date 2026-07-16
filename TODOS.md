@@ -3,20 +3,10 @@
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Performance
   - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
-- [ ] remove "has_*" keys from context.
-- [x] Enable configuration to opt-out of features, particular pre/post processors.
-- [ ] proper date/time/now object.
-- [ ] Footer isn't centered properly.
 - [ ] mustache data keys for opengraph, etc.
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
-- [x] Emoji shortcodes (`:shrug:` etc.) — 2 instances
-  - [x] Backslash in shrug not visible.
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
-- [x] Nix build integration — main flake runs thor + tailwindcss instead of Hugo
-- [x] OpenGraph meta tags
-- [x] copy all files from `static` to `public`.
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
-- [x] Search up for `thor.json` files.
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Add Opt-in deflist support.
 - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
@@ -40,6 +30,8 @@
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
 - [ ] commands
+  - [ ] `build` alias of default
+  - [ ] `init` set up new project
 - [ ] Use spall to find ways to reduce run time.
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Review every file in thor

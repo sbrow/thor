@@ -15,7 +15,6 @@ Page_Context :: struct {
 	permalink:    string,
 	title:        string,
 	starred:      bool,
-	has_date:     bool,
 	date_iso:     string,
 	date_display: string,
 }
@@ -43,7 +42,6 @@ Base_Data :: struct {
 Page_Data :: struct {
 	using base:   Base_Data,
 	page_title:   string,
-	has_date:     bool,
 	date_iso:     string,
 	date_display: string,
 	is_post:      bool,
@@ -61,12 +59,11 @@ Posts_Data :: struct {
 	year_sections: [dynamic]Year_Section,
 }
 
-build_page_context :: proc(page: Page) -> Page_Context {
+	build_page_context :: proc(page: Page) -> Page_Context {
 	return Page_Context {
 		permalink = page.permalink,
 		title = page.title,
 		starred = page.is_starred,
-		has_date = page.date != "",
 		date_iso = page.date,
 		date_display = format_date(page.date),
 	}
@@ -227,7 +224,6 @@ render_page_html :: proc(
 	data.title = fmt.tprintf("%s | %s", page.title, config.title)
 	data.page_title = page.title
 	data.body = page.body_html
-	data.has_date = page.date != ""
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
 	data.is_post = is_article
