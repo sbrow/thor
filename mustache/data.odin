@@ -9,19 +9,27 @@ import "core:strings"
 // effective unwraps union variants and strips Named/Distinct layers,
 // returning the "peeled" any value and its base type info.
 effective :: proc(a: any) -> (val: any, info: ^runtime.Type_Info) {
+	if a == nil {
+		return
+	}
+
 	val = a
 	info = nil
-	if val == nil do return
 
 	ti := type_info_of(val.id)
-	if ti == nil do return
+	if ti == nil {
+		return
+	}
 
 	base := runtime.type_info_base(ti)
 
 	if _, ok := base.variant.(runtime.Type_Info_Union); ok {
 		variant := reflect.get_union_variant(val)
-		if variant == nil do return {}, nil
-		return effective(variant)
+		if variant == nil {
+			return {}, nil
+		} else {
+			return effective(variant)
+		}
 	}
 
 	info = base
@@ -31,35 +39,36 @@ effective :: proc(a: any) -> (val: any, info: ^runtime.Type_Info) {
 // lookup_in resolves a single key in a container (struct or map).
 // Returns found=false if the key doesn't exist or the container is not a struct/map.
 lookup_in :: proc(container: any, key: string) -> (result: any, found: bool) {
-	if container == nil do return nil, false
+	if container == nil {
+		return
+	}
 
 	val, info := effective(container)
-	if info == nil do return nil, false
+	if info == nil {
+		return
+	}
 
 	#partial switch v in info.variant {
 	case runtime.Type_Info_Struct:
 		result = reflect.struct_field_value_by_name(val, key, allow_using = true)
 		found = result != nil
-		return
-
 	case runtime.Type_Info_Map:
 		mi := v
 		rm_ptr := (^runtime.Raw_Map)(val.data)
-		if rm_ptr.len == 0 do return nil, false
+		if rm_ptr.len == 0 {
+			return
+		}
 
 		k := key
 		seed := runtime.map_seed(rm_ptr^)
 		h := mi.map_info.key_hasher(&k, seed)
 		value_ptr := runtime.__dynamic_map_get(rm_ptr, mi.map_info, h, &k)
-		if value_ptr == nil do return nil, false
-
-		result = any{value_ptr, mi.value.id}
-		found = true
-		return
-
-	case:
-		return nil, false
+		if value_ptr != nil {
+			result = any{value_ptr, mi.value.id}
+			found = true
+		}
 	}
+
 	return
 }
 
@@ -68,8 +77,11 @@ lookup_in :: proc(container: any, key: string) -> (result: any, found: bool) {
 // resolve against the prior result only.
 resolve_name :: proc(name: string, ctx: []any) -> any {
 	if name == "." {
-		if len(ctx) > 0 do return ctx[len(ctx) - 1]
-		return nil
+		if len(ctx) > 0 {
+			return ctx[len(ctx) - 1]
+		} else {
+			return nil
+		}
 	}
 
 	parts: [16]string
@@ -89,22 +101,33 @@ resolve_name :: proc(name: string, ctx: []any) -> any {
 		part_count += 1
 	}
 
-	if part_count == 0 do return nil
+	if part_count == 0 {
+		return nil
+	}
+
 	dot_parts := parts[:part_count]
 
 	result: any = nil
 	found := false
 	for i := len(ctx) - 1; i >= 0; i -= 1 {
 		result, found = lookup_in(ctx[i], dot_parts[0])
-		if found do break
+		if found {
+			break
+		}
 	}
 
-	if !found do return nil
-	if len(dot_parts) == 1 do return result
+	if !found {
+		return nil
+	}
+	if len(dot_parts) == 1 {
+		return result
+	}
 
 	for i := 1; i < len(dot_parts); i += 1 {
 		result, found = lookup_in(result, dot_parts[i])
-		if !found do return nil
+		if !found {
+			return nil
+		}
 	}
 
 	return result
@@ -112,11 +135,17 @@ resolve_name :: proc(name: string, ctx: []any) -> any {
 
 // is_truthy checks mustache truthiness.
 is_truthy :: proc(a: any) -> bool {
-	if a == nil do return false
+	if a == nil {
+		return false
+	}
 
 	val, info := effective(a)
-	if info == nil do return false
-	if reflect.is_nil(val) do return false
+	if info == nil {
+		return false
+	}
+	if reflect.is_nil(val) {
+		return false
+	}
 
 	#partial switch _ in info.variant {
 	case runtime.Type_Info_Slice, runtime.Type_Info_Dynamic_Array, runtime.Type_Info_Map:
@@ -130,7 +159,9 @@ is_truthy :: proc(a: any) -> bool {
 // Returns elem_info=nil if the value is not a list.
 list_info :: proc(a: any) -> (elem_info: ^runtime.Type_Info, count: int, data: rawptr) {
 	val, info := effective(a)
-	if info == nil do return nil, 0, nil
+	if info == nil {
+		return
+	}
 
 	#partial switch v in info.variant {
 	case runtime.Type_Info_Slice:
@@ -148,7 +179,9 @@ list_info :: proc(a: any) -> (elem_info: ^runtime.Type_Info, count: int, data: r
 
 // any_to_string converts a scalar value to a string using the temp allocator.
 any_to_string :: proc(a: any) -> string {
-	if a == nil do return ""
+	if a == nil {
+		return ""
+	}
 	val, _ := effective(a)
 
 	switch v in val {
@@ -174,14 +207,18 @@ format_f64 :: proc(v: f64) -> string {
 	buf: [64]byte
 	for prec in 1 ..= 17 {
 		s := strconv.write_float(buf[:], v, 'g', prec, 64)
-		if len(s) > 0 && s[0] == '+' do s = s[1:]
+		if len(s) > 0 && s[0] == '+' {
+			s = s[1:]
+		}
 		parsed, ok := strconv.parse_f64(s)
 		if ok && parsed == v {
 			return strings.clone(s, context.temp_allocator)
 		}
 	}
 	s := strconv.write_float(buf[:], v, 'g', -1, 64)
-	if len(s) > 0 && s[0] == '+' do s = s[1:]
+	if len(s) > 0 && s[0] == '+' {
+		s = s[1:]
+	}
 	return strings.clone(s, context.temp_allocator)
 }
 
@@ -189,7 +226,9 @@ format_f64 :: proc(v: f64) -> string {
 // optionally HTML-escaped.
 write_value :: proc(b: ^strings.Builder, a: any, escape: bool) {
 	s := any_to_string(a)
-	if len(s) == 0 do return
+	if len(s) == 0 {
+		return
+	}
 
 	if !escape {
 		strings.write_string(b, s)
@@ -200,7 +239,9 @@ write_value :: proc(b: ^strings.Builder, a: any, escape: bool) {
 	for i in 0 ..< len(s) {
 		switch s[i] {
 		case '&', '<', '>', '"':
-			if i > start do strings.write_string(b, s[start:i])
+			if i > start {
+				strings.write_string(b, s[start:i])
+			}
 			switch s[i] {
 			case '&':
 				strings.write_string(b, "&amp;")

@@ -19,6 +19,7 @@ Token :: struct {
 	kind:       Token_Kind,
 	value:      string,
 	is_dynamic: bool,
+	indent:     string,
 	pos:        int,
 }
 
@@ -141,24 +142,83 @@ tokenize :: proc(
 // ---------------------------------------------------------------------------
 
 trim_standalone_whitespace :: proc(tokens: ^[dynamic]Token) {
-	for i := 0; i < len(tokens); i += 1 {
-		if !should_trim_whitespace(tokens[i].kind) do continue
+	n := len(tokens)
 
-		left_ok, left_idx := check_left(tokens[:], i)
-		right_ok, right_idx := check_right(tokens[:], i)
+	// First pass: detect standalone status using original token values
+	li_buf := make([dynamic]int, n, context.temp_allocator)
+	defer delete(li_buf)
+	ri_buf := make([dynamic]int, n, context.temp_allocator)
+	defer delete(ri_buf)
 
-		if !left_ok || !right_ok do continue
+	for i := 0; i < n; i += 1 {
+		li_buf[i] = -1
+		ri_buf[i] = -1
+	}
 
-		if left_idx >= 0 {
-			text := tokens[left_idx].value
-			nl := strings.last_index_byte(text, '\n')
-			tokens[left_idx].value = text[:nl+1] if nl >= 0 else ""
+	for i := 0; i < n; i += 1 {
+		should_trim_whitespace(tokens[i].kind) or_continue
+
+		left_ok, li := check_left(tokens[:], i)
+		right_ok, ri := check_right(tokens[:], i)
+
+		if left_ok && right_ok {
+			li_buf[i] = li
+			ri_buf[i] = ri
+		}
+	}
+
+	// Second pass: apply trims left-to-right
+	// Track which text tokens have been trimmed to avoid double-trimming
+	left_done := make([dynamic]bool, n, context.temp_allocator)
+	defer delete(left_done)
+	right_done := make([dynamic]bool, n, context.temp_allocator)
+	defer delete(right_done)
+
+	for i := 0; i < n; i += 1 {
+		should_trim_whitespace(tokens[i].kind) or_continue
+		li := li_buf[i]
+		ri := ri_buf[i]
+		if li < 0 && ri < 0 {
+			continue
 		}
 
-		if right_idx >= 0 {
-			text := tokens[right_idx].value
-			nl := strings.index_byte(text, '\n')
-			tokens[right_idx].value = text[nl+1:] if nl >= 0 else ""
+		if li >= 0 && !left_done[li] {
+			left_done[li] = true
+			text := tokens[li].value
+			nl := strings.last_index_byte(text, '\n')
+			if tokens[i].kind == .Partial ||
+			   tokens[i].kind == .Parent ||
+			   tokens[i].kind == .Block_Open {
+				tokens[i].indent = text[nl + 1:] if nl >= 0 else text
+			}
+			tokens[li].value = text[:nl + 1] if nl >= 0 else ""
+		}
+
+		if ri >= 0 && !right_done[ri] {
+			right_done[ri] = true
+			// When a Block_Open and its Section_Close are adjacent (e.g.
+			// {{$block}}{{/block}}\n), the close tag is the one that
+			// should consume the trailing newline — not the block open.
+			// Skip the right-trim if a Section_Close sits between this
+			// tag and its right text, or if this IS the Section_Close
+			// immediately following a Block_Open (the close handles it).
+			skip := false
+			if tokens[i].kind == .Block_Open {
+				for k := i + 1; k < ri; k += 1 {
+					if tokens[k].kind == .Section_Close {
+						skip = true
+						break
+					}
+				}
+			}
+			if tokens[i].kind == .Section_Close && i > 0 && tokens[i - 1].kind == .Block_Open {
+				skip = true
+			}
+			if !skip {
+				text := tokens[ri].value
+				nl := strings.index_byte(text, '\n')
+				tokens[ri].value = text[nl + 1:] if nl >= 0 else ""
+			}
 		}
 	}
 }
@@ -174,7 +234,7 @@ check_left :: proc(tokens: []Token, i: int) -> (ok: bool, text_idx: int) {
 			}
 			nl := strings.last_index_byte(text, '\n')
 			if nl >= 0 {
-				return strings.trim_space(text[nl+1:]) == "", j
+				return strings.trim_space(text[nl + 1:]) == "", j
 			}
 			if j == 0 {
 				return strings.trim_space(text) == "", j

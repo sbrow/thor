@@ -4,9 +4,12 @@ package mustache
 import "core:encoding/json"
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
 import "core:testing"
 
 run_spec_file :: proc(t: ^testing.T, path: string) {
+	dirs := [?]string{#directory, path}
+	path, _ := filepath.join(dirs[:], context.temp_allocator)
 	raw_data, err := os.read_entire_file(path, context.allocator)
 	if err != nil {
 		testing.expectf(t, false, "Failed to read %s", path)

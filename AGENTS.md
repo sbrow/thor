@@ -28,7 +28,7 @@ public/            ← build output (generated)
 | `sectionate.odin` | `wrap_sections` proc — splits HTML at `<h2` into `<section>` wrappers |
 | `render.odin` | Mustache template rendering, all page types, RSS, sitemap, robots.txt, `load_partials` recursive scan |
 | `feed.odin` | RSS feed + sitemap XML generation |
-| `mustache/` | Vendored [odin-mustache](https://github.com/benjamindblock/odin-mustache) library |
+| `mustache/` | Mustache template engine (spec-compliant, replaces vendored odin-mustache) |
 
 Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss, chevron_up, star).
 
@@ -131,19 +131,39 @@ odin test .           # site + mustache smoke tests
 odin test mustache    # mustache spec + targeted tests (37 total)
 ```
 
-## Vendored mustache patches
+## Mustache engine
 
-Four modifications to `mustache/mustache.odin`:
+Spec-compliant Mustache implementation at `mustache/`. Passes all 170 tests across 7 official spec files (interpolation, sections, inverted, comments, partials, dynamic-names, inheritance).
 
-1. **`any` unwrapping** in `map_get` and `data_type` — when values come from `map[string]any`, the inner `any` wrapper is unwrapped so type detection works correctly for nested maps and lists.
+### Files
 
-2. **Layout partials** — `layout_template.partials = tmpl.partials` added so partials (`{{> nav}}`, `{{> footer}}`) work inside the base layout template.
+| File | Responsibility |
+|---|---|
+| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), post-parse de-indent (`deindent_blocks`), renderer (`render_nodes`), indent helpers |
+| `tokenizer.odin` | Tokenizer (template string → `[]Token`), two-pass standalone whitespace detection (`trim_standalone_whitespace`) |
+| `data.odin` | Reflection-based data model: `effective` (union/distinct peeling), `lookup_in`, `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `write_value`, `format_f64` |
+| `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case |
 
-3. **Inline partial rendering** — replaced `template_insert_partial` (which injected tokens into the main token list, breaking section iteration) with `template_render_partial` (which lexes the partial, temporarily swaps `tmpl.lexer`, and recursively processes via `template_process_tokens`). Fixes partials inside sections. Standalone indentation applied to partial source before lexing.
+### Architecture
 
-4. **Dynamic Names** — `{{>*key}}` support. When a partial token value starts with `*`, the remaining key is resolved from the data context stack, and the resolved string is used as the partial name. Enables per-item partial selection inside sections (e.g., `{{>* icon}}` resolves `icon` from each social link).
+```
+parse(source) → tokenize → trim_standalone_whitespace → parse_section → deindent_blocks → Template
+render(tmpl, data, partials) → render_nodes (walks flat node array against context stack) → string
+```
 
-Extracted `template_process_tokens` from `template_eat_tokens` to separate ROOT initialization + skip pass from the core token loop, allowing partials to reuse the loop.
+- **Flat `[dynamic]Node` array** with `first_child`/`child_count` indices — one allocation, one `delete`. Pre-order layout: children stored contiguously after their parent.
+- **`render_nodes`** takes `all_nodes` (full array, for absolute child access) + `nodes` (current slice). Index-based loop, skips children after sections/blocks via `i += 1 + child_count`.
+- **Context stack**: `^[dynamic]any` with `append`/`pop` for section push/pop.
+- **`effective(a)`** peels Named/Distinct/Union layers (including `json.Value`) so all downstream operations can switch on base `Type_Info` variant directly.
+- **Two-pass standalone detection**: detect using original token values, then trim left-to-right with `left_done`/`right_done` tracking to prevent double-trims. Cascading `check_left`/`check_right` skip adjacent standalone-eligible tags.
+- **Block indent**: `deindent_blocks` runs post-parse — finds common indent of direct text children, sets block's intrinsic indent if empty, removes common indent. Renderer applies block indent at output level via `write_indented`.
+- **Partial/parent indent**: `Template` stores `source` for indent re-parse. `render_template` calls `indent_lines(source, indent)` then re-parses with temp allocator when indent is non-empty.
+- **Block overrides** (`Block_Override` struct): carries `all_nodes` + child range so override content from different templates renders correctly. `merge_block_overrides` propagates overrides through multi-level inheritance chains.
+
+### Not implemented
+
+- Lambdas (`~lambdas.json`)
+- Set delimiters (`{{= =}}`, `delimiters.json`)
 
 ## Known limitations
 
@@ -152,12 +172,15 @@ Extracted `template_process_tokens` from `template_eat_tokens` to separate ROOT 
 - `json.Value` params require 64-byte aligned arena (workaround for `dynamic_arena_allocator_proc` ignoring per-allocation alignment).
 - Tree-sitter grammar/query paths hardcoded in `tree_sitter.odin` (Nix store hashes, Helix-version-dependent).
 - `TSQueryCapture` needs explicit `_padding: u32` field for C ABI compatibility (40-byte sizeof).
-- `{{&content}}` in layout template must have no leading whitespace — `template_insert_content_into_layout` indents all lines by preceding whitespace, which corrupts `<pre>` blocks.
 - highlight.js removed; syntax highlighting is build-time only (no fallback if Tree-sitter fails).
+- `format_f64` in mustache brute-forces shortest float representation (Odin's `strconv` doesn't produce shortest round-trip for all values like `3.3`).
+- Block indent uses output-level indentation (`write_indented`), not source-level re-parse. Multi-line interpolated content inside a standalone block would get incorrectly indented. No spec test exercises this.
 
 ## Design decisions
 
 See `HUGO.md` for analysis of why thor doesn't need Hugo's shortcode context isolation.
+See `mustache/PARTIAL_INDENT.md` for whitespace handling analysis.
+See `mustache/SPEC.md` for the original implementation specification.
 
 ## TODO
 

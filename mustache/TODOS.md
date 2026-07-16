@@ -1,3 +1,6 @@
 - [ ] Initialize string builder size based on filesize?
-- [ ] Review [whitespace handling code](./tokenizer.odin)
-- [ ] Add leak checks for public procs.
+- [x] Review [whitespace handling code](./tokenizer.odin)
+- [x] Add leak checks for public procs.
+- [ ] Simplify `trim_standalone_whitespace` — four temp arrays (`li_buf`, `ri_buf`, `left_done`, `right_done`) could potentially be reduced to two by merging the done-tracking into the index buffers using sentinel values (e.g. `-2` = already trimmed).
+- [ ] Adjacent standalone tags don't capture indent for the second tag (e.g. `  {{>a}}\n  {{>b}}` — `{{>b}}` gets `indent=""` because its left text was consumed by `{{>a}}`'s right-trim). Blocks recover via `deindent_blocks`, but partials/parents have no fallback.
+- [ ] lazy load partials ? (with mutex)
