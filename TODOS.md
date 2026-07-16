@@ -1,7 +1,8 @@
 - README.md
   - [ ] "Zero is beautiful"
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
-- [ ] Enable configuration to  opt-out of features, particular pre/post processors.
+- [ ] remove "has_*" keys from context.
+- [ ] Enable configuration to opt-out of features, particular pre/post processors.
 - [ ] proper date/time/now object.
 - [ ] Footer isn't centered properly.
 - [ ] mustache data keys for opengraph, etc.
@@ -22,11 +23,12 @@
 - [ ] Theme selector for syntax highlighting.
   - use http://github.com/helix-editor/helix/tree/master/runtime/themes) as a
     guide
-- [ ] Search for grammars in multiple places
-- [ ] Download missing grammars.
-- [ ] Add reflection support to mustache / consider rewriting from scratch.
-- [ ] Syntax highlighting in production: CI (`nix build` on ubuntu-latest) has no grammar `.so`s and a machine-specific `QUERIES_PATH` nix store hash, so the deployed site renders unhighlighted. Provide grammars + queries as nix build inputs and pass paths to thor at runtime (env vars/flags).
-- [ ] Durable highlight paths: read `GRAPHS_PATH`/`QUERIES_PATH` from env vars set by the flake instead of hardcoded nix store hashes, so they survive `nix flake update` and let the grammar/query version-mismatch detector fire automatically.
+- [ ] grammars
+  - [ ] Search in multiple places
+  - [ ] Download missing grammars.
+  - [ ] Durable highlight paths: read `GRAPHS_PATH`/`QUERIES_PATH` from env vars set by the flake instead of hardcoded nix store hashes, so they survive `nix flake update` and let the grammar/query version-mismatch detector fire automatically.
+- [ ] CI
+  - [ ] Syntax highlighting in production: CI (`nix build` on ubuntu-latest) has no grammar `.so`s and a machine-specific `QUERIES_PATH` nix store hash, so the deployed site renders unhighlighted. Provide grammars + queries as nix build inputs and pass paths to thor at runtime (env vars/flags).
 - [ ] Unit tests for highlighting helpers: `capture_name_to_css`, `escape_html`, `unescape_html`, `extract_query_token`, `helix_version_from_path`.
 - [ ] `<pre><code>` blocks need to set background to theme background,
   regardless of prefers-dark. (or use a different theme)
@@ -36,7 +38,7 @@
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
 - [ ] commands
-- [ ] Add spall and find ways to reduce run time. (Getting close to 1/2sec here.)
+- [ ] Use spall to find ways to reduce run time.
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Review every file in thor
   - [ ] Review alerts.odin
@@ -45,8 +47,10 @@
   - [ ] Review feed.odin
   - [ ] Review footnotes.odin
   - [ ] Review frontmatter.odin
+  - [ ] Review highlight.odin
   - [ ] Review main.odin
-  - [ ] Review main_test.odin
-  - [ ] Review mustache_test.odin
+  - [ ] Review minifiy.odin
   - [ ] Review render.odin
+  - [ ] Review sectionate.odin
   - [x] Review site.odin
+  - [ ] Review tree_sitter.odin

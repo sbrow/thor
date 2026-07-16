@@ -5,10 +5,10 @@ Thor is a static site generator written in [Odin](https://odin-lang.org), replac
 ## Architecture
 
 ```
-thor.json          ← site config (title, base_url, author, params, sectionate)
+thor.json          ← site config (title, base_url, author, params)
 content/           ← markdown and HTML content files
 layouts/           ← Mustache templates + partials (including icons)
-assets/            ← CSS (Tufte-based, no build step) and JS
+assets/            ← CSS (Tufte-based), JS, fonts, images — copied/processed to public/
 public/            ← build output (generated)
 ```
 
@@ -16,35 +16,45 @@ public/            ← build output (generated)
 
 | File | Responsibility |
 |---|---|
-| `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `walk_content`, `render_site` |
-| `site.odin` | `Site` struct (config + arena), `init_site`, `load_site_config`, `site_merge`, `site_allocator`, `destroy_site` |
+| `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `walk_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
+| `site.odin` | `Flags` (parsed config), `Site` (runtime state + arena), `Feature` bit_set enum, `init_site`, `load_site_config`, `merge_flags`, `site_apply_flags`, `find_config` (walks up dir tree for `thor.json`) |
 | `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited) |
-| `content.odin` | `Page` struct, content walker, page loader, cmark integration, full markdown pipeline |
+| `content.odin` | `Page` struct, content walker, page loader, cmark integration, full markdown pipeline, `copy_assets_dir` (recursive copy with CSS minification) |
 | `footnotes.odin` | Note definition stripping (pre-cmark) + sidenote/marginnote injection (post-cmark) |
 | `alerts.odin` | GitHub alert post-processor (`> [!CAUTION]` → styled blockquote) |
 | `emoji.odin` | Emoji shortcode expander (`:shrug:` → `¯\_(ツ)_/¯`), post-cmark |
-| `highlight.odin` | Post-cmark Tree-sitter syntax highlighter; loads grammars/queries from Helix, caches loaded grammars, reports syntax errors with file/line |
-| `tree_sitter.odin` | C FFI bindings for Tree-sitter (TSParser, TSQuery, TSQueryCursor, node traversal, dlopen/dlsym) |
+| `highlight.odin` | Post-cmark Tree-sitter syntax highlighter; statically links HTML/CSS grammars, dlopen for others; caches loaded grammars, reports syntax errors |
+| `tree_sitter.odin` | C FFI bindings for Tree-sitter (TSParser, TSQuery, TSQueryCursor, node traversal, dlopen/dlsym). Statically links `tree-sitter-html` and `tree-sitter-css` via Nix. |
 | `sectionate.odin` | `wrap_sections` proc — splits HTML at `<h2` into `<section>` wrappers |
-| `render.odin` | Mustache template rendering, all page types, RSS, sitemap, robots.txt, `load_partials` recursive scan |
-| `feed.odin` | RSS feed + sitemap XML generation |
-| `mustache/` | Mustache template engine (spec-compliant, replaces vendored odin-mustache) |
+| `render.odin` | Template rendering pipeline: pre-parses templates/partials once, struct-based data model (`Base_Data`/`Page_Data`/`Home_Data`/`Posts_Data`), `mustache.render()`, minification gate, RSS, sitemap, robots.txt |
+| `minify.odin` | Tree-sitter-based HTML and CSS minification (`minify_html`, `minify_css`). Strips comments, collapses whitespace, removes inter-tag spaces. Preserves `<pre>`/`<code>`/`<script>`/`<style>` content. |
+| `feed.odin` | RSS feed + sitemap XML generation. Uses `strings.Builder`. `format_rfc822` uses `core:time` for date parsing. |
+| `mustache/` | Mustache template engine (spec-compliant, custom implementation) |
 
 Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss, chevron_up, star).
 
 ### Data flow
 
 ```
-thor.json → init_site → Site (config + Dynamic_Arena)
-                            ↓
+thor.json → find_config → init_site → Flags → merge_flags → site_apply_flags → Site (config + Dynamic_Arena + features: bit_set)
+                                                                                              ↓
 content/ → walk_content → []Page (with body_html from pipeline)
-                            ↓
-layouts/*.html → render_site (Mustache render_in_layout) → public/
+                                                                                              ↓
+layouts/*.html → parse() → mustache.Template (parsed once)
+                                   ↓
+render_site → mustache.render(Page_Data, partials) → optional minify_html → public/
 ```
 
 ### Config system
 
-`Site` has `params: json.Value` for arbitrary user-defined data from `thor.json`. Social links and other template-only data live under `"params"`. `sectionate: bool` controls automatic `<section>` wrapping at `<h2>` boundaries.
+Config is split into `Flags` (parsed from CLI args + JSON) and `Site` (runtime state):
+
+- **`Flags`** — pure parsed config struct. CLI args via `core:flags`, JSON via `json.unmarshal_string`.
+- **`Site`** — runtime state: arena, resolved config values, `features: bit_set[Feature]`.
+- **`Feature` enum** — `Sections`, `Drafts`, `Minify`, `Watch`. Checked with `.Minify in site.features`.
+- **`find_config`** — walks up from CWD looking for `thor.json`. Falls back to `./thor.json`.
+
+Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
 
 ```json
 {
@@ -60,22 +70,51 @@ layouts/*.html → render_site (Mustache render_in_layout) → public/
 }
 ```
 
-Templates access params via dotted keys: `{{#params.social}}`, `{{>* icon}}`.
+### Template system
 
-Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
+Templates use Mustache with template inheritance (`{{<base}}` / `{{$block}}`):
+
+```html
+<!-- base.html -->
+<body>{{> nav}}{{$content}}{{/content}}{{> footer}}</body>
+
+<!-- post.html -->
+{{<base}}
+{{$content}}
+<main><article><h1>{{page_title}}</h1>{{&body}}</article></main>
+{{/content}}
+{{/base}}
+```
+
+Data is passed as **typed structs** (not `map[string]any`). Mustache resolves struct fields via Odin reflection, including `using`-embedded fields:
+
+```odin
+Base_Data :: struct {
+    now:  datetime.DateTime,
+    body: string,
+    title: string,
+    // ...
+}
+Page_Data :: struct {
+    using base: Base_Data,  // fields promoted via struct_get fallback
+    page_title: string,
+    // ...
+}
+```
+
+`render_site` pre-parses all templates and partials once (via `mustache.parse`), then reuses them for every page render.
 
 ### Markdown pipeline (in content.odin `load_page`)
 
 ```
 raw markdown
-  → expand_emoji          (pre-cmark: :shortcode: → unicode)
   → strip_definitions     (pre-cmark: extract [^id]: definitions)
   → cmark markdown_to_html (Unsafe mode for HTML passthrough)
   → expand_emoji          (post-cmark: :shortcode: → unicode, avoids cmark escape issues)
-  → inject_sidenotes      (post-cmark: [^id] → <label><input><span> markup)
+  → inject_notes          (post-cmark: [^id] → <label><input><span> markup)
   → inject_alerts         (post-cmark: [!TYPE] blockquotes → styled alerts)
   → highlight_code        (post-cmark: tree-sitter per code block, with error reporting)
-  → wrap_sections         (post-cmark: if site.sectionate, wraps content in <section> at <h2>)
+  → wrap_sections         (post-cmark: if .Sections in features, wraps content in <section> at <h2>)
 ```
 
 `.html` content files skip cmark entirely — body is used as-is.
@@ -84,13 +123,21 @@ raw markdown
 
 Build-time highlighting via Tree-sitter C FFI. No client-side JavaScript.
 
-- Grammars loaded via `dlopen` from Helix's compiled `.so` files
-- Highlight queries (`.scm`) loaded from Helix's runtime directory
-- Paths hardcoded in `tree_sitter.odin` (Nix store paths, Helix-version-dependent)
-- Capture names mapped to CSS classes: `keyword` → `.hl-keyword`, `constant.numeric.integer` → `.hl-constant-numeric-integer`, etc.
-- Atom-one-dark color theme in `main.css`
-- Failed grammar loads are cached (no retries) and logged via `log.warnf`
-- Syntax errors detected via `ts_node_has_error`, reported with file path and line number relative to code block
+- **HTML and CSS grammars** statically linked via Nix (`mkGrammarStaticLib` in `thor/flake.nix`). Always available, no dlopen.
+- **Other grammars** (bash, odin, nu, etc.) loaded via `dlopen` from Helix's compiled `.so` files.
+- Highlight queries (`.scm`) loaded from Helix's runtime directory.
+- Paths hardcoded in `tree_sitter.odin` (Nix store paths, Helix-version-dependent).
+- Grammar loading split: `ensure_parser` (parser only, used by minify) vs `load_grammar` (parser + query, used by highlight).
+- Capture names mapped to CSS classes: `keyword` → `.hl-keyword`, etc.
+- Atom-one-dark color theme in `main.css`.
+
+### Minification
+
+Optional, enabled with `-minify` flag (`.Minify` in `Feature` bit_set).
+
+- **HTML** — tree-sitter parses output, strips comments, removes inter-tag whitespace, preserves `<pre>`/`<code>`/`<textarea>`/`<script>`/`<style>` content. Applied after template rendering.
+- **CSS** — tree-sitter parses `.css` files in `assets/`, strips comments, collapses whitespace, trims around `{};:,`. Applied during `copy_assets_dir`.
+- Non-CSS files in `assets/` copied verbatim.
 
 ### Memory management
 
@@ -100,7 +147,18 @@ Build-time highlighting via Tree-sitter C FFI. No client-side JavaScript.
 - `site_allocator(site)` returns the arena allocator for callers
 - `destroy_site` frees the arena
 - `main.odin` sets `context.logger = log.create_console_logger()` — without this, all `log.*` calls are silently dropped
-- **Not yet wired:** `context.allocator` is not set to the arena in `main.odin`, so rendering and content processing still use the heap allocator
+- `context.allocator` is set to `site_allocator(&site)` in the main loop
+
+### Spall profiling
+
+Optional, compiled out by default. Enabled with `-define:SPALL=true`:
+
+```bash
+odin build . -define:SPALL=true -o:speed -out:thor-prof
+./thor-prof -drafts  # generates thor.spall
+```
+
+Uses `core:prof/spall` with `@(instrumentation_enter)`/`@(instrumentation_exit)` hooks — every function auto-instrumented, no manual annotation needed.
 
 ## Building
 
@@ -110,8 +168,7 @@ Build-time highlighting via Tree-sitter C FFI. No client-side JavaScript.
 nix develop
 # From blog root:
 odin run ./thor -- -drafts
-cp assets/css/main.css public/css/main.css
-cp assets/js/main.js public/js/main.js
+# Assets (CSS/JS/fonts) are copied/minified automatically by thor
 caddy run  # serves public/ on blog.localhost
 ```
 
@@ -120,45 +177,44 @@ No CSS build step — `main.css` is static Tufte-based CSS, no preprocessor or c
 ### Production build
 
 ```bash
-nix build  # runs thor + copies CSS/JS, outputs to ./result/
+nix build  # runs thor, outputs to ./result/
 ```
 
 ### Tests
 
 ```bash
 cd thor
-odin test .           # site + mustache smoke tests
-odin test mustache    # mustache spec + targeted tests (37 total)
+odin test .              # site tests (config, frontmatter, footnotes)
+odin test . -all-packages  # includes mustache spec tests
 ```
 
 ## Mustache engine
 
-Spec-compliant Mustache implementation at `mustache/`. Passes all 170 tests across 7 official spec files (interpolation, sections, inverted, comments, partials, dynamic-names, inheritance).
+Spec-compliant Mustache implementation at `mustache/`. See `mustache/SPEC.md` for the implementation specification.
 
 ### Files
 
 | File | Responsibility |
 |---|---|
-| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), post-parse de-indent (`deindent_blocks`), renderer (`render_nodes`), indent helpers |
-| `tokenizer.odin` | Tokenizer (template string → `[]Token`), two-pass standalone whitespace detection (`trim_standalone_whitespace`) |
-| `data.odin` | Reflection-based data model: `effective` (union/distinct peeling), `lookup_in`, `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `write_value`, `format_f64` |
+| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), renderer (`render_nodes`), template inheritance (`merge_block_overrides`) |
+| `tokenizer.odin` | Tokenizer (template string → `[]Token`), standalone whitespace detection |
+| `data.odin` | Reflection-based data model: `effective` (union/distinct peeling), `lookup_in`, `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `write_value` |
 | `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case |
 
 ### Architecture
 
 ```
-parse(source) → tokenize → trim_standalone_whitespace → parse_section → deindent_blocks → Template
+parse(source) → tokenize → trim_standalone_whitespace → parse_section → Template
 render(tmpl, data, partials) → render_nodes (walks flat node array against context stack) → string
 ```
 
-- **Flat `[dynamic]Node` array** with `first_child`/`child_count` indices — one allocation, one `delete`. Pre-order layout: children stored contiguously after their parent.
-- **`render_nodes`** takes `all_nodes` (full array, for absolute child access) + `nodes` (current slice). Index-based loop, skips children after sections/blocks via `i += 1 + child_count`.
+- **Two-phase API**: `parse()` produces a reusable `Template`, `render()` walks it against data. Templates parsed once, rendered many times.
+- **Flat `[dynamic]Node` array** with `first_child`/`child_count` indices — pre-order layout.
 - **Context stack**: `^[dynamic]any` with `append`/`pop` for section push/pop.
-- **`effective(a)`** peels Named/Distinct/Union layers (including `json.Value`) so all downstream operations can switch on base `Type_Info` variant directly.
-- **Two-pass standalone detection**: detect using original token values, then trim left-to-right with `left_done`/`right_done` tracking to prevent double-trims. Cascading `check_left`/`check_right` skip adjacent standalone-eligible tags.
-- **Block indent**: `deindent_blocks` runs post-parse — finds common indent of direct text children, sets block's intrinsic indent if empty, removes common indent. Renderer applies block indent at output level via `write_indented`.
-- **Partial/parent indent**: `Template` stores `source` for indent re-parse. `render_template` calls `indent_lines(source, indent)` then re-parses with temp allocator when indent is non-empty.
-- **Block overrides** (`Block_Override` struct): carries `all_nodes` + child range so override content from different templates renders correctly. `merge_block_overrides` propagates overrides through multi-level inheritance chains.
+- **`effective(a)`** peels Named/Distinct/Union layers (including `json.Value`).
+- **`lookup_in`** resolves keys on structs (via `reflect.struct_field_value_by_name` with `allow_using = true`) and maps (via runtime map internals).
+- **Template inheritance**: `{{<parent}}` loads parent from partials, `{{$block}}` defines overridable sections. `merge_block_overrides` propagates overrides through multi-level chains.
+- **Dynamic partial names**: `{{>*key}}` resolves partial name from data context at render time.
 
 ### Not implemented
 
@@ -169,12 +225,9 @@ render(tmpl, data, partials) → render_nodes (walks flat node array against con
 
 - cmark allocates via C malloc, not the arena. HTML output leaks until process exit.
 - CSS/JS cache busting uses manual `?v=N` query params instead of content hashing.
-- `json.Value` params require 64-byte aligned arena (workaround for `dynamic_arena_allocator_proc` ignoring per-allocation alignment).
-- Tree-sitter grammar/query paths hardcoded in `tree_sitter.odin` (Nix store hashes, Helix-version-dependent).
-- `TSQueryCapture` needs explicit `_padding: u32` field for C ABI compatibility (40-byte sizeof).
-- highlight.js removed; syntax highlighting is build-time only (no fallback if Tree-sitter fails).
-- `format_f64` in mustache brute-forces shortest float representation (Odin's `strconv` doesn't produce shortest round-trip for all values like `3.3`).
-- Block indent uses output-level indentation (`write_indented`), not source-level re-parse. Multi-line interpolated content inside a standalone block would get incorrectly indented. No spec test exercises this.
+- Tree-sitter grammar/query paths for dynamic grammars hardcoded in `tree_sitter.odin` (Nix store hashes, Helix-version-dependent). HTML/CSS are statically linked.
+- `map[string]any` not fully supported by mustache `lookup_in` — thor uses structs instead.
+- `format_f64` in mustache brute-forces shortest float representation.
 
 ## Design decisions
 
