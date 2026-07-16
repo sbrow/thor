@@ -1,8 +1,10 @@
 - README.md
   - [ ] "Zero is beautiful"
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
+- [ ] Performance
+  - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
 - [ ] remove "has_*" keys from context.
-- [ ] Enable configuration to opt-out of features, particular pre/post processors.
+- [x] Enable configuration to opt-out of features, particular pre/post processors.
 - [ ] proper date/time/now object.
 - [ ] Footer isn't centered properly.
 - [ ] mustache data keys for opengraph, etc.

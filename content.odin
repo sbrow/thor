@@ -35,18 +35,18 @@ Page :: struct {
 walk_content :: proc(site: ^Site) -> []Page {
 	content_path := site.content_dir
 	include_drafts := .Drafts in site.features
-	sectionate := .Sections in site.features
+	ext := site.markdown_extensions
 
 	allocator := site_allocator(site)
 
 	pages := make([dynamic]Page, allocator)
 
-	collect_home(&pages, content_path, sectionate)
-	collect_standalone(&pages, content_path, sectionate)
+	collect_home(&pages, content_path, ext)
+	collect_standalone(&pages, content_path, ext)
 
 	posts_path := fmt.tprintf("%s/posts", content_path)
 	if os.exists(posts_path) {
-		collect_posts(&pages, posts_path, sectionate)
+		collect_posts(&pages, posts_path, ext)
 	}
 
 	if include_drafts {
@@ -63,10 +63,10 @@ walk_content :: proc(site: ^Site) -> []Page {
 	}
 }
 
-collect_home :: proc(pages: ^[dynamic]Page, content_path: string, sectionate: bool) {
+collect_home :: proc(pages: ^[dynamic]Page, content_path: string, ext: bit_set[Markdown_Extension]) {
 	html_path := fmt.tprintf("%s/index.html", content_path)
 	if os.exists(html_path) {
-		page, ok := load_page(html_path, .Home, "", sectionate)
+		page, ok := load_page(html_path, .Home, "", ext)
 		if ok {
 			page.permalink = "/"
 			append(pages, page)
@@ -76,7 +76,7 @@ collect_home :: proc(pages: ^[dynamic]Page, content_path: string, sectionate: bo
 
 	md_path := fmt.tprintf("%s/index.md", content_path)
 	if os.exists(md_path) {
-		page, ok := load_page(md_path, .Home, "", sectionate)
+		page, ok := load_page(md_path, .Home, "", ext)
 		if ok {
 			page.permalink = "/"
 			append(pages, page)
@@ -84,7 +84,7 @@ collect_home :: proc(pages: ^[dynamic]Page, content_path: string, sectionate: bo
 	}
 }
 
-collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string, sectionate: bool) {
+collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string, ext: bit_set[Markdown_Extension]) {
 	entries, err := os.read_all_directory_by_path(content_path, context.allocator)
 	if err != nil {
 		log.warnf("thor: cannot read %s: %v", content_path, err)
@@ -104,14 +104,14 @@ collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string, sectiona
 		}
 
 		slug := strip_extension(entry.name)
-		page, ok := load_page(entry.fullpath, .Standalone, slug, sectionate)
+		page, ok := load_page(entry.fullpath, .Standalone, slug, ext)
 		if ok {
 			append(pages, page)
 		}
 	}
 }
 
-collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, sectionate: bool) {
+collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, ext: bit_set[Markdown_Extension]) {
 	entries, err := os.read_all_directory_by_path(posts_path, context.allocator)
 	if err != nil {
 		log.warnf("thor: cannot read %s: %v", posts_path, err)
@@ -126,7 +126,7 @@ collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, sectionate: boo
 				continue
 			}
 			slug := strip_extension(entry.name)
-			page, ok := load_page(entry.fullpath, .Post, slug, sectionate)
+			page, ok := load_page(entry.fullpath, .Post, slug, ext)
 			if ok {
 				append(pages, page)
 			}
@@ -138,7 +138,7 @@ collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, sectionate: boo
 			if !os.exists(index_path) {
 				continue
 			}
-			page, ok := load_page(index_path, .Post, entry.name, sectionate)
+			page, ok := load_page(index_path, .Post, entry.name, ext)
 			if ok {
 				page.bundle_dir = entry.fullpath
 				append(pages, page)
@@ -152,7 +152,7 @@ load_page :: proc(
 	file_path: string,
 	page_type: Page_Type,
 	slug: string,
-	sectionate: bool,
+	ext: bit_set[Markdown_Extension],
 ) -> (
 	page: Page,
 	ok: bool,
@@ -182,11 +182,26 @@ load_page :: proc(
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)
 	} else {
-		clean_body, sn_defs, mn_defs := strip_definitions(body)
+		sn_defs := make(map[string]string)
+		mn_defs := make(map[string]string)
+		clean_body := body
+		if .Sidenotes in ext {
+			clean_body, sn_defs, mn_defs = strip_definitions(body)
+		}
 		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
-		html = expand_emoji(html)
-		html = highlight_code(inject_alerts(inject_notes(html, sn_defs, mn_defs)), file_path)
-		if sectionate {
+		if .Emoji in ext {
+			html = expand_emoji(html)
+		}
+		if .Sidenotes in ext {
+			html = inject_notes(html, sn_defs, mn_defs)
+		}
+		if .Alerts in ext {
+			html = inject_alerts(html)
+		}
+		if .Highlight in ext {
+			html = highlight_code(html, file_path)
+		}
+		if .Sections in ext {
 			html = wrap_sections(html)
 		}
 		page.body_html = html

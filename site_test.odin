@@ -18,7 +18,7 @@ write_temp_config :: proc(name: string, content: string) -> string {
 }
 
 @(test)
-test_load_site_config :: proc(t: ^testing.T) {
+test_load_config_file :: proc(t: ^testing.T) {
 	path := write_temp_config(
 		"valid",
 		`{
@@ -35,7 +35,8 @@ test_load_site_config :: proc(t: ^testing.T) {
 	)
 	defer os.remove(path)
 
-	cfg, ok := load_site_config(path, context.temp_allocator)
+	cfg: Config_File
+	ok := load_config_file(&cfg, path, context.temp_allocator)
 
 	testing.expect(t, ok)
 	testing.expect_value(t, cfg.title, "Test Site")
@@ -62,103 +63,39 @@ test_load_site_config :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_load_site_config_missing_file :: proc(t: ^testing.T) {
-	_, ok := load_site_config("./nonexistent_thor_test.json", context.temp_allocator)
+test_load_config_file_missing :: proc(t: ^testing.T) {
+	cfg: Config_File
+	ok := load_config_file(&cfg, "./nonexistent_thor_test.json", context.temp_allocator)
 	testing.expect(t, !ok)
 }
 
 @(test)
-test_load_site_config_invalid_json :: proc(t: ^testing.T) {
+test_load_config_file_invalid_json :: proc(t: ^testing.T) {
 	path := write_temp_config("invalid", `{not valid json}`)
 	defer os.remove(path)
 
+	cfg: Config_File
 	ok := false
 	{
 		context.logger = log.nil_logger()
-		_, ok = load_site_config(path, context.temp_allocator)
+		ok = load_config_file(&cfg, path, context.temp_allocator)
 	}
 	testing.expect(t, !ok)
 }
 
 @(test)
-test_load_site_config_partial :: proc(t: ^testing.T) {
+test_load_config_file_partial :: proc(t: ^testing.T) {
 	path := write_temp_config("partial", `{"title":"Partial"}`)
 	defer os.remove(path)
 
-	cfg, ok := load_site_config(path, context.temp_allocator)
+	cfg: Config_File
+	ok := load_config_file(&cfg, path, context.temp_allocator)
 
 	testing.expect(t, ok)
 	testing.expect_value(t, cfg.title, "Partial")
 	testing.expect_value(t, cfg.description, "")
 	testing.expect_value(t, cfg.author, "")
 	testing.expect(t, cfg.params == nil)
-}
-
-@(test)
-test_site_merge_overrides :: proc(t: ^testing.T) {
-	config := Flags {
-		base_url    = "https://original.com",
-		content_dir = "./content",
-	}
-	flags := Flags {
-		base_url = "https://override.com",
-	}
-
-	merge_flags(&config, flags)
-
-	testing.expect_value(t, config.base_url, "https://override.com")
-	testing.expect_value(t, config.content_dir, "./content")
-}
-
-@(test)
-test_site_merge_empty_flags_keep_config :: proc(t: ^testing.T) {
-	config := Flags {
-		base_url    = "https://keep.com",
-		content_dir = "./keep",
-	}
-	flags := Flags{}
-
-	merge_flags(&config, flags)
-
-	testing.expect_value(t, config.base_url, "https://keep.com")
-	testing.expect_value(t, config.content_dir, "./keep")
-}
-
-@(test)
-test_site_merge_drafts_true :: proc(t: ^testing.T) {
-	config := Flags {
-		drafts = false,
-	}
-	flags := Flags {
-		drafts = true,
-	}
-
-	merge_flags(&config, flags)
-	testing.expect(t, config.drafts)
-}
-
-@(test)
-test_site_merge_drafts_false_preserves :: proc(t: ^testing.T) {
-	config := Flags {
-		drafts = false,
-	}
-	flags := Flags {
-		drafts = false,
-	}
-
-	merge_flags(&config, flags)
-	testing.expect(t, !config.drafts)
-}
-
-@(test)
-test_site_merge_config_path :: proc(t: ^testing.T) {
-	config := Flags{}
-	flags := Flags {
-		config_path = "./custom/thor.json",
-	}
-
-	merge_flags(&config, flags)
-	testing.expect_value(t, config.config_path, "./custom/thor.json")
 }
 
 @(test)
@@ -169,9 +106,13 @@ test_init_site_defaults_no_config :: proc(t: ^testing.T) {
 	defer destroy_site(&site)
 
 	testing.expect_value(t, site.content_dir, "./content")
+	testing.expect_value(t, site.assets_dir, "./assets")
 	testing.expect_value(t, site.output_dir, "./public")
 	testing.expect_value(t, site.layouts_dir, "./layouts")
 	testing.expect_value(t, site.base_url, "http://localhost:8080")
+	testing.expect(t, .Emoji in site.markdown_extensions)
+	testing.expect(t, .Sidenotes in site.markdown_extensions)
+	testing.expect(t, .Alerts in site.markdown_extensions)
 }
 
 @(test)
@@ -182,6 +123,7 @@ test_init_site_config_dir_relative :: proc(t: ^testing.T) {
 	defer destroy_site(&site)
 
 	testing.expect_value(t, site.content_dir, "./sub/content")
+	testing.expect_value(t, site.assets_dir, "./sub/assets")
 	testing.expect_value(t, site.output_dir, "./sub/public")
 	testing.expect_value(t, site.layouts_dir, "./sub/layouts")
 }
@@ -215,5 +157,18 @@ test_init_site_full_pipeline :: proc(t: ^testing.T) {
 	testing.expect_value(t, site.author, "Author")
 	testing.expect(t, .Drafts in site.features)
 	testing.expect_value(t, site.base_url, "https://config.com")
+}
+
+@(test)
+test_init_site_md_enable_disable :: proc(t: ^testing.T) {
+	site: Site
+	args := []string{"thor", "-config:./nonexistent.json", "-ext:highlight,sections", "-no-ext:emoji"}
+	init_site(&site, args)
+	defer destroy_site(&site)
+
+	testing.expect(t, .Highlight in site.markdown_extensions)
+	testing.expect(t, .Sections in site.markdown_extensions)
+	testing.expect(t, !(.Emoji in site.markdown_extensions))
+	testing.expect(t, .Sidenotes in site.markdown_extensions)
 }
 

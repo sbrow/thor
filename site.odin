@@ -9,49 +9,84 @@ import "core:os"
 import "core:strings"
 
 
+// Site is the primary workhorse.
 Site :: struct {
-	arena:       mem.Dynamic_Arena,
-	title:       string,
-	description: string,
-	author:      string,
-	base_url:    string,
-	config_path: string,
-	content_dir: string,
-	assets_dir:  string,
-	output_dir:  string,
-	layouts_dir: string,
-	params:      json.Value,
-	features:    bit_set[Feature],
+	arena:               mem.Dynamic_Arena,
+	title:               string,
+	description:         string,
+	author:              string,
+	base_url:            string,
+	config_path:         string,
+	content_dir:         string,
+	assets_dir:          string,
+	output_dir:          string,
+	layouts_dir:         string,
+	params:              json.Object,
+	features:            bit_set[Feature],
+	markdown_extensions: bit_set[Markdown_Extension],
 }
 
 Feature :: enum {
-	Sections,
 	Drafts,
 	Minify,
 	Watch,
 }
 
+Markdown_Extension :: enum {
+	Emoji,
+	Sidenotes,
+	Alerts,
+	Highlight,
+	Sections,
+}
+
+DEFAULT_MARKDOWN_EXTENSIONS :: bit_set[Markdown_Extension] {
+	.Emoji,
+	.Sidenotes,
+	.Alerts,
+	// .Highlight,
+	// .Sections,
+}
+
+// Configuration loaded from `thor.json`. Gets folded in to Site before
+// Flags
+Config_File :: struct {
+	title:               string,
+	description:         string,
+	base_url:            string,
+	author:              string,
+	content_dir:         string,
+	assets_dir:          string,
+	output_dir:          string,
+	layouts_dir:         string,
+	markdown_extensions: json.Value,
+	params:              json.Value,
+}
+
+// Configuration loaded from command line arguments. Gets folded in to Site
+// after Config_File
 Flags :: struct {
-	config_path: string `args:"name=config"`,
-	title:       string,
-	description: string,
-	base_url:    string `args:"name=base-url"`,
-	content_dir: string `args:"name=content"`,
-	assets_dir:  string `args:"name=assets"`,
-	output_dir:  string `args:"name=output"`,
-	layouts_dir: string,
-	author:      string,
-	params:      json.Value,
-	sectionate:  bool `args:"name=sections"`,
-	drafts:      bool `args:"name=drafts"`,
-	watch:       bool,
-	minify:      bool `args:"name=minify"`,
+	config_path: string `args:"name=config" usage:"Path to thor.json config file"`,
+	base_url:    string `args:"name=base-url" usage:"Site base URL (e.g. https://example.com)"`,
+	content_dir: string `args:"name=content" usage:"Path to content directory"`,
+	assets_dir:  string `args:"name=assets" usage:"Path to assets directory (CSS, JS, fonts, images)"`,
+	output_dir:  string `args:"name=output" usage:"Path to output directory (default: public/)"`,
+	drafts:      bool `args:"name=drafts" usage:"Include draft pages in the build"`,
+	watch:       bool `usage:"Rebuild on file changes (polls every 5 seconds)"`,
+	minify:      bool `args:"name=minify" usage:"Minify HTML output and CSS assets"`,
+	md_enable:   string `args:"name=ext" usage:"Enable markdown extensions (comma-separated: emoji,sidenotes,alerts,highlight,sections)"`,
+	md_disable:  string `args:"name=no-ext" usage:"Disable markdown extensions (comma-separated: emoji,sidenotes,alerts,highlight,sections)"`,
 }
 
 init_site :: proc(site: ^Site, args: []string) {
-	_flags: Flags
-	mem.dynamic_arena_init(&site.arena, alignment = 64) // FIXME: This is a hack
+	mem.dynamic_arena_init(&site.arena, alignment = 64)
 	alloc := site_allocator(site)
+
+	// Set defaults
+	site.base_url = "http://localhost:8080"
+	site.markdown_extensions = DEFAULT_MARKDOWN_EXTENSIONS
+
+	_flags: Flags
 	flags.parse_or_exit(&_flags, args, .Odin, alloc)
 
 	path := _flags.config_path
@@ -65,106 +100,127 @@ init_site :: proc(site: ^Site, args: []string) {
 		}
 	}
 
-	cfg, cfg_ok := load_site_config(path, alloc)
-	if cfg_ok {
-		merge_flags(&cfg, _flags)
-	} else {
-		cfg = _flags
-	}
+	config: Config_File
+	config_loaded := load_config_file(&config, path, alloc)
 
-	site_apply_flags(site, cfg)
-
-	// Determine config file's directory for relative defaults
 	config_dir := "./"
 	if idx := strings.last_index(path, "/"); idx >= 0 {
 		config_dir = path[:idx]
 	}
 
-	// Hardcoded defaults (lowest precedence)
-	// TODO: Probably shouldn't use temp allocator here?
-	if site.content_dir == "" {
-		site.content_dir = fmt.tprintf("%s/content", config_dir)
+	if config_loaded {
+		site_apply_config(site, config, config_dir)
+	} else {
+		site_apply_path_defaults(site, config_dir)
 	}
-	if site.assets_dir == "" {
-		site.assets_dir = fmt.tprintf("%s/assets", config_dir)
-	}
-	if site.output_dir == "" {
-		site.output_dir = fmt.tprintf("%s/public", config_dir)
-	}
-	if site.layouts_dir == "" {
-		site.layouts_dir = fmt.tprintf("%s/layouts", config_dir)
-	}
-	if site.base_url == "" {
-		site.base_url = "http://localhost:8080"
-	}
+
+	site_apply_cli_flags(site, _flags)
+	site.config_path = path
 }
 
-load_site_config :: proc(
+load_config_file :: proc(
+	config: ^Config_File,
 	path: string,
 	allocator := context.allocator,
-) -> (
-	config: Flags,
-	ok: bool,
-) {
+) -> bool {
 	data, err := os.read_entire_file_from_path(path, allocator)
 	if err != nil {
-		return
+		return false
 	}
 
-	unmarshal_err := json.unmarshal_string(string(data), &config, allocator = allocator)
+	unmarshal_err := json.unmarshal_string(string(data), config, allocator = allocator)
 	if unmarshal_err != nil {
 		log.warnf("thor: failed to parse %s: %v", path, unmarshal_err)
-		return
+		return false
 	}
 
-	ok = true
-	return
+	return true
 }
 
-merge_flags :: proc(config: ^Flags, flags: Flags) {
-	if flags.base_url != "" {
-		config.base_url = flags.base_url
+site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) {
+	if config.title != "" do site.title = config.title
+	if config.description != "" do site.description = config.description
+	if config.author != "" do site.author = config.author
+	if config.base_url != "" do site.base_url = config.base_url
+
+	site.content_dir =
+		config.content_dir if config.content_dir != "" else fmt.tprintf("%s/content", config_dir)
+	site.assets_dir =
+		config.assets_dir if config.assets_dir != "" else fmt.tprintf("%s/assets", config_dir)
+	site.output_dir =
+		config.output_dir if config.output_dir != "" else fmt.tprintf("%s/public", config_dir)
+	site.layouts_dir =
+		config.layouts_dir if config.layouts_dir != "" else fmt.tprintf("%s/layouts", config_dir)
+
+	if params, ok := config.markdown_extensions.(json.Object); ok {
+		site.params = params
 	}
-	if flags.content_dir != "" {
-		config.content_dir = flags.content_dir
+
+	// Apply markdown extensions from config
+	if ext_obj, ok := config.markdown_extensions.(json.Object); ok {
+		apply_extension_config(&site.markdown_extensions, ext_obj)
 	}
-	if flags.assets_dir != "" {
-		config.assets_dir = flags.assets_dir
-	}
-	if flags.output_dir != "" {
-		config.output_dir = flags.output_dir
-	}
-	if flags.drafts {
-		config.drafts = true
-	}
-	if flags.watch {
-		config.watch = true
-	}
-	if flags.sectionate {
-		config.sectionate = true
-	}
-	if flags.minify {
-		config.minify = true
-	}
-	config.config_path = flags.config_path
 }
 
-site_apply_flags :: proc(site: ^Site, flags: Flags) {
-	site.title = flags.title
-	site.description = flags.description
-	site.author = flags.author
-	site.base_url = flags.base_url
-	site.config_path = flags.config_path
-	site.content_dir = flags.content_dir
-	site.assets_dir = flags.assets_dir
-	site.output_dir = flags.output_dir
-	site.layouts_dir = flags.layouts_dir
-	site.params = flags.params
+site_apply_path_defaults :: proc(site: ^Site, config_dir: string) {
+	site.content_dir = fmt.tprintf("%s/content", config_dir)
+	site.assets_dir = fmt.tprintf("%s/assets", config_dir)
+	site.output_dir = fmt.tprintf("%s/public", config_dir)
+	site.layouts_dir = fmt.tprintf("%s/layouts", config_dir)
+}
 
-	if flags.sectionate {site.features += {.Sections}}
+site_apply_cli_flags :: proc(site: ^Site, flags: Flags) {
+	if flags.base_url != "" do site.base_url = flags.base_url
+	if flags.content_dir != "" do site.content_dir = flags.content_dir
+	if flags.assets_dir != "" do site.assets_dir = flags.assets_dir
+	if flags.output_dir != "" do site.output_dir = flags.output_dir
+
 	if flags.drafts {site.features += {.Drafts}}
 	if flags.watch {site.features += {.Watch}}
 	if flags.minify {site.features += {.Minify}}
+
+	site.markdown_extensions += parse_extension_list(flags.md_enable)
+	site.markdown_extensions -= parse_extension_list(flags.md_disable)
+}
+
+parse_extension_list :: proc(s: string) -> bit_set[Markdown_Extension] {
+	result: bit_set[Markdown_Extension]
+	if s == "" do return result
+	for part in strings.split(s, ",", allocator = context.temp_allocator) {
+		name := strings.to_lower(strings.trim_space(part), allocator = context.temp_allocator)
+		switch name {
+		case "emoji":
+			result += {.Emoji}
+		case "sidenotes":
+			result += {.Sidenotes}
+		case "alerts":
+			result += {.Alerts}
+		case "highlight":
+			result += {.Highlight}
+		case "sections":
+			result += {.Sections}
+		}
+	}
+	return result
+}
+
+apply_extension_config :: proc(ext: ^bit_set[Markdown_Extension], config: json.Object) {
+	for name, val in config {
+		enabled, is_bool := val.(json.Boolean)
+		if !is_bool do continue
+		switch name {
+		case "emoji":
+			if enabled {ext^ += {.Emoji}} else {ext^ -= {.Emoji}}
+		case "sidenotes":
+			if enabled {ext^ += {.Sidenotes}} else {ext^ -= {.Sidenotes}}
+		case "alerts":
+			if enabled {ext^ += {.Alerts}} else {ext^ -= {.Alerts}}
+		case "highlight":
+			if enabled {ext^ += {.Highlight}} else {ext^ -= {.Highlight}}
+		case "sections":
+			if enabled {ext^ += {.Sections}} else {ext^ -= {.Sections}}
+		}
+	}
 }
 
 site_allocator :: proc(site: ^Site) -> mem.Allocator {
