@@ -152,7 +152,7 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 	site.layouts_dir =
 		config.layouts_dir if config.layouts_dir != "" else fmt.tprintf("%s/layouts", config_dir)
 
-	if params, ok := config.markdown_extensions.(json.Object); ok {
+	if params, ok := config.params.(json.Object); ok {
 		site.params = params
 	}
 
