@@ -6,9 +6,9 @@ import "core:reflect"
 import "core:strconv"
 import "core:strings"
 
-// effective unwraps union variants and strips Named/Distinct layers,
+// base_value unwraps union variants and strips Named/Distinct layers,
 // returning the "peeled" any value and its base type info.
-effective :: proc(a: any) -> (val: any, info: ^runtime.Type_Info) {
+base_value :: proc(a: any) -> (val: any, info: ^runtime.Type_Info) {
 	if a == nil {
 		return
 	}
@@ -28,7 +28,7 @@ effective :: proc(a: any) -> (val: any, info: ^runtime.Type_Info) {
 		if variant == nil {
 			return {}, nil
 		} else {
-			return effective(variant)
+			return base_value(variant)
 		}
 	}
 
@@ -43,7 +43,7 @@ lookup_in :: proc(container: any, key: string) -> (result: any, found: bool) {
 		return
 	}
 
-	val, info := effective(container)
+	val, info := base_value(container)
 	if info == nil {
 		return
 	}
@@ -139,7 +139,7 @@ is_truthy :: proc(a: any) -> bool {
 		return false
 	}
 
-	val, info := effective(a)
+	val, info := base_value(a)
 	if info == nil {
 		return false
 	}
@@ -158,7 +158,7 @@ is_truthy :: proc(a: any) -> bool {
 // list_info returns element type info, count, and data pointer for a list value.
 // Returns elem_info=nil if the value is not a list.
 list_info :: proc(a: any) -> (elem_info: ^runtime.Type_Info, count: int, data: rawptr) {
-	val, info := effective(a)
+	val, info := base_value(a)
 	if info == nil {
 		return
 	}
@@ -182,7 +182,7 @@ any_to_string :: proc(a: any) -> string {
 	if a == nil {
 		return ""
 	}
-	val, _ := effective(a)
+	val, _ := base_value(a)
 
 	switch v in val {
 	case string:
