@@ -14,11 +14,15 @@ Note_Kind :: enum {
 // sidenotes, [*id]: text for marginnotes), removes them, and returns the cleaned
 // text plus separate maps of id->definition for each kind.
 // Handles multi-line definitions with indented continuation lines.
-strip_definitions :: proc(body: string) -> (clean_body: string, sn_defs, mn_defs: map[string]string) {
-	sn_defs = make(map[string]string)
-	mn_defs = make(map[string]string)
-
+strip_definitions :: proc(
+	body: string,
+) -> (
+	clean_body: string,
+	sn_defs, mn_defs: map[string]string,
+) {
+	// TODO: Should this be temp allocated?
 	lines := strings.split(body, "\n")
+	defer delete(lines)
 	output_lines: [dynamic]string
 	defer delete(output_lines)
 
@@ -119,8 +123,9 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 		return html
 	}
 
-	parts: [dynamic]string
-	defer delete(parts)
+	parts: strings.Builder
+	strings.builder_init_len(&parts, 0) // TODO: Set a reasonable default
+	defer strings.builder_destroy(&parts)
 
 	remaining := html
 
@@ -134,20 +139,20 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 			pos = mn_pos
 		}
 		if pos < 0 {
-			append(&parts, remaining)
+			strings.write_string(&parts, remaining)
 			break
 		}
 
 		// Append text before the reference
-		append(&parts, remaining[:pos])
+		strings.write_string(&parts, remaining[:pos])
 
 		close := strings.index(remaining[pos + 2:], "]")
 		if close < 0 {
-			append(&parts, remaining[pos:])
+			strings.write_string(&parts, remaining[pos:])
 			break
 		}
 
-		id := remaining[pos + 2 : pos + 2 + close]
+		id := remaining[pos + 2:pos + 2 + close]
 		ref_end := pos + 2 + close + 1
 
 		defs := sn_defs
@@ -157,7 +162,7 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 		def_text, found := defs[id]
 		if !found {
 			// No definition found, leave as literal text
-			append(&parts, remaining[pos:ref_end])
+			strings.write_string(&parts, remaining[pos:ref_end])
 			remaining = remaining[ref_end:]
 			continue
 		}
@@ -167,6 +172,7 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 		def_html = strip_p_tags(def_html)
 
 		note: string
+		defer delete(note)
 		if is_margin {
 			note = fmt.aprintf(
 				`<label for="mn-%s" class="margin-toggle"></label><input type="checkbox" id="mn-%s" class="margin-toggle"><span class="marginnote">%s</span>`,
@@ -182,12 +188,12 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 				def_html,
 			)
 		}
-		append(&parts, note)
+		strings.write_string(&parts, note)
 
 		remaining = remaining[ref_end:]
 	}
 
-	return strings.join(parts[:], "")
+	return strings.to_string(parts)
 }
 
 // strip_p_tags removes surrounding <p></p> if the HTML is a single paragraph.
@@ -201,3 +207,4 @@ strip_p_tags :: proc(html: string) -> string {
 	}
 	return s
 }
+

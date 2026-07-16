@@ -34,6 +34,13 @@ test_parse_def_line :: proc(t: ^testing.T) {
 test_strip_definitions :: proc(t: ^testing.T) {
 	body := "Intro[^a] and [*b].\n\n[^a]: a side\n\n[*b]: a margin\n"
 	clean, sn_defs, mn_defs := strip_definitions(body)
+	defer {
+		delete(clean)
+		delete(sn_defs["a"])
+		delete(sn_defs)
+		delete(mn_defs["b"])
+		delete(mn_defs)
+	}
 
 	// references stay; definitions are removed
 	testing.expect(t, strings.contains(clean, "Intro[^a]"))
@@ -60,13 +67,22 @@ test_strip_definitions :: proc(t: ^testing.T) {
 @(test)
 test_inject_notes :: proc(t: ^testing.T) {
 	html := "Text[^a] more [*b] end."
-	sn_defs := map[string]string{"a" = "side note"}
-	mn_defs := map[string]string{"b" = "margin note"}
+	sn_defs := map[string]string {
+		"a" = "side note",
+	}
+	defer delete(sn_defs)
+	mn_defs := map[string]string {
+		"b" = "margin note",
+	}
+	defer delete(mn_defs)
 
 	out := inject_notes(html, sn_defs, mn_defs)
 
 	// sidenote: numbered, fn- prefix, .sidenote span, rendered text
-	testing.expect(t, strings.contains(out, `for="fn-a" class="margin-toggle sidenote-number"></label>`))
+	testing.expect(
+		t,
+		strings.contains(out, `for="fn-a" class="margin-toggle sidenote-number"></label>`),
+	)
 	testing.expect(t, strings.contains(out, `class="sidenote"`))
 	testing.expect(t, strings.contains(out, "side note"))
 
@@ -87,12 +103,20 @@ test_inject_notes_no_defs :: proc(t: ^testing.T) {
 @(test)
 test_inject_notes_missing_ref :: proc(t: ^testing.T) {
 	html := "Ref[^missing] and [*missing] end."
-	sn := map[string]string{"other" = "x"}
-	mn := map[string]string{"other2" = "y"}
+	sn := map[string]string {
+		"other" = "x",
+	}
+	defer delete_map(sn)
+	mn := map[string]string {
+		"other2" = "y",
+	}
+	defer delete_map(mn)
 
 	out := inject_notes(html, sn, mn)
 
 	// references with no matching definition are left as literal text
+	testing.expect(t, len(out) > 2)
 	testing.expect(t, strings.contains(out, "[^missing]"))
 	testing.expect(t, strings.contains(out, "[*missing]"))
 }
+

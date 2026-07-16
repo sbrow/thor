@@ -4,6 +4,7 @@ package main
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:testing"
 
@@ -71,7 +72,11 @@ test_load_site_config_invalid_json :: proc(t: ^testing.T) {
 	path := write_temp_config("invalid", `{not valid json}`)
 	defer os.remove(path)
 
-	_, ok := load_site_config(path, context.temp_allocator)
+	ok := false
+	{
+		context.logger = log.nil_logger()
+		_, ok = load_site_config(path, context.temp_allocator)
+	}
 	testing.expect(t, !ok)
 }
 
