@@ -126,13 +126,14 @@ render_template :: proc(
 	return result
 }
 
-render_site :: proc(pages: []Page, config: Site) {
+render_site :: proc(site: ^Site) {
+	pages := site.pages[:]
 	sort_pages_by_date(pages)
 
 	// Load shared resources once
-	partials := load_partials(config.layouts_dir)
-	partials["base"] = load_template(config.layouts_dir, "base.html")
-	post_tpl := load_template(config.layouts_dir, "post.html")
+	partials := load_partials(site.layouts_dir)
+	partials["base"] = load_template(site.layouts_dir, "base.html")
+	post_tpl := load_template(site.layouts_dir, "post.html")
 
 	now, ok := time.time_to_datetime(time.now())
 	assert(ok)
@@ -140,11 +141,11 @@ render_site :: proc(pages: []Page, config: Site) {
 	// Build base data once
 	base := Base_Data {
 		now            = now,
-		author         = config.author,
-		params         = config.params,
-		og_site_name   = config.title,
-		og_description = config.description,
-		og_image       = fmt.tprintf("%s/avatar.jpg", config.base_url),
+		author         = site.author,
+		params         = site.params,
+		og_site_name   = site.title,
+		og_description = site.description,
+		og_image       = fmt.tprintf("%s/avatar.jpg", site.base_url),
 	}
 
 	// Find home page
@@ -163,56 +164,56 @@ render_site :: proc(pages: []Page, config: Site) {
 		if page.type == .Home {
 			continue
 		}
-		html := render_page_html(page, config, post_tpl, partials, base)
-		if .Minify in config.features {
+		html := render_page_html(page, site, post_tpl, partials, base)
+		if .Minify in site.features {
 			html = minify_html(html)
 		}
-		write_page(config.output_dir, page.permalink, html)
+		write_page(site.output_dir, page.permalink, html)
 	}
 
 	// Render home page
 	if has_home {
-		home_tpl := load_template(config.layouts_dir, "home.html")
-		home_html := render_home_html(home, pages, config, home_tpl, partials, base)
-		if .Minify in config.features {
+		home_tpl := load_template(site.layouts_dir, "home.html")
+		home_html := render_home_html(home, site, home_tpl, partials, base)
+		if .Minify in site.features {
 			home_html = minify_html(home_html)
 		}
-		write_file(fmt.tprintf("%s/index.html", config.output_dir), home_html)
+		write_file(fmt.tprintf("%s/index.html", site.output_dir), home_html)
 	}
 
 	// Render posts list page
-	posts_tpl := load_template(config.layouts_dir, "posts_list.html")
-	posts_html := render_posts_html(pages, config, posts_tpl, partials, base)
-	if .Minify in config.features {
+	posts_tpl := load_template(site.layouts_dir, "posts_list.html")
+	posts_html := render_posts_html(site, posts_tpl, partials, base)
+	if .Minify in site.features {
 		posts_html = minify_html(posts_html)
 	}
-	write_page(config.output_dir, "/posts/", posts_html)
+	write_page(site.output_dir, "/posts/", posts_html)
 
 	// Generate RSS feed
-	rss := generate_rss(pages, config)
-	write_file(fmt.tprintf("%s/index.xml", config.output_dir), rss)
+	rss := generate_rss(site)
+	write_file(fmt.tprintf("%s/index.xml", site.output_dir), rss)
 
 	// Generate sitemap
-	sitemap := generate_sitemap(pages, config.base_url)
-	write_file(fmt.tprintf("%s/sitemap.xml", config.output_dir), sitemap)
+	sitemap := generate_sitemap(site)
+	write_file(fmt.tprintf("%s/sitemap.xml", site.output_dir), sitemap)
 
 	// Copy and optionally minify assets directory
-	copy_assets_dir(config.assets_dir, config.output_dir, config.features)
+	copy_assets_dir(site.assets_dir, site.output_dir, site.features)
 
 	// Generate robots.txt
-	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", config.base_url)
-	write_file(fmt.tprintf("%s/robots.txt", config.output_dir), robots)
+	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", site.base_url)
+	write_file(fmt.tprintf("%s/robots.txt", site.output_dir), robots)
 
 	total := len(pages) + 1
 	if !has_home {
 		total += 1
 	}
-	fmt.printfln("Rendered %d pages to %s", total, config.output_dir)
+	fmt.printfln("Rendered %d pages to %s", total, site.output_dir)
 }
 
 render_page_html :: proc(
 	page: Page,
-	config: Site,
+	site: ^Site,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	base: Base_Data,
@@ -221,13 +222,13 @@ render_page_html :: proc(
 	data := Page_Data {
 		base = base,
 	}
-	data.title = fmt.tprintf("%s | %s", page.title, config.title)
+	data.title = fmt.tprintf("%s | %s", page.title, site.title)
 	data.page_title = page.title
 	data.body = page.body_html
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
 	data.is_post = is_article
-	data.og_url = fmt.tprintf("%s%s", config.base_url, page.permalink)
+	data.og_url = fmt.tprintf("%s%s", site.base_url, page.permalink)
 	data.og_title = strip_html_tags(page.title)
 	data.og_type = og_type(is_article)
 	data.is_article = is_article
@@ -238,15 +239,14 @@ render_page_html :: proc(
 
 render_home_html :: proc(
 	home: Page,
-	pages: []Page,
-	config: Site,
+	site: ^Site,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
 	list_pages := make([dynamic]Page_Context)
 	defer delete(list_pages)
-	for page in pages {
+	for page in site.pages {
 		if page.type == .Home {
 			continue
 		}
@@ -256,19 +256,18 @@ render_home_html :: proc(
 	data := Home_Data {
 		base = base,
 	}
-	data.title = config.title
+	data.title = site.title
 	data.body = home.body_html
 	data.list_pages = list_pages
-	data.og_url = fmt.tprintf("%s/", config.base_url)
-	data.og_title = config.title
+	data.og_url = fmt.tprintf("%s/", site.base_url)
+	data.og_title = site.title
 	data.og_type = "website"
 	data.is_article = false
 	return render_template(content_tpl, data, partials)
 }
 
 render_posts_html :: proc(
-	pages: []Page,
-	config: Site,
+	site: ^Site,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	base: Base_Data,
@@ -276,7 +275,7 @@ render_posts_html :: proc(
 	year_sections := make([dynamic]Year_Section)
 	defer delete(year_sections)
 	current_year := ""
-	for page in pages {
+	for page in site.pages {
 		if page.type != .Post {
 			continue
 		}
@@ -291,9 +290,9 @@ render_posts_html :: proc(
 	data := Posts_Data {
 		base = base,
 	}
-	data.title = fmt.tprintf("Posts | %s", config.title)
+	data.title = fmt.tprintf("Posts | %s", site.title)
 	data.year_sections = year_sections
-	data.og_url = fmt.tprintf("%s/posts/", config.base_url)
+	data.og_url = fmt.tprintf("%s/posts/", site.base_url)
 	data.og_title = "Posts"
 	data.og_type = "website"
 	data.is_article = false

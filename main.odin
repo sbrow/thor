@@ -45,8 +45,8 @@ main :: proc() {
 		// TODO: Make it so this isn't necessary
 		context.allocator = site_allocator(&site)
 
-		pages := walk_content(&site)
-		render_site(pages, site)
+		site_load_content(&site)
+		render_site(&site)
 
 		if !(.Watch in site.features) {
 			break
@@ -72,3 +72,4 @@ when SPALL {
 		spall._buffer_end(&spall_ctx, &spall_buffer)
 	}
 }
+

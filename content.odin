@@ -8,7 +8,7 @@ import "core:os"
 import "core:strings"
 
 Page_Type :: enum {
-	Standalone,
+	Page,
 	Post,
 	Home,
 }
@@ -23,53 +23,30 @@ Page :: struct {
 	draft:       bool,
 	is_starred:  bool,
 	menu:        string,
-	body:        string,
 	body_html:   string,
 	bundle_dir:  string,
 }
 
-// walk_content reads the content directory and returns all non-draft pages
-// (or all pages if include_drafts is true).
-//
-// TODO: What is the lifetime of pages?
-walk_content :: proc(site: ^Site) -> []Page {
-	content_path := site.content_dir
-	include_drafts := .Drafts in site.features
-	ext := site.markdown_extensions
+// site_load_content reads the content directory and populates site.pages.
+// Drafts are excluded unless .Drafts is enabled.
+site_load_content :: proc(site: ^Site) {
+	site.pages = make([dynamic]Page, 0, 8, site_allocator(site))
 
-	allocator := site_allocator(site)
-
-	pages := make([dynamic]Page, allocator)
-
-	collect_home(&pages, content_path, ext)
-	collect_standalone(&pages, content_path, ext)
-
-	posts_path := fmt.tprintf("%s/posts", content_path)
-	if os.exists(posts_path) {
-		collect_posts(&pages, posts_path, ext)
-	}
-
-	if include_drafts {
-		return pages[:]
-	} else {
-		filtered := make([dynamic]Page, allocator)
-		for &page in pages {
-			if !page.draft {
-				append(&filtered, page)
-			}
-		}
-		delete(pages)
-		return filtered[:]
-	}
+	load_homepage(site)
+	load_pages(site)
+	load_posts(site)
 }
 
-collect_home :: proc(pages: ^[dynamic]Page, content_path: string, ext: bit_set[Markdown_Extension]) {
+load_homepage :: proc(site: ^Site) {
+	content_path := site.content_dir
+	ext := site.markdown_extensions
+
 	html_path := fmt.tprintf("%s/index.html", content_path)
 	if os.exists(html_path) {
 		page, ok := load_page(html_path, .Home, "", ext)
-		if ok {
+		if ok && (!page.draft || .Drafts in site.features) {
 			page.permalink = "/"
-			append(pages, page)
+			append(&site.pages, page)
 		}
 		return
 	}
@@ -77,14 +54,17 @@ collect_home :: proc(pages: ^[dynamic]Page, content_path: string, ext: bit_set[M
 	md_path := fmt.tprintf("%s/index.md", content_path)
 	if os.exists(md_path) {
 		page, ok := load_page(md_path, .Home, "", ext)
-		if ok {
+		if ok && (!page.draft || .Drafts in site.features) {
 			page.permalink = "/"
-			append(pages, page)
+			append(&site.pages, page)
 		}
 	}
 }
 
-collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string, ext: bit_set[Markdown_Extension]) {
+load_pages :: proc(site: ^Site) {
+	content_path := site.content_dir
+	ext := site.markdown_extensions
+
 	entries, err := os.read_all_directory_by_path(content_path, context.allocator)
 	if err != nil {
 		log.warnf("thor: cannot read %s: %v", content_path, err)
@@ -104,14 +84,20 @@ collect_standalone :: proc(pages: ^[dynamic]Page, content_path: string, ext: bit
 		}
 
 		slug := strip_extension(entry.name)
-		page, ok := load_page(entry.fullpath, .Standalone, slug, ext)
-		if ok {
-			append(pages, page)
+		page, ok := load_page(entry.fullpath, .Page, slug, ext)
+		if ok && (!page.draft || .Drafts in site.features) {
+			append(&site.pages, page)
 		}
 	}
 }
 
-collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, ext: bit_set[Markdown_Extension]) {
+load_posts :: proc(site: ^Site) {
+	posts_path := fmt.tprintf("%s/posts", site.content_dir)
+	if !os.exists(posts_path) {
+		return
+	}
+
+	ext := site.markdown_extensions
 	entries, err := os.read_all_directory_by_path(posts_path, context.allocator)
 	if err != nil {
 		log.warnf("thor: cannot read %s: %v", posts_path, err)
@@ -127,8 +113,8 @@ collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, ext: bit_set[Ma
 			}
 			slug := strip_extension(entry.name)
 			page, ok := load_page(entry.fullpath, .Post, slug, ext)
-			if ok {
-				append(pages, page)
+			if ok && (!page.draft || .Drafts in site.features) {
+				append(&site.pages, page)
 			}
 		case .Directory:
 			index_path := fmt.tprintf("%s/index.html", entry.fullpath)
@@ -139,9 +125,9 @@ collect_posts :: proc(pages: ^[dynamic]Page, posts_path: string, ext: bit_set[Ma
 				continue
 			}
 			page, ok := load_page(index_path, .Post, entry.name, ext)
-			if ok {
+			if ok && (!page.draft || .Drafts in site.features) {
 				page.bundle_dir = entry.fullpath
-				append(pages, page)
+				append(&site.pages, page)
 			}
 		case .Undetermined, .Symlink, .Named_Pipe, .Socket, .Block_Device, .Character_Device:
 		}
@@ -177,7 +163,6 @@ load_page :: proc(
 	page.draft = fm.draft
 	page.is_starred = fm.isStarred
 	page.menu = fm.menu
-	page.body = strings.clone(body)
 
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)
@@ -212,7 +197,7 @@ load_page :: proc(
 		page.permalink = "/"
 	case .Post:
 		page.permalink = fmt.aprintf("/posts/%s/", slug)
-	case .Standalone:
+	case .Page:
 		page.permalink = fmt.aprintf("/%s/", slug)
 	}
 

@@ -3,12 +3,17 @@
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Performance
   - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
+  - [ ] Instead of loading the site fresh each time in watch mode, create a
+        `reload_site` proc, that just updates changed resources.
 - [ ] mustache data keys for opengraph, etc.
+- [ ] Infer page types / collections rather than having dedicated procs for
+      everything
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Add Opt-in deflist support.
+- [ ] We need to be able to do `Year_Section` in a non-magical, unpriviledged way.
 - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
@@ -29,6 +34,7 @@
   - [ ] filesystem poll loop
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
+- [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] commands
   - [ ] `build` alias of default
   - [ ] `init` set up new project

@@ -12,6 +12,7 @@ import "core:strings"
 // Site is the primary workhorse.
 Site :: struct {
 	arena:               mem.Dynamic_Arena,
+	pages:               [dynamic]Page,
 	title:               string,
 	description:         string,
 	author:              string,

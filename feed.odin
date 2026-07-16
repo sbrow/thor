@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:strings"
 import "core:time"
 
-generate_rss :: proc(pages: []Page, config: Site) -> string {
+generate_rss :: proc(site: ^Site) -> string {
 	sb := strings.builder_make()
 
 	strings.write_string(&sb, fmt.aprintf(
@@ -16,13 +16,13 @@ generate_rss :: proc(pages: []Page, config: Site) -> string {
 <description>%s</description>
 <language>en-us</language>
 <atom:link href="%s/index.xml" rel="self" type="application/rss+xml"/>`,
-		xml_escape(config.title),
-		config.base_url,
-		xml_escape(config.description),
-		config.base_url,
+		xml_escape(site.title),
+		site.base_url,
+		xml_escape(site.description),
+		site.base_url,
 	))
 
-	for page in pages {
+	for page in site.pages {
 		if page.type == .Home {
 			continue
 		}
@@ -42,10 +42,10 @@ generate_rss :: proc(pages: []Page, config: Site) -> string {
 </item>
 `,
 			xml_escape(page.title),
-			config.base_url,
+			site.base_url,
 			page.permalink,
 			pub_date,
-			config.base_url,
+			site.base_url,
 			page.permalink,
 			xml_escape(page.body_html),
 		))
@@ -55,26 +55,26 @@ generate_rss :: proc(pages: []Page, config: Site) -> string {
 	return strings.to_string(sb)
 }
 
-generate_sitemap :: proc(pages: []Page, base_url: string) -> string {
+generate_sitemap :: proc(site: ^Site) -> string {
 	sb := strings.builder_make()
 
 	strings.write_string(&sb, `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 `)
 
-	for page in pages {
+	for page in site.pages {
 		lastmod := ""
 		if page.date != "" {
 			lastmod = fmt.aprintf("<lastmod>%s</lastmod>", page.date)
 		}
 		strings.write_string(&sb, fmt.aprintf(
-			"<url><loc>%s%s</loc>%s</url>\n", base_url, page.permalink, lastmod,
+			"<url><loc>%s%s</loc>%s</url>\n", site.base_url, page.permalink, lastmod,
 		))
 	}
 
 	// Posts list page
 	posts_lastmod := ""
-	for page in pages {
+	for page in site.pages {
 		if page.type == .Post && page.date > posts_lastmod {
 			posts_lastmod = page.date
 		}
@@ -84,7 +84,7 @@ generate_sitemap :: proc(pages: []Page, base_url: string) -> string {
 		posts_lm = fmt.aprintf("<lastmod>%s</lastmod>", posts_lastmod)
 	}
 	strings.write_string(&sb, fmt.aprintf(
-		"<url><loc>%s/posts/</loc>%s</url>\n", base_url, posts_lm,
+		"<url><loc>%s/posts/</loc>%s</url>\n", site.base_url, posts_lm,
 	))
 
 	strings.write_string(&sb, "</urlset>")
