@@ -1,0 +1,15 @@
+{{<base}}
+{{$content}}
+<main>
+  <header>
+    {{&body}}
+  </header>
+  <ul>
+    {{#list_pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date_iso}}<time
+          datetime="{{date_iso}}">{{date_display}}</time>{{/date_iso}}</span>
+    </li>
+    {{/list_pages}}
+  </ul>
+</main>
+{{/content}}
+{{/base}}

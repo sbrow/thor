@@ -13,6 +13,8 @@ import "core:strings"
 Site :: struct {
 	arena:               mem.Dynamic_Arena,
 	pages:               [dynamic]Page,
+	modules:             [dynamic]string,
+	vfs:                 VFS,
 	title:               string,
 	description:         string,
 	author:              string,
@@ -62,6 +64,7 @@ Config_File :: struct {
 	layouts_dir:         string,
 	markdown_extensions: json.Value,
 	params:              json.Value,
+	modules:             json.Value,
 }
 
 // Configuration loaded from command line arguments. Gets folded in to Site
@@ -160,6 +163,14 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 	// Apply markdown extensions from config
 	if ext_obj, ok := config.markdown_extensions.(json.Object); ok {
 		apply_extension_config(&site.markdown_extensions, ext_obj)
+	}
+
+	if modules_arr, ok := config.modules.(json.Array); ok {
+		for &item in modules_arr {
+			if s, ok2 := item.(json.String); ok2 {
+				append(&site.modules, fmt.tprintf("%s/%s", config_dir, s))
+			}
+		}
 	}
 }
 

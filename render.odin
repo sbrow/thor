@@ -102,24 +102,24 @@ og_type :: proc(is_article: bool) -> string {
 	return "website"
 }
 
-load_template :: proc(layouts_dir: string, name: string) -> mustache.Template {
-	data, _ := os.read_entire_file_from_path(
-		fmt.tprintf("%s/%s", layouts_dir, name),
-		context.allocator,
-	)
+load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
+	data, ok := vfs_get(vfs, virtual_path)
+	if !ok {
+		log.warnf("thor: template %s not found", virtual_path)
+		return mustache.Template{}
+	}
 	tpl, err := mustache.parse(string(data))
 	if err != nil {
-		log.warnf("thor: failed to parse template %s: %v", name, err)
+		log.warnf("thor: failed to parse template %s: %v", virtual_path, err)
 	}
 	return tpl
 }
 
 get_template :: proc(
-	layouts_dir: string,
+	vfs: ^VFS,
 	layout: string,
 	cache: ^map[string]mustache.Template,
 ) -> mustache.Template {
-	// Build fallback chain: <layout> → [section_index] → page → base
 	chain: [4]string
 	n := 0
 	chain[n] = layout; n += 1
@@ -133,23 +133,23 @@ get_template :: proc(
 		chain[n] = "base"; n += 1
 	}
 
-	for i in 0 ..< n {
+	for i in 0..<n {
 		candidate := chain[i]
 		if cached, ok := cache[candidate]; ok {
 			return cached
 		}
-		filename := fmt.tprintf("%s.html", candidate)
-		if os.exists(fmt.tprintf("%s/%s", layouts_dir, filename)) {
-			tpl := load_template(layouts_dir, filename)
+		virtual := fmt.tprintf("layouts/%s.html", candidate)
+		if _, ok := vfs_get(vfs, virtual); ok {
+			tpl := load_template(vfs, virtual)
 			cache[candidate] = tpl
 			return tpl
 		}
 		if candidate != chain[n - 1] {
-			log.warnf("thor: template %s not found, falling back", filename)
+			log.warnf("thor: template %s not found, falling back", virtual)
 		}
 	}
 
-	log.errorf("thor: base.html not found in %s", layouts_dir)
+	log.errorf("thor: base.html not found in VFS")
 	return mustache.Template{}
 }
 
@@ -181,8 +181,8 @@ render_site :: proc(site: ^Site) {
 	sort_pages_by_date(pages)
 
 	// Load shared resources
-	partials := load_partials(site.layouts_dir)
-	partials["base"] = load_template(site.layouts_dir, "base.html")
+	partials := load_partials(&site.vfs)
+	partials["base"] = load_template(&site.vfs, "layouts/base.html")
 
 	template_cache: map[string]mustache.Template
 	defer delete(template_cache)
@@ -225,7 +225,7 @@ render_site :: proc(site: ^Site) {
 		if page._is_index {
 			continue
 		}
-		tpl := get_template(site.layouts_dir, page.layout, &template_cache)
+		tpl := get_template(&site.vfs, page.layout, &template_cache)
 		html := render_page_html(page, site, tpl, partials, base)
 		if .Minify in site.features {
 			html = minify_html(html)
@@ -246,7 +246,7 @@ render_site :: proc(site: ^Site) {
 		}
 
 		layout := fmt.tprintf("%s_index", section)
-		section_tpl := get_template(site.layouts_dir, layout, &template_cache)
+		section_tpl := get_template(&site.vfs, layout, &template_cache)
 		html := render_section(
 			site,
 			section,
@@ -264,7 +264,7 @@ render_site :: proc(site: ^Site) {
 
 	// Render home page
 	if has_home {
-		home_tpl := get_template(site.layouts_dir, "home", &template_cache)
+		home_tpl := get_template(&site.vfs, "home", &template_cache)
 		home_html := render_home_html(home, site, home_tpl, partials, base)
 		if .Minify in site.features {
 			home_html = minify_html(home_html)
@@ -281,7 +281,7 @@ render_site :: proc(site: ^Site) {
 	write_file(fmt.tprintf("%s/sitemap.xml", site.output_dir), sitemap)
 
 	// Copy and optionally minify assets directory
-	copy_assets_dir(site.assets_dir, site.output_dir, site.features)
+	copy_assets_dir(&site.vfs, site.output_dir, site.features)
 
 	// Generate robots.txt
 	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", site.base_url)
@@ -393,52 +393,32 @@ render_section :: proc(
 	return render_template(content_tpl, data, partials)
 }
 
-load_partials :: proc(layouts_dir: string) -> map[string]mustache.Template {
+load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 	partials: map[string]mustache.Template
-	partials_dir := fmt.tprintf("%s/partials", layouts_dir)
-	load_partials_recursive(&partials, partials_dir, "")
-	return partials
-}
-
-load_partials_recursive :: proc(
-	partials: ^map[string]mustache.Template,
-	base_dir: string,
-	rel_prefix: string,
-) {
-	entries, err := os.read_all_directory_by_path(base_dir, context.allocator)
-	if err != nil {
-		return
-	}
-	defer os.file_info_slice_delete(entries, context.allocator)
-
-	for entry in entries {
-		#partial switch entry.type {
-		case .Regular:
-			name := entry.name
-			if !strings.has_suffix(name, ".html") {
-				continue
-			}
-			stripped := name[:len(name) - len(".html")]
-			key := stripped
-			if rel_prefix != "" {
-				key = fmt.tprintf("%s/%s", rel_prefix, stripped)
-			}
-			data, ok := os.read_entire_file_from_path(entry.fullpath, context.allocator)
-			if ok == nil {
-				tpl, perr := mustache.parse(string(data))
-				if perr != nil {
-					log.warnf("thor: failed to parse partial %s: %v", key, perr)
-				}
-				partials[key] = tpl
-			}
-		case .Directory:
-			sub_prefix := entry.name
-			if rel_prefix != "" {
-				sub_prefix = fmt.tprintf("%s/%s", rel_prefix, entry.name)
-			}
-			load_partials_recursive(partials, entry.fullpath, sub_prefix)
+	prefix := "layouts/partials/"
+	for virtual_path in vfs.files {
+		if !strings.has_prefix(virtual_path, prefix) {
+			continue
 		}
+		if !strings.has_suffix(virtual_path, ".html") {
+			continue
+		}
+
+		stripped := virtual_path[len(prefix):]
+		key := stripped[:len(stripped) - len(".html")]
+
+		data, ok := vfs_get(vfs, virtual_path)
+		if !ok {
+			continue
+		}
+		tpl, err := mustache.parse(string(data))
+		if err != nil {
+			log.warnf("thor: failed to parse partial %s: %v", key, err)
+			continue
+		}
+		partials[key] = tpl
 	}
+	return partials
 }
 
 format_date :: proc(iso: string) -> string {

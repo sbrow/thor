@@ -44,13 +44,12 @@ main :: proc() {
 		defer destroy_site(&site)
 		// TODO: Make it so this isn't necessary
 		context.allocator = site_allocator(&site)
+		build_vfs(&site)
 
 		site_load_content(&site)
 		render_site(&site)
 
-		if !(.Watch in site.features) {
-			break
-		}
+		(.Watch in site.features) or_break
 		time.sleep(5 * time.Second)
 	}
 }

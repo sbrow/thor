@@ -1,0 +1,11 @@
+{{<base}}
+{{$content}}
+<main>
+  <article>
+    <h1>{{page_title}}</h1>
+    {{#date_iso}} <time class="subtitle" datetime="{{date_iso}}">{{date_display}}</time>
+    {{/date_iso}} {{&body}}
+  </article>
+</main>
+{{/content}}
+{{/base}}
