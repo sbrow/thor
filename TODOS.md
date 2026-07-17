@@ -7,6 +7,7 @@
   - [ ] Instead of loading the site fresh each time in watch mode, create a
         `reload_site` proc, that just updates changed resources.
   - [ ] Only publish referenced assets.
+  - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] mustache data keys for opengraph, etc.
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
@@ -36,7 +37,6 @@
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
 - [ ] Rename `{{#is_post}}` to `{{#is_article}}` in templates and data model — currently hardcoded to posts section, should use `is_article` (any page with a section) instead.
-- [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] Mount content in VFS
 - [ ] commands
   - [ ] `build` alias of default

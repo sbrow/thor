@@ -75,6 +75,7 @@ Flags :: struct {
 	content_dir: string `args:"name=content" usage:"Path to content directory"`,
 	assets_dir:  string `args:"name=assets" usage:"Path to assets directory (CSS, JS, fonts, images)"`,
 	output_dir:  string `args:"name=output" usage:"Path to output directory (default: public/)"`,
+	layouts_dir: string `args:"name=layouts" usage:"Path to layouts directory"`,
 	drafts:      bool `args:"name=drafts" usage:"Include draft pages in the build"`,
 	watch:       bool `usage:"Rebuild on file changes (polls every 5 seconds)"`,
 	minify:      bool `args:"name=minify" usage:"Minify HTML output and CSS assets"`,
@@ -186,6 +187,7 @@ site_apply_cli_flags :: proc(site: ^Site, flags: Flags) {
 	if flags.content_dir != "" do site.content_dir = flags.content_dir
 	if flags.assets_dir != "" do site.assets_dir = flags.assets_dir
 	if flags.output_dir != "" do site.output_dir = flags.output_dir
+	if flags.layouts_dir != "" do site.layouts_dir = flags.layouts_dir
 
 	if flags.drafts {site.features += {.Drafts}}
 	if flags.watch {site.features += {.Watch}}
