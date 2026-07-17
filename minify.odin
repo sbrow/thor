@@ -1,5 +1,7 @@
 package main
 
+import ts "treesitter"
+
 import "core:log"
 import "core:strings"
 
@@ -11,7 +13,7 @@ Range :: struct {
 }
 
 minify_html :: proc(source: string) -> string {
-	gc := ensure_parser("html")
+	gc := ts.ensure_parser("html")
 	if gc == nil {
 		return source
 	}
@@ -19,15 +21,15 @@ minify_html :: proc(source: string) -> string {
 	source_c := strings.clone_to_cstring(source)
 	defer delete(source_c)
 
-	tree := ts_parser_parse_string(gc.parser, nil, source_c, u32(len(source)))
+	tree := ts.parser_parse_string(gc.parser, nil, source_c, u32(len(source)))
 	if tree == nil {
 		return source
 	}
-	defer ts_tree_delete(tree)
+	defer ts.tree_delete(tree)
 
-	root := ts_tree_root_node(tree)
+	root := ts.tree_root_node(tree)
 
-	if ts_node_has_error(root) {
+	if ts.node_has_error(root) {
 		log.warnf("minify: HTML parse errors, skipping minification")
 		return source
 	}
@@ -95,32 +97,32 @@ minify_html :: proc(source: string) -> string {
 }
 
 collect_html_ranges :: proc(
-	node: TSNode,
+	node: ts.Node,
 	source: string,
 	comments: ^[dynamic]Range,
 	preserves: ^[dynamic]Range,
 ) {
-	child_count := ts_node_named_child_count(node)
+	child_count := ts.node_named_child_count(node)
 	for i in 0..<child_count {
-		child := ts_node_named_child(node, u32(i))
-		type_str := string(ts_node_type(child))
+		child := ts.node_named_child(node, u32(i))
+		type_str := string(ts.node_type(child))
 
 		if type_str == "comment" {
 			append(comments, Range{
-				start = ts_node_start_byte(child),
-				end = ts_node_end_byte(child),
+				start = ts.node_start_byte(child),
+				end = ts.node_end_byte(child),
 			})
 		} else if type_str == "script_element" || type_str == "style_element" {
 			append(preserves, Range{
-				start = ts_node_start_byte(child),
-				end = ts_node_end_byte(child),
+				start = ts.node_start_byte(child),
+				end = ts.node_end_byte(child),
 			})
 		} else if type_str == "element" {
 			tag := html_tag_name(child, source)
 			if is_preserve_tag(tag) {
 				append(preserves, Range{
-					start = ts_node_start_byte(child),
-					end = ts_node_end_byte(child),
+					start = ts.node_start_byte(child),
+					end = ts.node_end_byte(child),
 				})
 			} else {
 				collect_html_ranges(child, source, comments, preserves)
@@ -131,17 +133,17 @@ collect_html_ranges :: proc(
 	}
 }
 
-html_tag_name :: proc(element: TSNode, source: string) -> string {
-	child_count := ts_node_named_child_count(element)
+html_tag_name :: proc(element: ts.Node, source: string) -> string {
+	child_count := ts.node_named_child_count(element)
 	for i in 0..<child_count {
-		child := ts_node_named_child(element, u32(i))
-		if string(ts_node_type(child)) == "start_tag" {
-			tag_child_count := ts_node_named_child_count(child)
+		child := ts.node_named_child(element, u32(i))
+		if string(ts.node_type(child)) == "start_tag" {
+			tag_child_count := ts.node_named_child_count(child)
 			for j in 0..<tag_child_count {
-				tag_child := ts_node_named_child(child, u32(j))
-				if string(ts_node_type(tag_child)) == "tag_name" {
-					start := ts_node_start_byte(tag_child)
-					end := ts_node_end_byte(tag_child)
+				tag_child := ts.node_named_child(child, u32(j))
+				if string(ts.node_type(tag_child)) == "tag_name" {
+					start := ts.node_start_byte(tag_child)
+					end := ts.node_end_byte(tag_child)
 					return source[start:end]
 				}
 			}
@@ -167,7 +169,7 @@ is_css_delim :: proc(c: u8) -> bool {
 }
 
 minify_css :: proc(source: string) -> string {
-	gc := ensure_parser("css")
+	gc := ts.ensure_parser("css")
 	if gc == nil {
 		return source
 	}
@@ -175,15 +177,15 @@ minify_css :: proc(source: string) -> string {
 	source_c := strings.clone_to_cstring(source)
 	defer delete(source_c)
 
-	tree := ts_parser_parse_string(gc.parser, nil, source_c, u32(len(source)))
+	tree := ts.parser_parse_string(gc.parser, nil, source_c, u32(len(source)))
 	if tree == nil {
 		return source
 	}
-	defer ts_tree_delete(tree)
+	defer ts.tree_delete(tree)
 
-	root := ts_tree_root_node(tree)
+	root := ts.tree_root_node(tree)
 
-	if ts_node_has_error(root) {
+	if ts.node_has_error(root) {
 		log.warnf("minify: CSS parse errors, skipping minification")
 		return source
 	}
@@ -237,14 +239,14 @@ minify_css :: proc(source: string) -> string {
 	return strings.to_string(sb)
 }
 
-collect_css_comments :: proc(node: TSNode, comments: ^[dynamic]Range) {
-	child_count := ts_node_named_child_count(node)
+collect_css_comments :: proc(node: ts.Node, comments: ^[dynamic]Range) {
+	child_count := ts.node_named_child_count(node)
 	for i in 0..<child_count {
-		child := ts_node_named_child(node, u32(i))
-		if string(ts_node_type(child)) == "comment" {
+		child := ts.node_named_child(node, u32(i))
+		if string(ts.node_type(child)) == "comment" {
 			append(comments, Range{
-				start = ts_node_start_byte(child),
-				end = ts_node_end_byte(child),
+				start = ts.node_start_byte(child),
+				end = ts.node_end_byte(child),
 			})
 		} else {
 			collect_css_comments(child, comments)
