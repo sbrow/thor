@@ -4,17 +4,19 @@ package markdown
 import "core:testing"
 
 @(test)
-test_basic_expansion :: proc(t: ^testing.T) {
+test_basic_emoji_expansion_works :: proc(t: ^testing.T) {
 	testing.expect_value(t, expand_emoji(":smile:"), "😄")
 	testing.expect_value(t, expand_emoji(":smile: :heart:"), "😄 ❤️")
 	testing.expect_value(t, expand_emoji(":smile::heart:"), "😄❤️")
 	testing.expect_value(t, expand_emoji("Hello :wave:!"), "Hello 👋!")
 	testing.expect_value(t, expand_emoji(":smile: rest"), "😄 rest")
 	testing.expect_value(t, expand_emoji("rest :smile:"), "rest 😄")
+	testing.expect_value(t, expand_emoji(":100:"), "💯")
+	testing.expect_value(t, expand_emoji(":stuck_out_tongue:"), "😛")
 }
 
 @(test)
-test_no_match :: proc(t: ^testing.T) {
+test_emoji_skips_non_matches :: proc(t: ^testing.T) {
 	testing.expect_value(t, expand_emoji("Hello world"), "Hello world")
 	testing.expect_value(t, expand_emoji("Hello:"), "Hello:")
 	testing.expect_value(t, expand_emoji(":notreal:"), ":notreal:")
@@ -23,14 +25,9 @@ test_no_match :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_invalid_shortcodes :: proc(t: ^testing.T) {
+test_emoji_skips_invalid_shortcodes :: proc(t: ^testing.T) {
 	testing.expect_value(t, expand_emoji("::"), "::")
 	testing.expect_value(t, expand_emoji(":Smile:"), ":Smile:")
 	testing.expect_value(t, expand_emoji(": not real :"), ": not real :")
 }
 
-@(test)
-test_valid_formats :: proc(t: ^testing.T) {
-	testing.expect_value(t, expand_emoji(":100:"), "💯")
-	testing.expect_value(t, expand_emoji(":stuck_out_tongue:"), "😛")
-}

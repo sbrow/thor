@@ -37,8 +37,10 @@ wrap_sections :: proc(html: string) -> string {
 		found = true
 	}
 
-	if !found {
+	if found {
+		return strings.to_string(sb)
+	} else {
 		return html
 	}
-	return strings.to_string(sb)
 }
+

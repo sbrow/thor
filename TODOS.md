@@ -45,6 +45,8 @@
 - [ ] Use spall to find ways to reduce run time.
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
+- [ ] Markdown
+  - [ ] Add overloads for every extension - accept ^strings.Builder.
 - [ ] Review every file in thor
   - [ ] Review assets.odin
   - [ ] Review content.odin
@@ -55,12 +57,14 @@
   - [ ] Review minify.odin
   - [ ] Review `markdown/`
     - [ ] Review alerts.odin
-    - [ ] Review emoji.odin
+    - [x] Review emoji.odin
+    - [x] Review emoji_test.odin
     - [ ] Review footnotes.odin
     - [ ] Review footnotes_test.odin
     - [ ] Review highlight.odin
     - [ ] Review markdown.odin
-    - [ ] Review sectionate.odin
+    - [x] Review sectionate.odin
+    - [x] Review sectionate_test.odin
   - [ ] Review render.odin
   - [x] Review site.odin
   - [ ] Review treesitter/treesitter.odin
