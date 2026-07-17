@@ -56,7 +56,8 @@
   - [ ] Review main.odin
   - [ ] Review minify.odin
   - [ ] Review `markdown/`
-    - [ ] Review alerts.odin
+    - [x] Review alerts.odin
+    - [x] Review alerts_test.odin
     - [x] Review emoji.odin
     - [x] Review emoji_test.odin
     - [ ] Review footnotes.odin
@@ -69,3 +70,5 @@
   - [x] Review site.odin
   - [ ] Review treesitter/treesitter.odin
   - [ ] Review vfs.odin
+- [ ] Review procs
+  - [ ] markdown.transform_alert
