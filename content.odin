@@ -1,6 +1,6 @@
 package main
 
-import cm "vendor:commonmark"
+import md "markdown"
 
 import "core:fmt"
 import "core:log"
@@ -101,7 +101,7 @@ load_page :: proc(
 	section: string,
 	slug: string,
 	is_index: bool,
-	ext: bit_set[Markdown_Extension],
+	ext: bit_set[md.Extension],
 ) -> (
 	page: Page,
 	ok: bool,
@@ -132,29 +132,7 @@ load_page :: proc(
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)
 	} else {
-		sn_defs := make(map[string]string)
-		mn_defs := make(map[string]string)
-		clean_body := body
-		if .Sidenotes in ext {
-			clean_body, sn_defs, mn_defs = strip_definitions(body)
-		}
-		html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
-		if .Emoji in ext {
-			html = expand_emoji(html)
-		}
-		if .Sidenotes in ext {
-			html = inject_notes(html, sn_defs, mn_defs)
-		}
-		if .Alerts in ext {
-			html = inject_alerts(html)
-		}
-		if .Highlight in ext {
-			html = highlight_code(html, file_path)
-		}
-		if .Sections in ext {
-			html = wrap_sections(html)
-		}
-		page.body_html = html
+		page.body_html = md.process(body, ext, file_path)
 	}
 
 	if section == "" && is_index {

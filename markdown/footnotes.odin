@@ -1,4 +1,4 @@
-package main
+package markdown
 
 import cm "vendor:commonmark"
 

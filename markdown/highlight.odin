@@ -1,6 +1,6 @@
-package main
+package markdown
 
-import ts "treesitter"
+import ts "../treesitter"
 
 import "core:fmt"
 import "core:log"

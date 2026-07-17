@@ -1,5 +1,5 @@
 #+feature dynamic-literals
-package main
+package markdown
 
 import "core:strings"
 

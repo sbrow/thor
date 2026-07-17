@@ -1,6 +1,6 @@
 #+feature dynamic-literals
 #+test
-package main
+package markdown
 
 import "core:strings"
 import "core:testing"

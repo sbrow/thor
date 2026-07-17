@@ -8,6 +8,8 @@ import "core:mem"
 import "core:os"
 import "core:strings"
 
+import md "markdown"
+
 
 // Site is the primary workhorse.
 Site :: struct {
@@ -26,29 +28,13 @@ Site :: struct {
 	layouts_dir:         string,
 	params:              json.Object,
 	features:            bit_set[Feature],
-	markdown_extensions: bit_set[Markdown_Extension],
+	markdown_extensions: bit_set[md.Extension],
 }
 
 Feature :: enum {
 	Drafts,
 	Minify,
 	Watch,
-}
-
-Markdown_Extension :: enum {
-	Emoji,
-	Sidenotes,
-	Alerts,
-	Highlight,
-	Sections,
-}
-
-DEFAULT_MARKDOWN_EXTENSIONS :: bit_set[Markdown_Extension] {
-	.Emoji,
-	.Sidenotes,
-	.Alerts,
-	// .Highlight,
-	// .Sections,
 }
 
 // Configuration loaded from `thor.json`. Gets folded in to Site before
@@ -89,7 +75,7 @@ init_site :: proc(site: ^Site, args: []string) {
 
 	// Set defaults
 	site.base_url = "http://localhost:8080"
-	site.markdown_extensions = DEFAULT_MARKDOWN_EXTENSIONS
+	site.markdown_extensions = md.DEFAULT_EXTENSIONS
 
 	_flags: Flags
 	flags.parse_or_exit(&_flags, args, .Odin, alloc)
@@ -163,7 +149,7 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 
 	// Apply markdown extensions from config
 	if ext_obj, ok := config.markdown_extensions.(json.Object); ok {
-		apply_extension_config(&site.markdown_extensions, ext_obj)
+		md.apply_extension_config(&site.markdown_extensions, ext_obj)
 	}
 
 	if modules_arr, ok := config.modules.(json.Array); ok {
@@ -193,48 +179,8 @@ site_apply_cli_flags :: proc(site: ^Site, flags: Flags) {
 	if flags.watch {site.features += {.Watch}}
 	if flags.minify {site.features += {.Minify}}
 
-	site.markdown_extensions += parse_extension_list(flags.md_enable)
-	site.markdown_extensions -= parse_extension_list(flags.md_disable)
-}
-
-parse_extension_list :: proc(s: string) -> bit_set[Markdown_Extension] {
-	result: bit_set[Markdown_Extension]
-	if s == "" do return result
-	for part in strings.split(s, ",", allocator = context.temp_allocator) {
-		name := strings.to_lower(strings.trim_space(part), allocator = context.temp_allocator)
-		switch name {
-		case "emoji":
-			result += {.Emoji}
-		case "sidenotes":
-			result += {.Sidenotes}
-		case "alerts":
-			result += {.Alerts}
-		case "highlight":
-			result += {.Highlight}
-		case "sections":
-			result += {.Sections}
-		}
-	}
-	return result
-}
-
-apply_extension_config :: proc(ext: ^bit_set[Markdown_Extension], config: json.Object) {
-	for name, val in config {
-		enabled, is_bool := val.(json.Boolean)
-		if !is_bool do continue
-		switch name {
-		case "emoji":
-			if enabled {ext^ += {.Emoji}} else {ext^ -= {.Emoji}}
-		case "sidenotes":
-			if enabled {ext^ += {.Sidenotes}} else {ext^ -= {.Sidenotes}}
-		case "alerts":
-			if enabled {ext^ += {.Alerts}} else {ext^ -= {.Alerts}}
-		case "highlight":
-			if enabled {ext^ += {.Highlight}} else {ext^ -= {.Highlight}}
-		case "sections":
-			if enabled {ext^ += {.Sections}} else {ext^ -= {.Sections}}
-		}
-	}
+	site.markdown_extensions += md.parse_extension_list(flags.md_enable)
+	site.markdown_extensions -= md.parse_extension_list(flags.md_disable)
 }
 
 site_allocator :: proc(site: ^Site) -> mem.Allocator {

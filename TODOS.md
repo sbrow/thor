@@ -46,16 +46,21 @@
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
 - [ ] Review every file in thor
   - [ ] Review assets.odin
-  - [ ] Review alerts.odin
   - [ ] Review content.odin
-  - [ ] Review emoji.odin
+  - [ ] Review defaults.odin
   - [ ] Review feed.odin
-  - [ ] Review footnotes.odin
   - [ ] Review frontmatter.odin
-  - [ ] Review highlight.odin
   - [ ] Review main.odin
-  - [ ] Review minifiy.odin
+  - [ ] Review minify.odin
+  - [ ] Review `markdown/`
+    - [ ] Review alerts.odin
+    - [ ] Review emoji.odin
+    - [ ] Review footnotes.odin
+    - [ ] Review footnotes_test.odin
+    - [ ] Review highlight.odin
+    - [ ] Review markdown.odin
+    - [ ] Review sectionate.odin
   - [ ] Review render.odin
-  - [ ] Review sectionate.odin
   - [x] Review site.odin
-  - [ ] Review tree_sitter.odin
+  - [ ] Review treesitter/treesitter.odin
+  - [ ] Review vfs.odin
