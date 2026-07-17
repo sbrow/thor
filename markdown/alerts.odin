@@ -1,7 +1,6 @@
 #+feature dynamic-literals
 package markdown
 
-import "core:fmt"
 import "core:strings"
 
 ALERT_EMOJIS: map[string]string = {
@@ -35,7 +34,7 @@ inject_alerts :: proc(html: string) -> string {
 		bq := remaining[bq_start:bq_end]
 
 		strings.write_string(&sb, remaining[:bq_start])
-		strings.write_string(&sb, transform_alert(bq))
+		transform_alert(&sb, bq)
 
 		remaining = remaining[bq_end:]
 	}
@@ -43,7 +42,7 @@ inject_alerts :: proc(html: string) -> string {
 	return strings.to_string(sb)
 }
 
-transform_alert :: proc(bq: string) -> string {
+transform_alert :: proc(sb: ^strings.Builder, bq: string) {
 	pos := len("<blockquote>")
 	for pos < len(bq) &&
 	    (bq[pos] == '\n' || bq[pos] == '\r' || bq[pos] == ' ' || bq[pos] == '\t') {
@@ -56,20 +55,23 @@ transform_alert :: proc(bq: string) -> string {
 	   bq[pos + 2] != '>' ||
 	   bq[pos + 3] != '[' ||
 	   bq[pos + 4] != '!' {
-		return bq
+		strings.write_string(sb, bq)
+		return
 	}
 
 	close := strings.index(bq[pos + 5:], "]")
 	if close < 0 {
-		return bq
+		strings.write_string(sb, bq)
+		return
 	}
 
 	type_raw := bq[pos + 5:pos + 5 + close]
-	type_lower := strings.to_lower(type_raw)
+	type_lower := strings.to_lower(type_raw, context.temp_allocator)
 
 	emoji, found := ALERT_EMOJIS[type_lower]
 	if !found {
-		return bq
+		strings.write_string(sb, bq)
+		return
 	}
 
 	after_type := pos + 5 + close + 1
@@ -84,12 +86,13 @@ transform_alert :: proc(bq: string) -> string {
 
 	rest := bq[content_start:]
 
-	return fmt.aprintf(
-		`<blockquote class="alert alert-%s">
-<p class="alert-title">%s %s`,
-		type_lower,
-		emoji,
-		rest,
-	)
+	strings.write_string(sb, `<blockquote class="alert alert-`)
+	strings.write_string(sb, type_lower)
+	strings.write_string(sb, `">`)
+	strings.write_string(sb, "\n")
+	strings.write_string(sb, `<p class="alert-title">`)
+	strings.write_string(sb, emoji)
+	strings.write_string(sb, " ")
+	strings.write_string(sb, rest)
 }
 
