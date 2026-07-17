@@ -155,6 +155,32 @@ is_truthy :: proc(a: any) -> bool {
 	}
 }
 
+call_interp_lambda :: proc(val: any) -> (result: string, ok: bool) {
+	switch v in val {
+	case proc() -> string:
+		return v(), true
+	case proc() -> int:
+		return fmt.tprintf("%d", v()), true
+	case proc() -> bool:
+		return "true" if v() else "false", true
+	case:
+		return "", false
+	}
+}
+
+call_section_lambda :: proc(val: any, text: string) -> (result: string, ok: bool) {
+	switch v in val {
+	case proc(string) -> string:
+		return v(text), true
+	case proc(string) -> int:
+		return fmt.tprintf("%d", v(text)), true
+	case proc(string) -> bool:
+		return "true" if v(text) else "false", true
+	case:
+		return "", false
+	}
+}
+
 // list_info returns element type info, count, and data pointer for a list value.
 // Returns elem_info=nil if the value is not a list.
 list_info :: proc(a: any) -> (elem_info: ^runtime.Type_Info, count: int, data: rawptr) {
