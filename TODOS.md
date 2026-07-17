@@ -14,7 +14,7 @@
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Add Opt-in deflist support.
-- [ ] We need to be able to do `Year_Section` in a non-magical, unpriviledged way.
+- [ ] We need to be able to do `Year_Section` in a non-magical, unprivileged way. See [PLAN.md](PLAN.md) for computed properties approach.
 - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
 - [ ] Table of contents support.
 - [ ] prefixing every log message with `thor: ` is silly
@@ -46,7 +46,7 @@
 - [ ] Markdown
   - [ ] Add overloads for every extension - accept ^strings.Builder.
   - [ ] Add conventional (Hugo style) footnotes option.
-  - [ ] Add header ids
+  - [ ] Add heading ids as a default on extension.
 - [ ] Review every file in thor
   - [ ] Review assets.odin
   - [ ] Review content.odin
