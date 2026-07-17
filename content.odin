@@ -91,6 +91,9 @@ infer_layout :: proc(section: string, is_index: bool) -> string {
 		return fmt.tprintf("%s_index", section)
 	}
 	if section != "" {
+		if len(section) > 1 && section[len(section) - 1] == 's' {
+			return section[:len(section) - 1]
+		}
 		return section
 	}
 	return "page"

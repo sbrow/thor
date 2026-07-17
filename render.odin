@@ -144,7 +144,7 @@ get_template :: proc(
 			return tpl
 		}
 		if candidate != chain[n - 1] {
-			log.warnf("thor: template %s not found, falling back", virtual)
+			log.debugf("thor: template %s not found, falling back", virtual)
 		}
 	}
 

@@ -17,6 +17,7 @@
 - [ ] We need to be able to do `Year_Section` in a non-magical, unpriviledged way.
 - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
 - [ ] Table of contents support.
+- [ ] prefixing every log message with `thor: ` is silly
 - [ ] Nav items should be active when the current page is selected.
 - [ ] Theme selector for syntax highlighting.
   - use http://github.com/helix-editor/helix/tree/master/runtime/themes) as a
