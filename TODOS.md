@@ -1,5 +1,3 @@
-- README.md
-  - [ ] "Zero is beautiful"
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Clean up the default layouts
 - [ ] Performance
@@ -37,7 +35,6 @@
   - [ ] filesystem poll loop
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
-- [ ] Rename `{{#is_post}}` to `{{#is_article}}` in templates and data model — currently hardcoded to posts section, should use `is_article` (any page with a section) instead.
 - [ ] Mount content in VFS
 - [ ] commands
   - [ ] `build` alias of default
@@ -47,6 +44,8 @@
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
 - [ ] Markdown
   - [ ] Add overloads for every extension - accept ^strings.Builder.
+  - [ ] Add conventional (Hugo style) footnotes option.
+  - [ ] Add header ids
 - [ ] Review every file in thor
   - [ ] Review assets.odin
   - [ ] Review content.odin

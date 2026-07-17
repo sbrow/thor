@@ -43,7 +43,6 @@ Page_Data :: struct {
 	page_title:   string,
 	date_iso:     string,
 	date_display: string,
-	is_post:      bool,
 	og_section:   string,
 	og_published: string,
 }
@@ -310,7 +309,6 @@ render_page_html :: proc(
 	data.body = page.body_html
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
-	data.is_post = is_article
 	data.og_url = fmt.tprintf("%s%s", site.base_url, page.permalink)
 	data.og_title = strip_html_tags(page.title)
 	data.og_type = og_type(is_article)
