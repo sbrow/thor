@@ -12,6 +12,7 @@ Frontmatter :: struct {
 	draft:       bool,
 	isStarred:   bool,
 	menu:        string,
+	layout:      string,
 }
 
 // parse_frontmatter splits raw file content into a Frontmatter struct and the
@@ -52,6 +53,7 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	fm.draft = json_get_bool(obj, "draft")
 	fm.isStarred = json_get_bool(obj, "isStarred")
 	fm.menu = json_get_string(obj, "menu")
+	fm.layout = json_get_string(obj, "layout")
 
 	ok = true
 	return

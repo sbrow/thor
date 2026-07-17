@@ -6,10 +6,9 @@
   - [ ] Instead of loading the site fresh each time in watch mode, create a
         `reload_site` proc, that just updates changed resources.
 - [ ] mustache data keys for opengraph, etc.
-- [ ] Infer page types / collections rather than having dedicated procs for
-      everything
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
+- [ ] follow symlinks in `scan_content`?
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Add Opt-in deflist support.
@@ -34,13 +33,16 @@
   - [ ] filesystem poll loop
   - [ ] event based
 - [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
+- [ ] Rename `{{#is_post}}` to `{{#is_article}}` in templates and data model — currently hardcoded to posts section, should use `is_article` (any page with a section) instead.
 - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] commands
   - [ ] `build` alias of default
   - [ ] `init` set up new project
 - [ ] Use spall to find ways to reduce run time.
 - [ ] warn/error when unknown key used in mustache.
+- [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
 - [ ] Review every file in thor
+  - [ ] Review assets.odin
   - [ ] Review alerts.odin
   - [ ] Review content.odin
   - [ ] Review emoji.odin

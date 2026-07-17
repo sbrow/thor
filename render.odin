@@ -54,12 +54,13 @@ Home_Data :: struct {
 	list_pages: [dynamic]Page_Context,
 }
 
-Posts_Data :: struct {
+Section_Data :: struct {
 	using base:    Base_Data,
+	page_title:    string,
 	year_sections: [dynamic]Year_Section,
 }
 
-	build_page_context :: proc(page: Page) -> Page_Context {
+build_page_context :: proc(page: Page) -> Page_Context {
 	return Page_Context {
 		permalink = page.permalink,
 		title = page.title,
@@ -114,6 +115,41 @@ load_template :: proc(layouts_dir: string, name: string) -> mustache.Template {
 	return tpl
 }
 
+get_template :: proc(
+	layouts_dir: string,
+	layout: string,
+	cache: ^map[string]mustache.Template,
+) -> mustache.Template {
+	if cached, ok := cache[layout]; ok {
+		return cached
+	}
+
+	filename := fmt.tprintf("%s.html", layout)
+	if os.exists(fmt.tprintf("%s/%s", layouts_dir, filename)) {
+		tpl := load_template(layouts_dir, filename)
+		cache[layout] = tpl
+		return tpl
+	}
+
+	if layout != "page" {
+		log.warnf("thor: template %s not found, falling back to page.html", filename)
+		return get_template(layouts_dir, "page", cache)
+	}
+
+	log.errorf("thor: default template page.html not found in %s", layouts_dir)
+	return load_template(layouts_dir, "page.html")
+}
+
+capitalize :: proc(s: string) -> string {
+	if len(s) == 0 {
+		return s
+	}
+	if s[0] >= 'a' && s[0] <= 'z' {
+		return fmt.aprintf("%c%s", s[0] - 32, s[1:])
+	}
+	return s
+}
+
 render_template :: proc(
 	content_tpl: mustache.Template,
 	data: any,
@@ -131,10 +167,12 @@ render_site :: proc(site: ^Site) {
 	pages := site.pages[:]
 	sort_pages_by_date(pages)
 
-	// Load shared resources once
+	// Load shared resources
 	partials := load_partials(site.layouts_dir)
 	partials["base"] = load_template(site.layouts_dir, "base.html")
-	post_tpl := load_template(site.layouts_dir, "post.html")
+
+	template_cache: map[string]mustache.Template
+	defer delete(template_cache)
 
 	now, ok := time.time_to_datetime(time.now())
 	assert(ok)
@@ -153,42 +191,73 @@ render_site :: proc(site: ^Site) {
 	home: Page
 	has_home := false
 	for page in pages {
-		if page.type == .Home {
+		if page.section == "" && page._is_index {
 			home = page
 			has_home = true
 			break
 		}
 	}
 
-	// Render individual content pages (skip home)
+	// Collect sections
+	sections := make(map[string]bool)
+	defer delete(sections)
 	for page in pages {
-		if page.type == .Home {
+		if page.section != "" {
+			sections[page.section] = true
+		}
+	}
+
+	// Render individual content pages (skip all index pages)
+	for page in pages {
+		if page._is_index {
 			continue
 		}
-		html := render_page_html(page, site, post_tpl, partials, base)
+		tpl := get_template(site.layouts_dir, page.layout, &template_cache)
+		html := render_page_html(page, site, tpl, partials, base)
 		if .Minify in site.features {
 			html = minify_html(html)
 		}
 		write_page(site.output_dir, page.permalink, html)
 	}
 
+	// Render section index pages
+	for section in sections {
+		section_index: Page
+		has_section_index := false
+		for page in pages {
+			if page.section == section && page._is_index {
+				section_index = page
+				has_section_index = true
+				break
+			}
+		}
+
+		layout := fmt.tprintf("%s_index", section)
+		section_tpl := get_template(site.layouts_dir, layout, &template_cache)
+		html := render_section(
+			site,
+			section,
+			section_index,
+			has_section_index,
+			section_tpl,
+			partials,
+			base,
+		)
+		if .Minify in site.features {
+			html = minify_html(html)
+		}
+		write_page(site.output_dir, fmt.aprintf("/%s/", section), html)
+	}
+
 	// Render home page
 	if has_home {
-		home_tpl := load_template(site.layouts_dir, "home.html")
+		home_tpl := get_template(site.layouts_dir, "home", &template_cache)
 		home_html := render_home_html(home, site, home_tpl, partials, base)
 		if .Minify in site.features {
 			home_html = minify_html(home_html)
 		}
 		write_file(fmt.tprintf("%s/index.html", site.output_dir), home_html)
 	}
-
-	// Render posts list page
-	posts_tpl := load_template(site.layouts_dir, "posts_list.html")
-	posts_html := render_posts_html(site, posts_tpl, partials, base)
-	if .Minify in site.features {
-		posts_html = minify_html(posts_html)
-	}
-	write_page(site.output_dir, "/posts/", posts_html)
 
 	// Generate RSS feed
 	rss := generate_rss(site)
@@ -205,7 +274,7 @@ render_site :: proc(site: ^Site) {
 	robots := fmt.aprintf("User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", site.base_url)
 	write_file(fmt.tprintf("%s/robots.txt", site.output_dir), robots)
 
-	total := len(pages) + 1
+	total := len(pages) + len(sections)
 	if !has_home {
 		total += 1
 	}
@@ -219,7 +288,7 @@ render_page_html :: proc(
 	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
-	is_article := page.type == .Post
+	is_article := page.section != ""
 	data := Page_Data {
 		base = base,
 	}
@@ -233,7 +302,7 @@ render_page_html :: proc(
 	data.og_title = strip_html_tags(page.title)
 	data.og_type = og_type(is_article)
 	data.is_article = is_article
-	data.og_section = "posts"
+	data.og_section = page.section
 	data.og_published = page.date
 	return render_template(content_tpl, data, partials)
 }
@@ -248,7 +317,7 @@ render_home_html :: proc(
 	list_pages := make([dynamic]Page_Context)
 	defer delete(list_pages)
 	for page in site.pages {
-		if page.type == .Home {
+		if page._is_index {
 			continue
 		}
 		append(&list_pages, build_page_context(page))
@@ -267,8 +336,11 @@ render_home_html :: proc(
 	return render_template(content_tpl, data, partials)
 }
 
-render_posts_html :: proc(
+render_section :: proc(
 	site: ^Site,
+	section: string,
+	section_index: Page,
+	has_index: bool,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	base: Base_Data,
@@ -277,7 +349,7 @@ render_posts_html :: proc(
 	defer delete(year_sections)
 	current_year := ""
 	for page in site.pages {
-		if page.type != .Post {
+		if page.section != section || page._is_index {
 			continue
 		}
 		year := get_year(page.date)
@@ -288,13 +360,21 @@ render_posts_html :: proc(
 		append(&year_sections[len(year_sections) - 1].posts, build_page_context(page))
 	}
 
-	data := Posts_Data {
+	data := Section_Data {
 		base = base,
 	}
-	data.title = fmt.tprintf("Posts | %s", site.title)
+	if has_index {
+		data.body = section_index.body_html
+		data.page_title = section_index.title
+		data.title = fmt.tprintf("%s | %s", section_index.title, site.title)
+		data.og_title = section_index.title
+	} else {
+		data.page_title = capitalize(section)
+		data.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
+		data.og_title = capitalize(section)
+	}
 	data.year_sections = year_sections
-	data.og_url = fmt.tprintf("%s/posts/", site.base_url)
-	data.og_title = "Posts"
+	data.og_url = fmt.tprintf("%s/%s/", site.base_url, section)
 	data.og_type = "website"
 	data.is_article = false
 	return render_template(content_tpl, data, partials)
