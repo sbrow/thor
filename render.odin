@@ -1,4 +1,3 @@
-#+feature dynamic-literals
 package main
 
 import "mustache"
@@ -134,7 +133,7 @@ get_template :: proc(
 		chain[n] = "base"; n += 1
 	}
 
-	for i in 0..<n {
+	for i in 0 ..< n {
 		candidate := chain[i]
 		if cached, ok := cache[candidate]; ok {
 			return cached
