@@ -120,24 +120,38 @@ get_template :: proc(
 	layout: string,
 	cache: ^map[string]mustache.Template,
 ) -> mustache.Template {
-	if cached, ok := cache[layout]; ok {
-		return cached
+	// Build fallback chain: <layout> → [section_index] → page → base
+	chain: [4]string
+	n := 0
+	chain[n] = layout; n += 1
+	if strings.has_suffix(layout, "_index") && layout != "section_index" {
+		chain[n] = "section_index"; n += 1
+	}
+	if layout != "page" && layout != "base" {
+		chain[n] = "page"; n += 1
+	}
+	if layout != "base" {
+		chain[n] = "base"; n += 1
 	}
 
-	filename := fmt.tprintf("%s.html", layout)
-	if os.exists(fmt.tprintf("%s/%s", layouts_dir, filename)) {
-		tpl := load_template(layouts_dir, filename)
-		cache[layout] = tpl
-		return tpl
+	for i in 0..<n {
+		candidate := chain[i]
+		if cached, ok := cache[candidate]; ok {
+			return cached
+		}
+		filename := fmt.tprintf("%s.html", candidate)
+		if os.exists(fmt.tprintf("%s/%s", layouts_dir, filename)) {
+			tpl := load_template(layouts_dir, filename)
+			cache[candidate] = tpl
+			return tpl
+		}
+		if candidate != chain[n - 1] {
+			log.warnf("thor: template %s not found, falling back", filename)
+		}
 	}
 
-	if layout != "page" {
-		log.warnf("thor: template %s not found, falling back to page.html", filename)
-		return get_template(layouts_dir, "page", cache)
-	}
-
-	log.errorf("thor: default template page.html not found in %s", layouts_dir)
-	return load_template(layouts_dir, "page.html")
+	log.errorf("thor: base.html not found in %s", layouts_dir)
+	return mustache.Template{}
 }
 
 capitalize :: proc(s: string) -> string {
