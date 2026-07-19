@@ -6,6 +6,7 @@
         `reload_site` proc, that just updates changed resources.
   - [ ] Only publish referenced assets.
   - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
+  - [ ] Use spall to find ways to reduce run time.
 - [ ] mustache data keys for opengraph, etc.
 - [ ] Author should be a struct adhering to https://schema.org/author
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
@@ -40,7 +41,6 @@
 - [ ] commands
   - [ ] `build` alias of default
   - [ ] `init` set up new project
-- [ ] Use spall to find ways to reduce run time.
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
 - [ ] Markdown

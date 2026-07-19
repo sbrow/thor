@@ -49,13 +49,13 @@ Page_Data :: struct {
 
 Home_Data :: struct {
 	using base: Base_Data,
-	list_pages: [dynamic]Page_Context,
+	pages: [dynamic]Page_Context,
 }
 
 Section_Data :: struct {
 	using base:    Base_Data,
 	page_title:    string,
-	year_sections: [dynamic]Year_Section,
+	by_year: [dynamic]Year_Section,
 }
 
 build_page_context :: proc(page: Page) -> Page_Context {
@@ -339,7 +339,7 @@ render_home_html :: proc(
 	}
 	data.title = site.title
 	data.body = home.body_html
-	data.list_pages = list_pages
+	data.pages = list_pages
 	data.og_url = fmt.tprintf("%s/", site.base_url)
 	data.og_title = site.title
 	data.og_type = "website"
@@ -356,8 +356,8 @@ render_section :: proc(
 	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
-	year_sections := make([dynamic]Year_Section)
-	defer delete(year_sections)
+	by_year := make([dynamic]Year_Section)
+	defer delete(by_year)
 	current_year := ""
 	for page in site.pages {
 		if page.section != section || page._is_index {
@@ -365,10 +365,10 @@ render_section :: proc(
 		}
 		year := get_year(page.date)
 		if year != current_year {
-			append(&year_sections, Year_Section{year = year})
+			append(&by_year, Year_Section{year = year})
 			current_year = year
 		}
-		append(&year_sections[len(year_sections) - 1].posts, build_page_context(page))
+		append(&by_year[len(by_year) - 1].posts, build_page_context(page))
 	}
 
 	data := Section_Data {
@@ -384,7 +384,7 @@ render_section :: proc(
 		data.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
 		data.og_title = capitalize(section)
 	}
-	data.year_sections = year_sections
+	data.by_year = by_year
 	data.og_url = fmt.tprintf("%s/%s/", site.base_url, section)
 	data.og_type = "website"
 	data.is_article = false

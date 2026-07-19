@@ -5,10 +5,10 @@
     {{&body}}
   </header>
   <ul>
-    {{#list_pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date_iso}}<time
+    {{#pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date_iso}}<time
           datetime="{{date_iso}}">{{date_display}}</time>{{/date_iso}}</span>
     </li>
-    {{/list_pages}}
+    {{/pages}}
   </ul>
 </main>
 {{/content}}
