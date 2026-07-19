@@ -85,7 +85,7 @@ init_site :: proc(site: ^Site, args: []string) {
 		found, ok := find_config("thor.json")
 		if ok {
 			path = found
-			log.debugf("thor: using config %s", path)
+			log.debugf("using config %s", path)
 		} else {
 			path = "./thor.json"
 		}
@@ -121,7 +121,7 @@ load_config_file :: proc(
 
 	unmarshal_err := json.unmarshal_string(string(data), config, allocator = allocator)
 	if unmarshal_err != nil {
-		log.warnf("thor: failed to parse %s: %v", path, unmarshal_err)
+		log.warnf("failed to parse %s: %v", path, unmarshal_err)
 		return false
 	}
 

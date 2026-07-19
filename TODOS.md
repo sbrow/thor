@@ -22,7 +22,12 @@
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
+- [ ] Avoid `json.Value` / `json.Object` where possible.
+- [ ] running ./thor/thor still logs the debug message: using config /home/spencer/github.com/sbrow.github.io/thor.json
+  - wrong cwd?
 - [ ] Clean up the default layouts
+- [ ] Add `-production` flag
+  - sets `-minify`
 - [ ] Open Graph
   - [x] mustache data keys for opengraph, etc.
   - [ ] OpenGraph meta tags — verify all fields match production site
@@ -36,7 +41,6 @@
 - [ ] Add Opt-in deflist support.
 - [ ] We need to be able to do `Year_Section` in a non-magical, unprivileged way. See [PLAN.md](PLAN.md) for computed properties approach.
 - [ ] Table of contents support.
-- [ ] prefixing every log message with `thor: ` is silly
 - [ ] Nav items should be active when the current page is selected.
 - [ ] Theme selector for syntax highlighting.
   - use http://github.com/helix-editor/helix/tree/master/runtime/themes) as a
@@ -62,6 +66,17 @@
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
 
+## Notes
+
+from the [Hugo docs](https://gohugo.io/quick-reference/glossary/#default-sort-order)
+
+default sort order
+: The default sort order for page collections, used when no other criteria are set, follows this priority:
+  1. weight (ascending)
+  2. date (descending)
+  3. linkTitle falling back to title (ascending)
+  4. logical path (ascending)
+
 ## Code Review
 
 A human should manually review every file in the project. AI cannot complete
@@ -86,6 +101,7 @@ these tasks.
     - [ ] Review markdown.odin
     - [x] Review sectionate.odin
     - [x] Review sectionate_test.odin
+  - [x] Review opengraph.odin
   - [ ] Review render.odin
   - [x] Review site.odin
   - [ ] Review treesitter/treesitter.odin

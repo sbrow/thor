@@ -41,7 +41,7 @@ site_load_content :: proc(site: ^Site) {
 scan_content :: proc(site: ^Site, dir: string, section: string) {
 	entries, err := os.read_all_directory_by_path(dir, context.allocator)
 	if err != nil {
-		log.warnf("thor: cannot read %s: %v", dir, err)
+		log.warnf("cannot read %s: %v", dir, err)
 		return
 	}
 	defer os.file_info_slice_delete(entries, context.allocator)
@@ -116,7 +116,7 @@ load_page :: proc(
 ) {
 	data, err := os.read_entire_file_from_path(file_path, context.allocator)
 	if err != nil {
-		log.warnf("thor: cannot read %s: %v", file_path, err)
+		log.warnf("cannot read %s: %v", file_path, err)
 		return
 	}
 

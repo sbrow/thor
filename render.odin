@@ -89,12 +89,12 @@ strip_html_tags :: proc(s: string, allocator := context.allocator) -> string {
 load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
 	data, ok := vfs_get(vfs, virtual_path)
 	if !ok {
-		log.warnf("thor: template %s not found", virtual_path)
+		log.warnf("template %s not found", virtual_path)
 		return mustache.Template{}
 	}
 	tpl, err := mustache.parse(string(data))
 	if err != nil {
-		log.warnf("thor: failed to parse template %s: %v", virtual_path, err)
+		log.warnf("failed to parse template %s: %v", virtual_path, err)
 	}
 	return tpl
 }
@@ -129,11 +129,11 @@ get_template :: proc(
 			return tpl
 		}
 		if candidate != chain[n - 1] {
-			log.debugf("thor: template %s not found, falling back", virtual)
+			log.debugf("template %s not found, falling back", virtual)
 		}
 	}
 
-	log.errorf("thor: base.html not found in VFS")
+	log.errorf("base.html not found in VFS")
 	return mustache.Template{}
 }
 
@@ -154,7 +154,7 @@ render_template :: proc(
 ) -> string {
 	result, err := mustache.render(content_tpl, data, partials)
 	if err != nil {
-		fmt.eprintfln("thor: mustache error: %v", err)
+		fmt.eprintfln("mustache error: %v", err)
 		return ""
 	}
 	return result
@@ -389,7 +389,7 @@ load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 		}
 		tpl, err := mustache.parse(string(data))
 		if err != nil {
-			log.warnf("thor: failed to parse partial %s: %v", key, err)
+			log.warnf("failed to parse partial %s: %v", key, err)
 			continue
 		}
 		partials[key] = tpl
@@ -432,7 +432,7 @@ write_page :: proc(output_dir: string, permalink: string, html: string) {
 
 	dir := fmt.tprintf("%s/%s", output_dir, rel)
 	if err := os.make_directory_all(dir); err != nil && err != .Exist {
-		fmt.eprintfln("thor: cannot create %s: %v", dir, err)
+		fmt.eprintfln("cannot create %s: %v", dir, err)
 		return
 	}
 
@@ -442,7 +442,7 @@ write_page :: proc(output_dir: string, permalink: string, html: string) {
 
 write_file :: proc(path: string, html: string) {
 	if err := os.write_entire_file_from_string(path, html); err != nil {
-		fmt.eprintfln("thor: cannot write %s: %v", path, err)
+		fmt.eprintfln("cannot write %s: %v", path, err)
 	}
 }
 
