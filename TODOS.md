@@ -1,18 +1,28 @@
+## Performance
+
+- [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
+- [ ] Instead of loading the site fresh each time in watch mode, create a
+      `reload_site` proc, that just updates changed resources.
+- [ ] Only publish referenced assets.
+- [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
+- [ ] Use spall to find ways to reduce run time.
+
+## Memory Management
+
+- [ ] Not sure whether to use temp allocator or site_allocator in opengraph.odin.
+- [ ] Not sure whether to use temp allocator or site_allocator in `site_load_content`.
+- [ ] Might not need to allocate in `strip_html_tags`
+
+## Markdown
+- [ ] Add overloads for every extension - accept ^strings.Builder.
+- [ ] Add conventional (Hugo style) footnotes option.
+- [ ] Add heading ids as a default on extension.
+
+## General 
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Clean up the default layouts
-- [ ] Memory
-  - [ ] Not sure whether to use temp allocator or site_allocator in opengraph.odin.
-  - [ ] Not sure whether to use temp allocator or site_allocator in `site_load_content`.
-  - [ ] Might not need to allocate in `strip_html_tags`
-- [ ] Performance
-  - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
-  - [ ] Instead of loading the site fresh each time in watch mode, create a
-        `reload_site` proc, that just updates changed resources.
-  - [ ] Only publish referenced assets.
-  - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
-  - [ ] Use spall to find ways to reduce run time.
 - [ ] Open Graph
   - [x] mustache data keys for opengraph, etc.
   - [ ] OpenGraph meta tags — verify all fields match production site
@@ -48,13 +58,15 @@
 - [ ] Mount content in VFS
 - [ ] commands
   - [ ] `build` alias of default
-  - [ ] `init` set up new project
+  - [ ] `new site` set up new project
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
-- [ ] Markdown
-  - [ ] Add overloads for every extension - accept ^strings.Builder.
-  - [ ] Add conventional (Hugo style) footnotes option.
-  - [ ] Add heading ids as a default on extension.
+
+## Code Review
+
+A human should manually review every file in the project. AI cannot complete
+these tasks.
+
 - [ ] Review every file in thor
   - [ ] Review assets.odin
   - [ ] Review content.odin
