@@ -24,12 +24,12 @@ Year_Section :: struct {
 }
 
 Base_Data :: struct {
-	now:     datetime.DateTime,
-	author:  string,
-	params:  json.Value,
-	body:    string,
-	title:   string,
-	og:      Open_Graph,
+	now:    datetime.DateTime,
+	author: string,
+	params: json.Value,
+	body:   string,
+	title:  string,
+	og:     Open_Graph,
 }
 
 Page_Data :: struct {
@@ -41,13 +41,13 @@ Page_Data :: struct {
 
 Home_Data :: struct {
 	using base: Base_Data,
-	pages: [dynamic]Page_Context,
+	pages:      [dynamic]Page_Context,
 }
 
 Section_Data :: struct {
-	using base:    Base_Data,
-	page_title:    string,
-	by_year: [dynamic]Year_Section,
+	using base: Base_Data,
+	page_title: string,
+	by_year:    [dynamic]Year_Section,
 }
 
 build_page_context :: proc(page: Page) -> Page_Context {
@@ -60,8 +60,8 @@ build_page_context :: proc(page: Page) -> Page_Context {
 	}
 }
 
-strip_html_tags :: proc(s: string) -> string {
-	sb := strings.builder_make()
+strip_html_tags :: proc(s: string, allocator := context.allocator) -> string {
+	sb := strings.builder_make(allocator)
 	defer strings.builder_destroy(&sb)
 
 	in_tag := false
@@ -117,7 +117,7 @@ get_template :: proc(
 		chain[n] = "base"; n += 1
 	}
 
-	for i in 0..<n {
+	for i in 0 ..< n {
 		candidate := chain[i]
 		if cached, ok := cache[candidate]; ok {
 			return cached
@@ -179,12 +179,7 @@ render_site :: proc(site: ^Site) {
 		now    = now,
 		author = site.author,
 		params = site.params,
-		og     = {
-			site_name   = site.title,
-			description = site.description,
-			image       = fmt.tprintf("%s/avatar.jpg", site.base_url),
-			locale      = "en_US",
-		},
+		og     = og_init(site^),
 	}
 
 	// Find home page
@@ -297,12 +292,7 @@ render_page_html :: proc(
 	data.body = page.body_html
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
-	data.og.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
-	data.og.title = strip_html_tags(page.title)
-	data.og.type = "article" if is_article else "website"
-	data.og.is_article = is_article
-	data.og.section = page.section
-	data.og.published_time = page.date
+	data.og = og_for_page(site^, page, base.og)
 	return render_template(content_tpl, data, partials)
 }
 

@@ -1,5 +1,7 @@
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Clean up the default layouts
+- [ ] Memory
+  - [ ] Not sure whether to use temp allocator or site_allocator in opengraph.odin.
 - [ ] Performance
   - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
   - [ ] Instead of loading the site fresh each time in watch mode, create a
