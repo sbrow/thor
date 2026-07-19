@@ -24,18 +24,12 @@ Year_Section :: struct {
 }
 
 Base_Data :: struct {
-	now:            datetime.DateTime,
-	author:         string,
-	params:         json.Value,
-	body:           string,
-	title:          string,
-	og_site_name:   string,
-	og_description: string,
-	og_image:       string,
-	og_url:         string,
-	og_title:       string,
-	og_type:        string,
-	is_article:     bool,
+	now:     datetime.DateTime,
+	author:  string,
+	params:  json.Value,
+	body:    string,
+	title:   string,
+	og:      Open_Graph,
 }
 
 Page_Data :: struct {
@@ -43,8 +37,6 @@ Page_Data :: struct {
 	page_title:   string,
 	date_iso:     string,
 	date_display: string,
-	og_section:   string,
-	og_published: string,
 }
 
 Home_Data :: struct {
@@ -92,13 +84,6 @@ strip_html_tags :: proc(s: string) -> string {
 		strings.write_string(&sb, s[start:])
 	}
 	return strings.to_string(sb)
-}
-
-og_type :: proc(is_article: bool) -> string {
-	if is_article {
-		return "article"
-	}
-	return "website"
 }
 
 load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
@@ -191,12 +176,15 @@ render_site :: proc(site: ^Site) {
 
 	// Build base data once
 	base := Base_Data {
-		now            = now,
-		author         = site.author,
-		params         = site.params,
-		og_site_name   = site.title,
-		og_description = site.description,
-		og_image       = fmt.tprintf("%s/avatar.jpg", site.base_url),
+		now    = now,
+		author = site.author,
+		params = site.params,
+		og     = {
+			site_name   = site.title,
+			description = site.description,
+			image       = fmt.tprintf("%s/avatar.jpg", site.base_url),
+			locale      = "en_US",
+		},
 	}
 
 	// Find home page
@@ -309,12 +297,12 @@ render_page_html :: proc(
 	data.body = page.body_html
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
-	data.og_url = fmt.tprintf("%s%s", site.base_url, page.permalink)
-	data.og_title = strip_html_tags(page.title)
-	data.og_type = og_type(is_article)
-	data.is_article = is_article
-	data.og_section = page.section
-	data.og_published = page.date
+	data.og.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
+	data.og.title = strip_html_tags(page.title)
+	data.og.type = "article" if is_article else "website"
+	data.og.is_article = is_article
+	data.og.section = page.section
+	data.og.published_time = page.date
 	return render_template(content_tpl, data, partials)
 }
 
@@ -340,10 +328,10 @@ render_home_html :: proc(
 	data.title = site.title
 	data.body = home.body_html
 	data.pages = list_pages
-	data.og_url = fmt.tprintf("%s/", site.base_url)
-	data.og_title = site.title
-	data.og_type = "website"
-	data.is_article = false
+	data.og.url = fmt.tprintf("%s/", site.base_url)
+	data.og.title = site.title
+	data.og.type = "website"
+	data.og.is_article = false
 	return render_template(content_tpl, data, partials)
 }
 
@@ -378,16 +366,16 @@ render_section :: proc(
 		data.body = section_index.body_html
 		data.page_title = section_index.title
 		data.title = fmt.tprintf("%s | %s", section_index.title, site.title)
-		data.og_title = section_index.title
+		data.og.title = section_index.title
 	} else {
 		data.page_title = capitalize(section)
 		data.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
-		data.og_title = capitalize(section)
+		data.og.title = capitalize(section)
 	}
 	data.by_year = by_year
-	data.og_url = fmt.tprintf("%s/%s/", site.base_url, section)
-	data.og_type = "website"
-	data.is_article = false
+	data.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
+	data.og.type = "website"
+	data.og.is_article = false
 	return render_template(content_tpl, data, partials)
 }
 
