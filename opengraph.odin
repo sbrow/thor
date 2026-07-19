@@ -28,7 +28,7 @@ og_init :: proc(site: Site) -> Open_Graph {
 og_for_page :: proc(site: Site, page: Page, base: Open_Graph) -> Open_Graph {
 	og := base
 	is_article := page.section != ""
-	og.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
+	og.url = page.url
 	og.title = strip_html_tags(page.title, context.temp_allocator)
 	og.type = "article" if is_article else "website"
 	og.is_article = is_article

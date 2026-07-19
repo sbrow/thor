@@ -250,6 +250,7 @@ render(tmpl, data, partials) → render_nodes (walks flat node array against con
 
 ## Design decisions
 
+You may never, *ever* remove `TODO:` or `FIXME:` comments. Those are for humans, not machines.
 See `HUGO.md` for analysis of why thor doesn't need Hugo's shortcode context isolation.
 See `mustache/PARTIAL_INDENT.md` for whitespace handling analysis.
 See `mustache/SPEC.md` for the original implementation specification.

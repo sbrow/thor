@@ -1,7 +1,11 @@
+- [ ] Integrity hash
+  - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Clean up the default layouts
 - [ ] Memory
   - [ ] Not sure whether to use temp allocator or site_allocator in opengraph.odin.
+  - [ ] Not sure whether to use temp allocator or site_allocator in `site_load_content`.
+  - [ ] Might not need to allocate in `strip_html_tags`
 - [ ] Performance
   - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
   - [ ] Instead of loading the site fresh each time in watch mode, create a
@@ -9,16 +13,18 @@
   - [ ] Only publish referenced assets.
   - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
   - [ ] Use spall to find ways to reduce run time.
-- [ ] mustache data keys for opengraph, etc.
+- [ ] Open Graph
+  - [x] mustache data keys for opengraph, etc.
+  - [ ] OpenGraph meta tags — verify all fields match production site
+  - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
+  - [ ] can't set avatar.jpg directly in `og_init`.
 - [ ] Author should be a struct adhering to https://schema.org/author
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] follow symlinks in `scan_content`?
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
-- [ ] OpenGraph meta tags — verify all fields match production site
 - [ ] Add Opt-in deflist support.
 - [ ] We need to be able to do `Year_Section` in a non-magical, unprivileged way. See [PLAN.md](PLAN.md) for computed properties approach.
-- [ ] set opengraph tags / description automatically if unset. (Like hugo does)
 - [ ] Table of contents support.
 - [ ] prefixing every log message with `thor: ` is silly
 - [ ] Nav items should be active when the current page is selected.

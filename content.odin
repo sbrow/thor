@@ -13,6 +13,7 @@ Page :: struct {
 	slug:        string,
 	layout:      string,
 	permalink:   string,
+	url:         string,
 	title:       string,
 	description: string,
 	date:        string,
@@ -28,6 +29,10 @@ Page :: struct {
 site_load_content :: proc(site: ^Site) {
 	site.pages = make([dynamic]Page, 0, 8, site_allocator(site))
 	scan_content(site, site.content_dir, "")
+
+	for &page in site.pages {
+		page.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
+	}
 }
 
 // scan_content walks the content directory. At the root level (section=""),

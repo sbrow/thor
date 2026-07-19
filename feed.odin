@@ -40,18 +40,16 @@ generate_rss :: proc(site: ^Site) -> string {
 			fmt.aprintf(
 				`<item>
 <title>%s</title>
-<link>%s%s</link>
+<link>%s</link>
 <pubDate>%s</pubDate>
-<guid>%s%s</guid>
+<guid>%s</guid>
 <description>%s</description>
 </item>
 `,
 				xml_escape(page.title),
-				site.base_url,
-				page.permalink,
+				page.url,
 				pub_date,
-				site.base_url,
-				page.permalink,
+				page.url,
 				xml_escape(page.body_html),
 			),
 		)
@@ -78,7 +76,7 @@ generate_sitemap :: proc(site: ^Site) -> string {
 		}
 		strings.write_string(
 			&sb,
-			fmt.aprintf("<url><loc>%s%s</loc>%s</url>\n", site.base_url, page.permalink, lastmod),
+			fmt.aprintf("<url><loc>%s</loc>%s</url>\n", page.url, lastmod),
 		)
 	}
 
