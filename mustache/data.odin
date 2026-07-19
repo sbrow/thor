@@ -64,7 +64,11 @@ lookup_in :: proc(container: any, key: string) -> (result: any, found: bool) {
 		h := mi.map_info.key_hasher(&k, seed)
 		value_ptr := runtime.__dynamic_map_get(rm_ptr, mi.map_info, h, &k)
 		if value_ptr != nil {
-			result = any{value_ptr, mi.value.id}
+			if _, ok := mi.value.variant.(runtime.Type_Info_Any); ok {
+				result = (^any)(value_ptr)^
+			} else {
+				result = any{value_ptr, mi.value.id}
+			}
 			found = true
 		}
 	}
