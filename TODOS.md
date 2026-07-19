@@ -32,7 +32,10 @@
   - [x] mustache data keys for opengraph, etc.
   - [ ] OpenGraph meta tags — verify all fields match production site
   - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
-  - [ ] can't set avatar.jpg directly in `og_init`.
+  - [ ] We can't use avatar.jpg as the default site image, that's unique to sbrow.github.io. We need to set that in the frontmatter of content/index.html. or possibly in the config
+  - [ ] Add `og Open_Graph` to `Config_File` and if `Some`, use it as the base
+        site og instead of `og_init()`?
+    - If we go this route, `og_init` might not be the best name.
 - [ ] Author should be a struct adhering to https://schema.org/author
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
