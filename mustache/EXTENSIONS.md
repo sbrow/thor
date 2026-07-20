@@ -58,16 +58,4 @@ Errors (returned as `Data_Error` at render time):
 - **Filter results** (e.g. the `[dynamic]Group` returned by `group_by`) are render-scoped allocations in `context.temp_allocator`. They die with the render call. No caller-side cleanup is needed.
 - The string data inside `Pipe_Filter` (op names, args) is borrowed from the template source — no cloning.
 
-### Future ops (not yet implemented)
 
-The pipe framework is general; additional ops are straightforward to add to `apply_filter` in `pipes.odin`:
-
-- `sort`, `sort_by <field>` — ordering
-- `filter <field> <value>`, `where <field>` — selection
-- `take <n>`, `take_last <n>`, `skip <n>` — slicing
-- `reverse` — order flip
-
-To add a new op:
-1. Implement `apply_<op>(value: any, args: []string) -> (any, Render_Error)` in `pipes.odin`.
-2. Add a `case` to `apply_filter`.
-3. Add tests to `pipes_test.odin`.
