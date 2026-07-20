@@ -62,6 +62,8 @@
             pkgs.tree-sitter-grammars.tree-sitter-html.src;
           css-grammar = mkGrammarStaticLib "tree-sitter-css"
             pkgs.tree-sitter-grammars.tree-sitter-css.src;
+          odin = pkgs.unstable.odin;
+          ols = pkgs.unstable.ols;
         in
         {
           _module.args.pkgs = import nixpkgs {
@@ -108,7 +110,7 @@
             src = ./.;
 
             nativeBuildInputs = [
-              pkgs.odin
+              odin
               pkgs.pkg-config
             ];
 
@@ -143,9 +145,7 @@
           };
 
           devShells.default = pkgs.mkShell {
-            buildInputs = with pkgs; [
-              odin
-              ols
+            buildInputs = [odin ols ] ++ (with pkgs; [
               cmark
               tree-sitter
 
@@ -153,7 +153,7 @@
               unstable.helix
               typescript-language-server
               vscode-langservers-extracted
-            ];
+            ]);
 
             shellHook = ''
               export LIBRARY_PATH="${html-grammar}/lib:${css-grammar}/lib:$LIBRARY_PATH"

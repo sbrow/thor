@@ -70,7 +70,7 @@ Flags :: struct {
 }
 
 init_site :: proc(site: ^Site, args: []string) {
-	mem.dynamic_arena_init(&site.arena, alignment = 64)
+	mem.dynamic_arena_init(&site.arena)
 	alloc := site_allocator(site)
 
 	// Set defaults
