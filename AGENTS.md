@@ -123,6 +123,8 @@ Page_Data :: struct {
 
 `render_site` pre-parses all templates and partials once (via `mustache.parse`), then reuses them for every page render.
 
+**Pipes extension**: section tags may transform the resolved value before iteration via `{{#key | op args…}}`. Pipe filters are parsed into `Node.filters` (allocator-owned by the template) and applied at render time via `apply_pipeline`, with filter results (e.g. `[dynamic]Group` from `group_by`) living in `context.temp_allocator`. Currently only `group_by <field>` is implemented; see `mustache/EXTENSIONS.md`. Used by `posts_index.html` to group posts by year without privileged Go-side data shaping.
+
 ### Markdown pipeline (in content.odin `load_page`)
 
 ```
@@ -209,7 +211,7 @@ odin test . -all-packages  # includes mustache spec tests
 
 ## Mustache engine
 
-Spec-compliant Mustache implementation at `mustache/`. See `mustache/SPEC.md` for the implementation specification.
+Spec-compliant Mustache implementation at `mustache/`. See `mustache/EXTENSIONS.md` for the non-standard extensions (pipes).
 
 ### Files
 
@@ -218,6 +220,7 @@ Spec-compliant Mustache implementation at `mustache/`. See `mustache/SPEC.md` fo
 | `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), renderer (`render_nodes`), template inheritance (`merge_block_overrides`) |
 | `tokenizer.odin` | Tokenizer (template string → `[]Token`), standalone whitespace detection |
 | `data.odin` | Reflection-based data model: `effective` (union/distinct peeling), `lookup_in`, `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `write_value` |
+| `pipes.odin` | Pipes extension: `Pipe_Filter` AST, `parse_pipeline`, `apply_pipeline`, `apply_group_by`. Stored on `Node.filters`; render-scoped results in temp allocator. |
 | `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case |
 
 ### Architecture

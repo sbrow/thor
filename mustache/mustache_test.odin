@@ -8,7 +8,7 @@ import "core:testing"
 leak_parse_free :: proc(t: ^testing.T) {
 	tmpl, err := parse("Hello {{name}}!")
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 }
 
 @(test)
@@ -20,7 +20,7 @@ leak_parse_free_tokens :: proc(t: ^testing.T) {
 
 	tmpl, err := parse("Hello {{name}}!", context.allocator, mem.dynamic_arena_allocator(&arena))
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 }
 
 @(test)
@@ -36,7 +36,7 @@ leak_render :: proc(t: ^testing.T) {
 	}
 	tmpl, err := parse("Hello {{name}}!")
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 
 	result, rerr := render(tmpl, Data{name = "World"})
 	testing.expect(t, rerr == nil)
@@ -48,7 +48,7 @@ leak_render_partials :: proc(t: ^testing.T) {
 	partials := make_map(map[string]Template)
 	defer {
 		for _, &p in partials {
-			template_free(&p)
+			delete_template(&p)
 		}
 		delete(partials)
 	}
@@ -59,7 +59,7 @@ leak_render_partials :: proc(t: ^testing.T) {
 
 	tmpl, err := parse("Hello {{> name}}!")
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 
 	Data :: struct {
 		name: string,
@@ -73,7 +73,7 @@ leak_render_partials :: proc(t: ^testing.T) {
 leak_render_sections :: proc(t: ^testing.T) {
 	tmpl, err := parse("{{#items}}{{.}}{{/items}}")
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 
 	Data :: struct {
 		items: [3]string,
@@ -96,7 +96,7 @@ leak_render_inheritance :: proc(t: ^testing.T) {
 	tmpl_src := "{{<layout}}{{$title}}custom{{/title}}{{/layout}}"
 	tmpl, err := parse(tmpl_src)
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 
 	result, rerr := render(tmpl, {}, partials)
 	testing.expect(t, rerr == nil)
@@ -107,7 +107,7 @@ leak_render_inheritance :: proc(t: ^testing.T) {
 leak_repeated_render :: proc(t: ^testing.T) {
 	tmpl, err := parse("Hello {{name}}!")
 	testing.expect(t, err == nil)
-	defer template_free(&tmpl)
+	defer delete_template(&tmpl)
 
 	Data :: struct {
 		name: string,

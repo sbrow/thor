@@ -44,6 +44,7 @@ Node :: struct {
 	kind:        Node_Kind,
 	text:        string,
 	key:         string,
+	filters:     [dynamic; MAX_PIPES]Pipe_Filter,
 	is_dynamic:  bool,
 	indent:      string,
 	first_child: int,
@@ -74,7 +75,7 @@ Block_Override :: struct {
 	count:     int,
 }
 
-template_free :: proc(tmpl: ^Template) {
+delete_template :: proc(tmpl: ^Template) {
 	if tmpl != nil && len(tmpl.nodes) > 0 {
 		delete(tmpl.nodes)
 	}
@@ -82,7 +83,7 @@ template_free :: proc(tmpl: ^Template) {
 
 delete_partials :: proc(partials: map[string]Template) {
 	for _, &p in partials {
-		template_free(&p)
+		delete_template(&p)
 	}
 	delete(partials)
 }
@@ -157,7 +158,7 @@ parse_tokens :: proc(
 ) {
 	nodes = make([dynamic]Node, 0, len(tokens), allocator)
 	pos := 0
-	err = parse_section(tokens, &pos, &nodes, "", source)
+	err = parse_section(tokens, &pos, &nodes, "", source, allocator)
 	return
 }
 
@@ -167,6 +168,7 @@ parse_section :: proc(
 	nodes: ^[dynamic]Node,
 	end_tag: string,
 	source: string,
+	allocator := context.allocator,
 ) -> Render_Error {
 	for pos^ < len(tokens) {
 		tok := tokens[pos^]
@@ -191,11 +193,19 @@ parse_section :: proc(
 			pos^ += 1
 			idx := len(nodes)
 			content_start := 0
-			if pos^ < len(tokens) { content_start = tokens[pos^].pos }
-			append(nodes, Node{kind = .Section, key = tok.value, first_child = -1})
-			parse_section(tokens, pos, nodes, tok.value, source) or_return
+			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
+			append(nodes, Node{kind = .Section, first_child = -1})
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters)
+			if perr != nil {
+				return Syntax_Error {
+					msg = fmt.tprintf("pipe parse error in '{{#%s}}': %v", tok.value, perr),
+					pos = tok.pos,
+				}
+			}
+			nodes[idx].key = pipe_key
+			parse_section(tokens, pos, nodes, pipe_key, source, allocator) or_return
 			close_pos := 0
-			if pos^ - 1 >= 0 && pos^ - 1 < len(tokens) { close_pos = tokens[pos^ - 1].pos }
+			if pos^ - 1 >= 0 && pos^ - 1 < len(tokens) {close_pos = tokens[pos^ - 1].pos}
 			nodes[idx].first_child = idx + 1
 			nodes[idx].child_count = len(nodes) - idx - 1
 			nodes[idx].content = source[content_start:close_pos]
@@ -204,16 +214,33 @@ parse_section :: proc(
 			pos^ += 1
 			idx := len(nodes)
 			content_start := 0
-			if pos^ < len(tokens) { content_start = tokens[pos^].pos }
-			append(nodes, Node{kind = .Inverted, key = tok.value, first_child = -1})
-			parse_section(tokens, pos, nodes, tok.value, source) or_return
+			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
+			append(nodes, Node{kind = .Inverted, first_child = -1})
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters)
+			if perr != nil {
+				return Syntax_Error {
+					msg = fmt.tprintf("pipe parse error in '{{^%s}}': %v", tok.value, perr),
+					pos = tok.pos,
+				}
+			}
+			nodes[idx].key = pipe_key
+			parse_section(tokens, pos, nodes, pipe_key, source, allocator) or_return
 			close_pos := 0
-			if pos^ - 1 >= 0 && pos^ - 1 < len(tokens) { close_pos = tokens[pos^ - 1].pos }
+			if pos^ - 1 >= 0 && pos^ - 1 < len(tokens) {close_pos = tokens[pos^ - 1].pos}
 			nodes[idx].first_child = idx + 1
 			nodes[idx].child_count = len(nodes) - idx - 1
 			nodes[idx].content = source[content_start:close_pos]
 
 		case .Section_Close:
+			if strings.contains(tok.value, "|") {
+				return Syntax_Error {
+					msg = fmt.tprintf(
+						"pipe expression not allowed in close tag '{{/%s}}' — use the bare key",
+						tok.value,
+					),
+					pos = tok.pos,
+				}
+			}
 			if end_tag != "" && tok.value == end_tag {
 				pos^ += 1
 				return nil
@@ -249,7 +276,7 @@ parse_section :: proc(
 				nodes,
 				Node{kind = .Parent, key = tok.value, indent = tok.indent, first_child = -1},
 			)
-			parse_section(tokens, pos, nodes, tok.value, source) or_return
+			parse_section(tokens, pos, nodes, tok.value, source, allocator) or_return
 			nodes[idx].first_child = idx + 1
 			nodes[idx].child_count = len(nodes) - idx - 1
 
@@ -260,7 +287,7 @@ parse_section :: proc(
 				nodes,
 				Node{kind = .Block, key = tok.value, indent = tok.indent, first_child = -1},
 			)
-			parse_section(tokens, pos, nodes, tok.value, source) or_return
+			parse_section(tokens, pos, nodes, tok.value, source, allocator) or_return
 			nodes[idx].first_child = idx + 1
 			nodes[idx].child_count = len(nodes) - idx - 1
 		}
@@ -465,7 +492,14 @@ render_nodes :: proc(
 				if perr == nil {
 					temp: strings.Builder
 					strings.builder_init(&temp, context.temp_allocator)
-					render_nodes(sub_tpl.nodes[:], sub_tpl.nodes[:], ctx, partials, &temp, blocks) or_return
+					render_nodes(
+						sub_tpl.nodes[:],
+						sub_tpl.nodes[:],
+						ctx,
+						partials,
+						&temp,
+						blocks,
+					) or_return
 					write_value(b, strings.to_string(temp), escape = true)
 				}
 			} else {
@@ -480,7 +514,14 @@ render_nodes :: proc(
 				if perr == nil {
 					temp: strings.Builder
 					strings.builder_init(&temp, context.temp_allocator)
-					render_nodes(sub_tpl.nodes[:], sub_tpl.nodes[:], ctx, partials, &temp, blocks) or_return
+					render_nodes(
+						sub_tpl.nodes[:],
+						sub_tpl.nodes[:],
+						ctx,
+						partials,
+						&temp,
+						blocks,
+					) or_return
 					write_value(b, strings.to_string(temp), escape = false)
 				}
 			} else {
@@ -490,18 +531,32 @@ render_nodes :: proc(
 
 		case .Section:
 			val := resolve_name(node.key, ctx[:])
+			if len(node.filters) > 0 {
+				transformed, perr := apply_pipeline(val, node.filters[:])
+				if perr != nil {
+					return perr
+				}
+				val = transformed
+			}
 			if result_str, ok := call_section_lambda(val, node.content); ok {
 				sub_tpl, perr := parse(result_str, context.temp_allocator, context.temp_allocator)
 				if perr == nil {
-					render_nodes(sub_tpl.nodes[:], sub_tpl.nodes[:], ctx, partials, b, blocks) or_return
+					render_nodes(
+						sub_tpl.nodes[:],
+						sub_tpl.nodes[:],
+						ctx,
+						partials,
+						b,
+						blocks,
+					) or_return
 				}
 			} else if is_truthy(val) {
 				children := all_nodes[node.first_child:node.first_child + node.child_count]
 				elem_info, count, data := list_info(val)
 				if elem_info != nil {
 					for j in 0 ..< count {
-						elem_ptr := rawptr(uintptr(data) + uintptr(j) * uintptr(elem_info.size))
-						append(ctx, any{elem_ptr, elem_info.id})
+						elem := extract_list_element(elem_info, data, j)
+						append(ctx, elem)
 						defer pop(ctx)
 						render_nodes(all_nodes, children, ctx, partials, b, blocks) or_return
 					}
@@ -515,6 +570,13 @@ render_nodes :: proc(
 
 		case .Inverted:
 			val := resolve_name(node.key, ctx[:])
+			if len(node.filters) > 0 {
+				transformed, perr := apply_pipeline(val, node.filters[:])
+				if perr != nil {
+					return perr
+				}
+				val = transformed
+			}
 			if !is_truthy(val) {
 				children := all_nodes[node.first_child:node.first_child + node.child_count]
 				render_nodes(all_nodes, children, ctx, partials, b, blocks) or_return

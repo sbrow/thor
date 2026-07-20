@@ -42,7 +42,7 @@
 - [ ] follow symlinks in `scan_content`?
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
 - [ ] Add Opt-in deflist support.
-- [ ] We need to be able to do `Year_Section` in a non-magical, unprivileged way. See [PLAN.md](PLAN.md) for computed properties approach.
+- [x] We need to be able to do `Year_Section` in a non-magical, unprivileged way. Implemented via the pipes extension to mustache — see [mustache/EXTENSIONS.md](mustache/EXTENSIONS.md).
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
 - [ ] Theme selector for syntax highlighting.

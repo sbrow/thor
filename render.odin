@@ -16,11 +16,7 @@ Page_Context :: struct {
 	starred:      bool,
 	date_iso:     string,
 	date_display: string,
-}
-
-Year_Section :: struct {
-	year:  string,
-	posts: [dynamic]Page_Context,
+	year:         string,
 }
 
 Base_Data :: struct {
@@ -47,7 +43,7 @@ Home_Data :: struct {
 Section_Data :: struct {
 	using base: Base_Data,
 	page_title: string,
-	by_year:    [dynamic]Year_Section,
+	posts:      [dynamic]Page_Context,
 }
 
 build_page_context :: proc(page: Page) -> Page_Context {
@@ -57,6 +53,7 @@ build_page_context :: proc(page: Page) -> Page_Context {
 		starred = page.is_starred,
 		date_iso = page.date,
 		date_display = format_date(page.date),
+		year = get_year(page.date),
 	}
 }
 
@@ -334,19 +331,13 @@ render_section :: proc(
 	partials: map[string]mustache.Template,
 	base: Base_Data,
 ) -> string {
-	by_year := make([dynamic]Year_Section)
-	defer delete(by_year)
-	current_year := ""
+	posts := make([dynamic]Page_Context)
+	defer delete(posts)
 	for page in site.pages {
 		if page.section != section || page._is_index {
 			continue
 		}
-		year := get_year(page.date)
-		if year != current_year {
-			append(&by_year, Year_Section{year = year})
-			current_year = year
-		}
-		append(&by_year[len(by_year) - 1].posts, build_page_context(page))
+		append(&posts, build_page_context(page))
 	}
 
 	data := Section_Data {
@@ -362,7 +353,7 @@ render_section :: proc(
 		data.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
 		data.og.title = capitalize(section)
 	}
-	data.by_year = by_year
+	data.posts = posts
 	data.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
 	data.og.type = "website"
 	data.og.is_article = false

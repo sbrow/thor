@@ -174,11 +174,11 @@ call_interp_lambda :: proc(val: any) -> (result: string, ok: bool) {
 
 call_section_lambda :: proc(val: any, text: string) -> (result: string, ok: bool) {
 	switch v in val {
-	case proc(string) -> string:
+	case proc(_: string) -> string:
 		return v(text), true
-	case proc(string) -> int:
+	case proc(_: string) -> int:
 		return fmt.tprintf("%d", v(text)), true
-	case proc(string) -> bool:
+	case proc(_: string) -> bool:
 		return "true" if v(text) else "false", true
 	case:
 		return "", false
@@ -205,6 +205,19 @@ list_info :: proc(a: any) -> (elem_info: ^runtime.Type_Info, count: int, data: r
 	case:
 		return nil, 0, nil
 	}
+}
+
+// extract_list_element returns the n-th element of a list (described by
+// elem_info/data from list_info) as a ready-to-use any.
+//
+// Unwraps [dynamic]any element types so downstream lookup_in sees the inner
+// value's real type, not a double-wrapped any-of-any.
+extract_list_element :: proc(elem_info: ^runtime.Type_Info, data: rawptr, n: int) -> any {
+	elem_ptr := rawptr(uintptr(data) + uintptr(n) * uintptr(elem_info.size))
+	if _, is_any := elem_info.variant.(runtime.Type_Info_Any); is_any {
+		return (^any)(elem_ptr)^
+	}
+	return any{elem_ptr, elem_info.id}
 }
 
 // any_to_string converts a scalar value to a string using the temp allocator.
