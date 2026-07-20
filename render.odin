@@ -57,32 +57,6 @@ build_page_context :: proc(page: Page) -> Page_Context {
 	}
 }
 
-strip_html_tags :: proc(s: string, allocator := context.allocator) -> string {
-	sb := strings.builder_make(allocator)
-	defer strings.builder_destroy(&sb)
-
-	in_tag := false
-	start := 0
-	for i in 0 ..< len(s) {
-		if s[i] == '<' && !in_tag {
-			if i > start {
-				strings.write_string(&sb, s[start:i])
-			}
-			in_tag = true
-		} else if s[i] == '>' && in_tag {
-			in_tag = false
-			start = i + 1
-		}
-	}
-	if start == 0 {
-		return s
-	}
-	if !in_tag && start < len(s) {
-		strings.write_string(&sb, s[start:])
-	}
-	return strings.to_string(sb)
-}
-
 load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
 	data, ok := vfs_get(vfs, virtual_path)
 	if !ok {
@@ -176,7 +150,7 @@ render_site :: proc(site: ^Site) {
 		now    = now,
 		author = site.author,
 		params = site.params,
-		og     = og_init(site^),
+		og     = site.og,
 	}
 
 	// Find home page
@@ -289,7 +263,7 @@ render_page_html :: proc(
 	data.body = page.body_html
 	data.date_iso = page.date
 	data.date_display = format_date(page.date)
-	data.og = og_for_page(site^, page, base.og)
+	data.og = og_for_page(site.og, page)
 	return render_template(content_tpl, data, partials)
 }
 
@@ -315,10 +289,7 @@ render_home_html :: proc(
 	data.title = site.title
 	data.body = home.body_html
 	data.pages = list_pages
-	data.og.url = fmt.tprintf("%s/", site.base_url)
-	data.og.title = site.title
-	data.og.type = "website"
-	data.og.is_article = false
+	data.og = og_for_page(site.og, home)
 	return render_template(content_tpl, data, partials)
 }
 
@@ -347,16 +318,17 @@ render_section :: proc(
 		data.body = section_index.body_html
 		data.page_title = section_index.title
 		data.title = fmt.tprintf("%s | %s", section_index.title, site.title)
-		data.og.title = section_index.title
+		data.og = og_for_page(site.og, section_index)
 	} else {
 		data.page_title = capitalize(section)
 		data.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
 		data.og.title = capitalize(section)
+		data.og.description = ""
+		data.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
+		data.og.type = "website"
+		data.og.is_article = false
 	}
 	data.posts = posts
-	data.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
-	data.og.type = "website"
-	data.og.is_article = false
 	return render_template(content_tpl, data, partials)
 }
 

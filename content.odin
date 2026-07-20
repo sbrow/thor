@@ -17,8 +17,10 @@ Page :: struct {
 	title:       string,
 	description: string,
 	date:        string,
+	lastmod:     string,
 	menu:        string,
 	body_html:   string,
+	og:          Open_Graph,
 	draft:       bool,
 	is_starred:  bool,
 	_is_index:   bool `private`,
@@ -132,10 +134,12 @@ load_page :: proc(
 	page.title = fm.title
 	page.description = fm.description
 	page.date = fm.date
+	page.lastmod = fm.lastmod
 	page.draft = fm.draft
 	page.is_starred = fm.isStarred
 	page.menu = fm.menu
 	page.layout = fm.layout if fm.layout != "" else infer_layout(section, is_index)
+	page.og = fm.og
 
 	if strings.has_suffix(file_path, ".html") {
 		page.body_html = strings.clone(body)

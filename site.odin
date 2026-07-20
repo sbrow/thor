@@ -29,6 +29,7 @@ Site :: struct {
 	params:              json.Object,
 	features:            bit_set[Feature],
 	markdown_extensions: bit_set[md.Extension],
+	og:                  Open_Graph,
 }
 
 Feature :: enum {
@@ -51,6 +52,7 @@ Config_File :: struct {
 	markdown_extensions: json.Value,
 	params:              json.Value,
 	modules:             json.Value,
+	og:                  Open_Graph,
 }
 
 // Configuration loaded from command line arguments. Gets folded in to Site
@@ -107,6 +109,9 @@ init_site :: proc(site: ^Site, args: []string) {
 
 	site_apply_cli_flags(site, _flags)
 	site.config_path = path
+
+	// Build the resolved site-level OG now that every other field is set.
+	site.og = og_for_site(site)
 }
 
 load_config_file :: proc(
@@ -159,6 +164,8 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 			}
 		}
 	}
+
+	site.og = config.og
 }
 
 site_apply_path_defaults :: proc(site: ^Site, config_dir: string) {

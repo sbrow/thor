@@ -6,6 +6,7 @@
 - [ ] Only publish referenced assets.
 - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] Use spall to find ways to reduce run time.
+- [ ] Consider using `#soa` for Page lists.
 
 ## Memory Management
 
@@ -28,14 +29,12 @@
 - [ ] Clean up the default layouts
 - [ ] Add `-production` flag
   - sets `-minify`
-- [ ] Open Graph
+- [x] Open Graph
   - [x] mustache data keys for opengraph, etc.
-  - [ ] OpenGraph meta tags — verify all fields match production site
-  - [ ] set opengraph tags / description automatically if unset. (Like hugo does)
-  - [ ] We can't use avatar.jpg as the default site image, that's unique to sbrow.github.io. We need to set that in the frontmatter of content/index.html. or possibly in the config
-  - [ ] Add `og Open_Graph` to `Config_File` and if `Some`, use it as the base
-        site og instead of `og_init()`?
-    - If we go this route, `og_init` might not be the best name.
+  - [x] OpenGraph meta tags — verify all fields match production site
+  - [x] set opengraph tags / description automatically if unset. (Like hugo does)
+  - [x] We can't use avatar.jpg as the default site image.
+  - [x] Add `og Open_Graph` to `Config_File`.
 - [ ] Author should be a struct adhering to https://schema.org/author
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
