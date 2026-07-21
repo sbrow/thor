@@ -3,6 +3,7 @@ package mustache
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:path/filepath"
 import "core:testing"
@@ -54,6 +55,10 @@ run_one_test :: proc(
 	test: json.Object,
 	name, template_src, expected: string,
 ) -> bool {
+	// Spec tests deliberately exercise missing keys, missing partials, etc.
+	// Silence the warnings to keep test output readable.
+	context.logger = log.nil_logger()
+
 	partials := make_map(map[string]Template, context.temp_allocator)
 
 	if "partials" in test {
@@ -63,7 +68,7 @@ run_one_test :: proc(
 			psrc, ok := pval.(string)
 			assert(ok)
 
-			pt, perr := parse(psrc, context.temp_allocator)
+			pt, perr := parse(psrc, "<spec>", context.temp_allocator)
 			if perr != nil {
 				testing.expectf(t, false, "[%s] partial '%s' parse error", name, pname)
 				return false
@@ -72,7 +77,7 @@ run_one_test :: proc(
 		}
 	}
 
-	tmpl, terr := parse(template_src, context.temp_allocator)
+	tmpl, terr := parse(template_src, "<spec>", context.temp_allocator)
 	if terr != nil {
 		testing.expectf(t, false, "[%s] template parse error", name)
 		return false

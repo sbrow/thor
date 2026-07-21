@@ -18,7 +18,12 @@ leak_parse_free_tokens :: proc(t: ^testing.T) {
 	mem.dynamic_arena_init(&arena)
 	defer mem.dynamic_arena_destroy(&arena)
 
-	tmpl, err := parse("Hello {{name}}!", context.allocator, mem.dynamic_arena_allocator(&arena))
+	tmpl, err := parse(
+		"Hello {{name}}!",
+		"<test>",
+		context.allocator,
+		mem.dynamic_arena_allocator(&arena),
+	)
 	testing.expect(t, err == nil)
 	defer delete_template(&tmpl)
 }

@@ -27,6 +27,7 @@
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Avoid `json.Value` / `json.Object` where possible.
+- [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.
 - [ ] Add page params
 - [ ] We must remove all mention of `posts` from the odin code.
       At present, "posts" are a user-level construct defined as pages in a
@@ -111,6 +112,8 @@ these tasks.
     - [ ] Review markdown.odin
     - [x] Review sectionate.odin
     - [x] Review sectionate_test.odin
+    - [ ] Review suggest.odin
+    - [ ] Review suggest_test.odin
   - [x] Review opengraph.odin
   - [ ] Review render.odin
   - [x] Review site.odin

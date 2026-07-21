@@ -78,3 +78,35 @@ vfs_get :: proc(vfs: ^VFS, virtual_path: string) -> ([]byte, bool) {
 	return data, true
 }
 
+// vfs_get_entry returns both the VFS_Entry (for fs_path) and the lazily-loaded
+// data. Use this instead of vfs_get when you need the entry's metadata along
+// with the contents.
+vfs_get_entry :: proc(vfs: ^VFS, virtual_path: string) -> (VFS_Entry, []byte, bool) {
+	entry, ok := vfs.files[virtual_path]
+	if !ok {
+		return {}, nil, false
+	}
+	if entry.data != nil {
+		return entry, entry.data, true
+	}
+	data, err := os.read_entire_file_from_path(entry.fs_path, context.allocator)
+	if err != nil {
+		return entry, nil, false
+	}
+	return entry, data, true
+}
+
+// vfs_entry_data returns the data for a VFS_Entry, reading from disk if it
+// hasn't been loaded yet. Useful when iterating vfs.files directly (where you
+// already have the entry and don't want a redundant map lookup).
+vfs_entry_data :: proc(entry: VFS_Entry) -> ([]byte, bool) {
+	if entry.data != nil {
+		return entry.data, true
+	}
+	data, err := os.read_entire_file_from_path(entry.fs_path, context.allocator)
+	if err != nil {
+		return nil, false
+	}
+	return data, true
+}
+

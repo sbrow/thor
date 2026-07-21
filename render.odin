@@ -55,14 +55,40 @@ build_page_context :: proc(page: Page) -> Page_Context {
 }
 
 load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
-	data, ok := vfs_get(vfs, virtual_path)
+	entry, data, ok := vfs_get_entry(vfs, virtual_path)
 	if !ok {
-		log.warnf("template %s not found", virtual_path)
-		return mustache.Template{}
+		log.fatalf("template %s not found", virtual_path)
+		os.exit(1)
 	}
-	tpl, err := mustache.parse(string(data))
+	source := string(data)
+	tpl, err := mustache.parse(source, entry.fs_path)
 	if err != nil {
-		log.warnf("failed to parse template %s: %v", virtual_path, err)
+		switch e in err {
+		// TODO: Find a way to merge these branches.
+		case mustache.Syntax_Error:
+			log.errorf(
+				"%s",
+				mustache.format_error(
+					entry.fs_path,
+					source,
+					e.pos,
+					e.msg,
+					colorize = mustache.should_colorize(),
+				),
+			)
+		case mustache.Data_Error:
+			log.errorf(
+				"%s",
+				mustache.format_error(
+					entry.fs_path,
+					source,
+					e.pos,
+					e.msg,
+					colorize = mustache.should_colorize(),
+				),
+			)
+		}
+		os.exit(1)
 	}
 	return tpl
 }
@@ -122,7 +148,10 @@ render_template :: proc(
 ) -> string {
 	result, err := mustache.render(content_tpl, data, partials)
 	if err != nil {
-		fmt.eprintfln("mustache error: %v", err)
+		log.errorf(
+			"%s",
+			mustache.format_render_error(err, content_tpl, colorize = mustache.should_colorize()),
+		)
 		return ""
 	}
 	return result
@@ -331,7 +360,7 @@ render_section :: proc(
 load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 	partials: map[string]mustache.Template
 	prefix := "layouts/partials/"
-	for virtual_path in vfs.files {
+	for virtual_path, entry in vfs.files {
 		if !strings.has_prefix(virtual_path, prefix) {
 			continue
 		}
@@ -342,14 +371,36 @@ load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 		stripped := virtual_path[len(prefix):]
 		key := stripped[:len(stripped) - len(".html")]
 
-		data, ok := vfs_get(vfs, virtual_path)
-		if !ok {
-			continue
-		}
-		tpl, err := mustache.parse(string(data))
+		data := vfs_entry_data(entry) or_continue
+		source := string(data)
+		tpl, err := mustache.parse(source, entry.fs_path)
 		if err != nil {
-			log.warnf("failed to parse partial %s: %v", key, err)
-			continue
+			// TODO: Find a way to merge these branches.
+			switch e in err {
+			case mustache.Syntax_Error:
+				log.errorf(
+					"%s",
+					mustache.format_error(
+						entry.fs_path,
+						source,
+						e.pos,
+						e.msg,
+						colorize = mustache.should_colorize(),
+					),
+				)
+			case mustache.Data_Error:
+				log.errorf(
+					"%s",
+					mustache.format_error(
+						entry.fs_path,
+						source,
+						e.pos,
+						e.msg,
+						colorize = mustache.should_colorize(),
+					),
+				)
+			}
+			os.exit(1)
 		}
 		partials[key] = tpl
 	}

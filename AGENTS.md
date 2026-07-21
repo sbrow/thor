@@ -5,7 +5,7 @@ Thor is a static site generator written in [Odin](https://odin-lang.org), replac
 ## Architecture
 
 ```
-thor.json          ← site config (title, base_url, params, modules)
+thor.json          ← site config (title, base_url, params, modules, og)
 content/           ← markdown and HTML content files
 layouts/           ← Mustache templates + partials (user overrides)
 assets/            ← CSS (Tufte-based), JS, fonts, images
@@ -19,7 +19,7 @@ public/            ← build output (generated)
 thor/
 ├── treesitter/         # FFI types + grammar management (standalone package)
 ├── markdown/           # Content transformation pipeline (imports ../treesitter)
-├── mustache/           # Template engine with lambdas + pipe filters
+├── mustache/           # Template engine with lambdas + pipe filters + diagnostics
 ├── content.odin        # Page struct, scan_content, load_page
 ├── render.odin         # Template rendering, data structs, RSS, sitemap
 ├── site.odin           # Config (Flags, Config_File, Site), init_site
@@ -27,8 +27,9 @@ thor/
 ├── feed.odin           # RSS + sitemap generation
 ├── vfs.odin            # Union file system (defaults → modules → site)
 ├── assets.odin         # VFS-based asset copying
-├── opengraph.odin      # Open_Graph struct + og_init/og_for_page
-├── frontmatter.odin    # JSON frontmatter parser
+├── html.odin           # HTML helpers: strip_html_tags, unescape_html, generate_summary
+├── opengraph.odin      # Open_Graph struct + og_for_site/og_for_page
+├── frontmatter.odin    # JSON frontmatter parser (supports nested og + lastmod)
 ├── defaults.odin       # DEFAULTS_PATH constant (#directory)
 ├── main.odin           # Entry point
 └── defaults/layouts/   # Bundled default templates
@@ -39,15 +40,16 @@ thor/
 | File | Responsibility |
 |---|---|
 | `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `build_vfs`, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
-| `site.odin` | `Flags` (CLI), `Config_File` (thor.json), `Site` (runtime state + arena + VFS + pages + modules). `Feature` enum. 5-step `init_site`. Imports `md "markdown"` for `Extension` enum. |
-| `content.odin` | `Page` struct, `scan_content` (section-aware walk that handles leaf bundles), `load_page`, `infer_layout`. Calls `md.process()` for the markdown pipeline. |
+| `site.odin` | `Flags` (CLI), `Config_File` (thor.json, includes `og: Open_Graph`), `Site` (runtime state + arena + VFS + pages + modules + `og`). `Feature` enum. 5-step `init_site`. Imports `md "markdown"` for `Extension` enum. |
+| `content.odin` | `Page` struct (includes `lastmod`, `og`), `scan_content` (section-aware walk that handles leaf bundles), `load_page`, `infer_layout`. Calls `md.process()` for the markdown pipeline. |
 | `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. Data structs (`Base_Data`, `Page_Data`, `Home_Data`, `Section_Data`). VFS-based template loading with fallback chain (`get_template`). |
 | `minify.odin` | HTML/CSS minification via tree-sitter. Imports `ts "treesitter"`. |
 | `feed.odin` | RSS feed + sitemap XML. Uses `page.url` for canonical URLs. |
-| `vfs.odin` | Union file system: `VFS`, `build_vfs`, `mount_dir`, `mount_subdir`, `mount_recursive`, `vfs_get`. Layers defaults → modules → site. |
+| `vfs.odin` | Union file system: `VFS`, `build_vfs`, `mount_dir`, `mount_subdir`, `mount_recursive`, `vfs_get`, `vfs_get_entry`, `vfs_entry_data`. Layers defaults → modules → site. |
 | `assets.odin` | `copy_assets_dir` — iterates VFS entries with `assets/` prefix, minifies CSS, copies verbatim or via `os.copy_file`. |
-| `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec). `og_init(site)` for site defaults, `og_for_page(site, page, base)` for page-specific OG data. |
-| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout` field for template override. |
+| `html.odin` | `strip_html_tags` (moved from render.odin), `unescape_html`, `generate_summary` (Hugo-style body summary for OG descriptions). |
+| `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec, `is_article: Maybe(bool)`). `og_for_site(site)` for site defaults (from config + derived), `og_for_page(site_og, page)` for page-specific (overlay page.og + derive from page data). |
+| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, and nested `og` object (via `json_get_open_graph`). |
 | `defaults.odin` | `DEFAULTS_PATH` constant, resolved at compile time via `#directory` so bundled templates ship in the binary. |
 
 ### Subpackages
@@ -90,10 +92,12 @@ Page :: struct {
     title:       string,
     description: string,
     date:        string,
+    lastmod:     string,
     menu:        string,
     body_html:   string,
     draft:       bool,
     is_starred:  bool,
+    og:          Open_Graph,  // per-page OG overrides from frontmatter
     _is_index:   bool `private`,
 }
 ```
@@ -112,8 +116,8 @@ No `Page_Type` enum — page type is inferred from section + `_is_index`. Layout
 Config is split into three structs with a clear 5-step initialization flow:
 
 - **`Flags`** — CLI args only. Parsed by `core:flags`. Includes path overrides (`--content`, `--assets`, `--output`, `--layouts`), build-mode toggles (`-drafts`, `-watch`, `-minify`), and `-ext`/`-no-ext` for markdown extension overrides.
-- **`Config_File`** — parsed from `thor.json` via `json.unmarshal_string`. Holds title, paths, `markdown_extensions` (JSON), `params` (JSON), `modules` (JSON array of relative paths).
-- **`Site`** — runtime state: arena, pages, modules, VFS, `features: bit_set[Feature]`, `markdown_extensions: bit_set[md.Extension]`.
+- **`Config_File`** — parsed from `thor.json` via `json.unmarshal_string`. Holds title, paths, `markdown_extensions` (JSON), `params` (JSON), `modules` (JSON array of relative paths), `og` (`Open_Graph` struct for site-level OG defaults).
+- **`Site`** — runtime state: arena, pages, modules, VFS, `features: bit_set[Feature]`, `markdown_extensions: bit_set[md.Extension]`, `og: Open_Graph` (resolved site-level OG).
 
 **`Feature` enum** — `Drafts`, `Minify`, `Watch`. Checked with `.Minify in site.features`.
 
@@ -130,15 +134,11 @@ Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
   "title": "...",
   "base_url": "...",
   "modules": ["../path/to/module"],
-  "markdown_extensions": {
-    "emoji": true,
-    "sidenotes": true,
-    "alerts": true,
-    "highlight": true,
-    "sections": true
+  "og": {
+    "image": "https://example.com/og.png"
   },
+  "markdown_extensions": { "emoji": true, "highlight": false },
   "params": {
-    "author": "...",
     "social": [
       { "name": "github", "url": "...", "icon": "icons/github" }
     ]
@@ -155,13 +155,33 @@ VFS :: struct { files: map[string]VFS_Entry }
 VFS_Entry :: struct { fs_path: string, data: []byte }
 ```
 
-`build_vfs` mounts in reverse precedence (defaults first, site last overwrites). `DEFAULTS_PATH` resolved at compile time via `#directory`, so bundled templates ship inside the binary. Modules configured via `"modules": ["../path"]` in `thor.json` — each module contributes `layouts/` and `assets/` subdirectories. `vfs_get` lazily reads file contents on first access.
+`build_vfs` mounts in reverse precedence (defaults first, site last overwrites). `DEFAULTS_PATH` resolved at compile time via `#directory`, so bundled templates ship inside the binary. Modules configured via `"modules": ["../path"]` in `thor.json` — each module contributes `layouts/` and `assets/` subdirectories.
+
+Three access patterns:
+- `vfs_get(vfs, path) -> ([]byte, bool)` — data only (lazy-loaded from disk)
+- `vfs_get_entry(vfs, path) -> (VFS_Entry, []byte, bool)` — entry + data (for callers that need `fs_path` for diagnostics)
+- `vfs_entry_data(entry) -> ([]byte, bool)` — data from an entry already in hand (avoids redundant map lookup when iterating `vfs.files`)
 
 Content is **not yet in the VFS** — `scan_content` still uses direct filesystem reads. (See `TODOS.md`.)
 
 ## Open Graph
 
-`Open_Graph` struct in `opengraph.odin` with fields ordered per [ogp.me](https://ogp.me/) spec. Site defaults set via `og_init(site)` (site_name, description, default image, locale). Page-specific fields via `og_for_page(site, page, base)` (copies base, overrides url/title/type/is_article/section/published_time). Templates access via `{{og.url}}`, `{{og.title}}`, `{{#og.is_article}}`, etc.
+`Open_Graph` struct in `opengraph.odin` with fields ordered per [ogp.me](https://ogp.me/) spec. `is_article` is `Maybe(bool)` — nil means "unset" (distinguished from explicitly `false`).
+
+**Site-level** (`og_for_site`): starts from `Config_File.og` (user-supplied defaults from `thor.json`), then fills empty fields derivable from `Site`:
+- `site_name ← site.title`
+- `locale ← "en_US"` (default if unset)
+
+**Page-level** (`og_for_page`): copies site OG, derives page-specific fields, then overlays `Page.og` (from frontmatter):
+- `url ← page.url`
+- `title ← page.title` (falls back to `site_name` if empty)
+- `type ← "article" if !page._is_index else "website"`
+- `is_article ← !page._is_index`
+- `section ← page.section`
+- `published_time / modified_time ← page.date / page.lastmod`
+- `description ← page.description`, else body summary (via `generate_summary`)
+
+Paths through maps (e.g. `params.*`) are silently allowed — not validated. Templates access via `{{og.url}}`, `{{og.title}}`, `{{#og.is_article}}`, etc.
 
 ## Markdown pipeline
 
@@ -237,7 +257,7 @@ Section tags and interpolation tags may transform the resolved value before rend
 <time datetime="{{date}}">{{date | format}}</time>
 ```
 
-Currently implemented: `group_by <field>` (list → list-of-groups) and `format` (ISO date string → display string). Filter results live in `context.temp_allocator` (render-scoped). See `mustache/EXTENSIONS.md` for syntax details, caps (`MAX_PIPES`, `MAX_PIPE_ARGS`), and the `Group` struct shape.
+Currently implemented: `group_by <field>` (list → list-of-groups) and `format` (ISO date string → display string like "15 Mar 2026"). Filter results live in `context.temp_allocator` (render-scoped). See `mustache/EXTENSIONS.md` for syntax details, caps (`MAX_PIPES`, `MAX_PIPE_ARGS`), and the `Group` struct shape.
 
 ### Comments
 
@@ -310,39 +330,65 @@ nix build  # runs thor, outputs to ./result/
 ```bash
 cd thor
 odin test .                  # main package tests (site, frontmatter)
-odin test . -all-packages    # includes mustache specs, lambdas, pipes, markdown tests
+odin test . -all-packages    # includes mustache specs, lambdas, pipes, diagnostics, markdown tests
 ```
 
 ## Mustache engine
 
-Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the implementation specification and `mustache/EXTENSIONS.md` for non-standard extensions (pipes).
+Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the implementation specification, `mustache/EXTENSIONS.md` for non-standard extensions (pipes), and `mustache/diagnostic.odin` for the rust-style error formatter.
 
 ### Files
 
 | File | Responsibility |
 |---|---|
-| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section` with allocator threading), renderer (`render_nodes`), template inheritance (`merge_block_overrides`), `delete_template`/`delete_partials` |
+| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), renderer (`render_nodes`, takes `Template` by value), template inheritance (`merge_block_overrides`), `delete_template`/`delete_partials`. Pipe support in Variable/Unescaped/Section/Inverted tags. |
 | `tokenizer.odin` | Tokenizer (template string → `[]Token`), standalone whitespace detection |
-| `data.odin` | Reflection-based data model: `base_value` (peels union/any/nested-any layers), `lookup_in` (structs + maps, handles `Type_Info_Any` value kind in maps), `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `extract_list_element` (unwraps `[dynamic]any` element types so downstream lookups see the real value), `call_interp_lambda`/`call_section_lambda` |
-| `pipes.odin` | Pipes extension: `Pipe_Filter` AST, `parse_pipeline`, `apply_pipeline`, `apply_filter` (switch dispatch), `apply_group_by`. Stored on `Node.filters`; render-scoped results in temp allocator. |
-| `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case |
+| `data.odin` | Reflection-based data model: `base_value` (peels union/any/nested-any layers), `lookup_in` (structs + maps, handles `Type_Info_Any` value kind in maps), `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `extract_list_element`, `call_interp_lambda`/`call_section_lambda` |
+| `pipes.odin` | Pipes extension: `Pipe_Filter` AST, `parse_pipeline` (takes `pos`), `apply_pipeline`, `apply_filter` (switch dispatch: `group_by` + `format`), `apply_group_by`, `apply_format`. Stored on `Node.filters`; render-scoped results in temp allocator. |
+| `diagnostic.odin` | Rust-style error formatter: `format_error` (multi-line context, ANSI colors via `core:terminal/ansi`, `colorize` param), `format_render_error` (dispatch on `Render_Error`), `line_col`, `line_text`, `context_extent`, `count_lines`, `digit_count`, `should_colorize`. |
+| `suggest.odin` | Strict-warning helpers: `validate_key_path` (walks dotted path, crosses maps silently), `suggest_correction` (Levenshtein via `core:strings/levenshtein_distance`), `collect_struct_keys` (via reflection, recurses into `using`), `struct_has_field` (distinguishes missing field from nil value — needed for `Maybe(bool)`), `collect_partial_names`, `collect_block_names`. |
+| `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case. Uses `log.nil_logger()` to suppress expected warnings. |
 | `lambda_test.odin` | Spec lambda tests |
-| `pipes_test.odin` | Pipe filter tests |
+| `pipes_test.odin` | Pipe filter tests (`group_by` + `format`) |
+| `diagnostic_test.odin` | Golden-output tests for `format_error` (multi-line context, edge cases, alignment, caret position, hint) + parser error message brace-escaping |
+| `suggest_test.odin` | Tests for `validate_key_path`, `suggest_correction`, `struct_has_field` with `Maybe(bool)` and `using`-promoted fields |
 
 ### Architecture
 
 ```
-parse(source) → tokenize → trim_standalone_whitespace → parse_section → Template
+parse(source, path) → tokenize → trim_standalone_whitespace → parse_section → Template
 render(tmpl, data, partials) → render_nodes (walks flat node array against context stack) → string
 ```
 
 - **Two-phase API**: `parse()` produces a reusable `Template`, `render()` walks it against data. Templates parsed once, rendered many times.
-- **Flat `[dynamic]Node` array** with `first_child`/`child_count` indices — pre-order layout.
+- **Flat `[dynamic]Node` array** with `first_child`/`child_count` indices — pre-order layout. Each `Node` carries `pos: int` (byte offset into source) for diagnostics.
+- **`Template`** carries `source` and `path` — used by diagnostics to show file location and source context.
 - **Context stack**: `^[dynamic]any` with `append`/`pop` for section push/pop.
+- **`render_nodes` takes `Template` by value** (not `^Template`) — Odin's calling convention promotes to pointer when efficient. Eliminates "local copy" patterns at call sites.
+- **`Block_Override.source: Template`** — carries the template that defined the override, so warnings inside block overrides point at the correct file.
 - **`base_value`** peels Named/Distinct/Union layers (including `json.Value`). Also unwraps nested `any`-of-`any` (which occurs when `map[string]any` values are read via runtime map internals).
 - **`lookup_in`** resolves keys on structs (via `reflect.struct_field_value_by_name` with `allow_using = true`) and maps. Detects `Type_Info_Any` value kind in maps and reads the inner any directly to avoid double-wrap.
 - **Template inheritance**: `{{<parent}}` loads parent from partials, `{{$block}}` defines overridable sections. `merge_block_overrides` propagates overrides through multi-level chains.
 - **Dynamic partial names**: `{{>*key}}` resolves partial name from data context at render time.
+
+### Diagnostics
+
+Rust-style error messages with multi-line source context, caret underlines, and Levenshtein suggestions. ANSI colors via `core:terminal/ansi`, gated on `should_colorize()` (TTY detection on stderr).
+
+**Error types**: `Syntax_Error{msg, pos}` and `Data_Error{msg, pos}` — both carry byte offset into template source. (`Partial_Error` was removed — dead code.)
+
+**Strict-by-default warnings** — `render_nodes` emits `log.warnf` diagnostics for:
+- Unknown keys in `{{k}}`, `{{{k}}}`, `{{#k}}`, `{{^k}}` (via `validate_key_path` + `suggest_correction`)
+- Missing partials (`{{> name}}` not in partials map)
+- Missing parent templates (`{{<name}}` not in partials map)
+- Unmatched block overrides (`{{$name}}` doesn't match any block in parent template)
+
+**Exceptions** (no warning):
+- `{{.}}` and dot-prefixed names (current context)
+- Paths that cross a map (e.g., `params.*` — user-defined namespace)
+- `Maybe(bool)` fields with nil value (field exists, value is nil — distinguished via `struct_has_field`)
+
+**Block override source tracking**: `Block_Override.source: Template` ensures warnings inside block overrides point at the override's source file (e.g., `page.html`), not the parent template (`base.html`).
 
 ### Lambdas
 
@@ -353,11 +399,17 @@ Spec-compliant. Stored as `any` values in the data context.
 
 ### Pipes
 
-`{{#key | op args…}}…{{/key}}`. Stored as `[dynamic; MAX_PIPES]Pipe_Filter` on each `Node` (fixed-cap inline storage, no per-tag heap allocation at parse time). Applied in the renderer via `apply_pipeline` before truthiness check. Currently only `group_by <field>` is implemented (returns `[dynamic]Group` where `Group{key, items}`). See `mustache/EXTENSIONS.md`.
+`{{key | op args…}}` for interpolation, `{{#key | op args…}}…{{/key}}` for sections. Stored as `[dynamic; MAX_PIPES]Pipe_Filter` on each `Node`. Applied in the renderer via `apply_pipeline` before truthiness/interpolation. Implemented filters:
+
+- `group_by <field>` — list → `[dynamic]Group` where `Group{key, items}`
+- `format` — ISO 8601 date string → display string (e.g., "15 Mar 2026")
+
+See `mustache/EXTENSIONS.md`.
 
 ### Not implemented
 
 - Set delimiters (`{{= =}}`, `delimiters.json`)
+- Partial invocation stack in diagnostics (warnings inside partials point at the partial file but don't show the `{{> name}}` invocation site — see TODOS.md)
 
 ## Known limitations
 

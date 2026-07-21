@@ -216,7 +216,7 @@ test_interp_pipe_basic :: proc(t: ^testing.T) {
 	data := Scalar_Data {
 		name = "2026-03-15T08:49:54-04:00",
 	}
-	tpl, _ := parse("[{{name | format}}]", context.temp_allocator)
+	tpl, _ := parse("[{{name | format}}]", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "[15 Mar 2026]")
 }
@@ -229,7 +229,7 @@ test_interp_pipe_unescaped :: proc(t: ^testing.T) {
 	data := Scalar_Data {
 		name = "2025-12-25T00:00:00Z",
 	}
-	tpl, _ := parse("[{{&name | format}}]", context.temp_allocator)
+	tpl, _ := parse("[{{&name | format}}]", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "[25 Dec 2025]")
 }
@@ -242,7 +242,7 @@ test_interp_pipe_dot_current :: proc(t: ^testing.T) {
 	data := List_Data {
 		items = {"2026-01-06T00:00:00Z", "2026-06-15T00:00:00Z", "2026-10-15T00:00:00Z"},
 	}
-	tpl, _ := parse("{{#items}}[{{. | format}}]{{/items}}", context.temp_allocator)
+	tpl, _ := parse("{{#items}}[{{. | format}}]{{/items}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "[6 Jan 2026][15 Jun 2026][15 Oct 2026]")
 }
@@ -260,7 +260,7 @@ test_format_typical_iso :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "2026-03-15T08:49:54-04:00",
 	}
-	tpl, _ := parse("{{date | format}}", context.temp_allocator)
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "15 Mar 2026")
 }
@@ -270,7 +270,7 @@ test_format_short_date_only :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "2026-06-06",
 	}
-	tpl, _ := parse("{{date | format}}", context.temp_allocator)
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "6 Jun 2026")
 }
@@ -280,7 +280,7 @@ test_format_empty_input_errors :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "",
 	}
-	tpl, _ := parse("[{{date | format}}]", context.temp_allocator)
+	tpl, _ := parse("[{{date | format}}]", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
 	_, err := render(tpl, data, {}, context.temp_allocator)
 	testing.expect(t, err != nil, "empty date should error")
@@ -291,7 +291,7 @@ test_format_non_date_string_errors :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "abc",
 	}
-	tpl, _ := parse("[{{date | format}}]", context.temp_allocator)
+	tpl, _ := parse("[{{date | format}}]", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
 	_, err := render(tpl, data, {}, context.temp_allocator)
 	testing.expect(t, err != nil, "non-date string should error")
@@ -305,7 +305,7 @@ test_format_non_string_value_errors :: proc(t: ^testing.T) {
 	data := Int_Data {
 		count = 42,
 	}
-	tpl, _ := parse("{{count | format}}", context.temp_allocator)
+	tpl, _ := parse("{{count | format}}", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
 	_, err := render(tpl, data, {}, context.temp_allocator)
 	testing.expect(t, err != nil, "non-string value should error")
@@ -316,7 +316,7 @@ test_format_invalid_month_errors :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "2023-13-15",
 	}
-	tpl, _ := parse("{{date | format}}", context.temp_allocator)
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
 	_, err := render(tpl, data, {}, context.temp_allocator)
 	testing.expect(t, err != nil, "invalid month should error")
@@ -331,7 +331,8 @@ test_format_inside_section_renders :: proc(t: ^testing.T) {
 	}
 	tpl, _ := parse(
 		"{{#date}}<time datetime=\"{{.}}\">{{. | format}}</time>{{/date}}",
-		context.temp_allocator,
+		"<test>",
+		allocator = context.temp_allocator,
 	)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "<time datetime=\"2025-12-25T00:00:00Z\">25 Dec 2025</time>")
@@ -342,7 +343,7 @@ test_format_inside_section_skips_when_empty :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "",
 	}
-	tpl, _ := parse("[{{#date}}<time>{{. | format}}</time>{{/date}}]", context.temp_allocator)
+	tpl, _ := parse("[{{#date}}<time>{{. | format}}</time>{{/date}}]", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "[]")
 }
@@ -362,7 +363,7 @@ test_format_handles_all_iso8601_variants :: proc(t: ^testing.T) {
 		data := Format_Data {
 			date = c.input,
 		}
-		tpl, _ := parse("{{date | format}}", context.temp_allocator)
+		tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 		result, _ := render(tpl, data, {}, context.temp_allocator)
 		testing.expect_value(t, result, c.expected)
 	}
