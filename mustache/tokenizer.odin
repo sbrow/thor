@@ -36,60 +36,73 @@ tokenize :: proc(
 	text_start := 0
 
 	for i < len(src) {
-		if src[i] == '{' && i + 1 < len(src) && src[i + 1] == '{' {
-			if i > text_start {
-				append(&tokens, Token{kind = .Text, value = src[text_start:i], pos = text_start})
+		// Find next '{' via AVX2/SSE-backed memchr instead of byte-by-byte scan.
+		rel := strings.index_byte(src[i:], '{')
+		if rel < 0 {
+			i = len(src)
+			break
+		}
+		next := i + rel
+		// Single '{' (not '{{') — advance past it and keep scanning.
+		if next + 1 >= len(src) || src[next + 1] != '{' {
+			i = next + 1
+			continue
+		}
+		i = next
+
+		if i > text_start {
+			append(&tokens, Token{kind = .Text, value = src[text_start:i], pos = text_start})
+		}
+
+		tag_pos := i
+
+		if i + 2 < len(src) && src[i + 2] == '{' {
+			content_start := i + 3
+			idx := strings.index(src[content_start:], "}}}")
+			if idx < 0 {
+				return tokens, Error_Body {
+					msg = "unclosed triple mustache '{{{'",
+					pos = tag_pos,
+					kind = .Syntax,
+				}
+			}
+			close := content_start + idx
+			key := strings.trim_space(src[content_start:close])
+			append(&tokens, Token{kind = .Unescaped, value = key, pos = tag_pos})
+			i = close + 3
+			text_start = i
+		} else {
+			content_start := i + 2
+			sigil: byte = 0
+			if content_start < len(src) {
+				sigil = src[content_start]
 			}
 
-			tag_pos := i
+			kind: Token_Kind
+			key_start := content_start
 
-			if i + 2 < len(src) && src[i + 2] == '{' {
-				content_start := i + 3
-				idx := strings.index(src[content_start:], "}}}")
-				if idx < 0 {
-					return tokens, Error_Body {
-						msg = "unclosed triple mustache '{{{'",
-						pos = tag_pos,
-						kind = .Syntax,
-					}
-				}
-				close := content_start + idx
-				key := strings.trim_space(src[content_start:close])
-				append(&tokens, Token{kind = .Unescaped, value = key, pos = tag_pos})
-				i = close + 3
-				text_start = i
-			} else {
-				content_start := i + 2
-				sigil: byte = 0
-				if content_start < len(src) {
-					sigil = src[content_start]
-				}
+			switch sigil {
+			case '&':
+				kind = .Unescaped; key_start = content_start + 1
+			case '#':
+				kind = .Section_Open; key_start = content_start + 1
+			case '^':
+				kind = .Inverted_Open; key_start = content_start + 1
+			case '/':
+				kind = .Section_Close; key_start = content_start + 1
+			case '!':
+				kind = .Comment; key_start = content_start + 1
+			case '>':
+				kind = .Partial; key_start = content_start + 1
+			case '<':
+				kind = .Parent; key_start = content_start + 1
+			case '$':
+				kind = .Block_Open; key_start = content_start + 1
+			case:
+				kind = .Variable
+			}
 
-				kind: Token_Kind
-				key_start := content_start
-
-				switch sigil {
-				case '&':
-					kind = .Unescaped; key_start = content_start + 1
-				case '#':
-					kind = .Section_Open; key_start = content_start + 1
-				case '^':
-					kind = .Inverted_Open; key_start = content_start + 1
-				case '/':
-					kind = .Section_Close; key_start = content_start + 1
-				case '!':
-					kind = .Comment; key_start = content_start + 1
-				case '>':
-					kind = .Partial; key_start = content_start + 1
-				case '<':
-					kind = .Parent; key_start = content_start + 1
-				case '$':
-					kind = .Block_Open; key_start = content_start + 1
-				case:
-					kind = .Variable
-				}
-
-				close_idx := strings.index(src[key_start:], "}}")
+			close_idx := strings.index(src[key_start:], "}}")
 			if close_idx < 0 {
 				return tokens, Error_Body {
 					msg = "unclosed tag '{{'",
@@ -97,40 +110,37 @@ tokenize :: proc(
 					kind = .Syntax,
 				}
 			}
-				close := key_start + close_idx
+			close := key_start + close_idx
 
-				content := src[key_start:close]
+			content := src[key_start:close]
 
-				if kind == .Comment {
-					append(&tokens, Token{kind = .Comment, value = content, pos = tag_pos})
-				} else if kind == .Partial {
-					trimmed := strings.trim_space(content)
-					is_dyn := false
-					if len(trimmed) > 0 && trimmed[0] == '*' {
-						is_dyn = true
-						trimmed = strings.trim_space(trimmed[1:])
-					}
-					append(
-						&tokens,
-						Token {
-							kind = .Partial,
-							value = trimmed,
-							is_dynamic = is_dyn,
-							pos = tag_pos,
-						},
-					)
-				} else {
-					append(
-						&tokens,
-						Token{kind = kind, value = strings.trim_space(content), pos = tag_pos},
-					)
+			if kind == .Comment {
+				append(&tokens, Token{kind = .Comment, value = content, pos = tag_pos})
+			} else if kind == .Partial {
+				trimmed := strings.trim_space(content)
+				is_dyn := false
+				if len(trimmed) > 0 && trimmed[0] == '*' {
+					is_dyn = true
+					trimmed = strings.trim_space(trimmed[1:])
 				}
-
-				i = close + 2
-				text_start = i
+				append(
+					&tokens,
+					Token {
+						kind = .Partial,
+						value = trimmed,
+						is_dynamic = is_dyn,
+						pos = tag_pos,
+					},
+				)
+			} else {
+				append(
+					&tokens,
+					Token{kind = kind, value = strings.trim_space(content), pos = tag_pos},
+				)
 			}
-		} else {
-			i += 1
+
+			i = close + 2
+			text_start = i
 		}
 	}
 

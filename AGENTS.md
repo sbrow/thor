@@ -32,6 +32,7 @@ thor/
 ├── frontmatter.odin    # JSON frontmatter parser (supports nested og + lastmod)
 ├── defaults.odin       # DEFAULTS_PATH constant (#directory)
 ├── main.odin           # Entry point
+├── bench/              # Template rendering benchmark
 └── defaults/layouts/   # Bundled default templates
 ```
 
@@ -64,6 +65,7 @@ thor/
 | | `sectionate.odin` | `wrap_sections` — splits HTML at `<h2>` into `<section>` wrappers |
 | | `highlight.odin` | Syntax highlighting via tree-sitter. Imports `../treesitter`. |
 | `mustache/` | See [Mustache engine](#mustache-engine) below | Template engine |
+| `bench/` | `bench.odin` + `templates/` | Standalone template rendering benchmark. Generates 500 posts + 100 comments, renders with indented partials + inheritance + pipes. `--dump <path>` for output validation, positional arg for iteration count (default 250). |
 
 Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss, chevron_up, star).
 
@@ -333,6 +335,16 @@ odin test .                  # main package tests (site, frontmatter)
 odin test . -all-packages    # includes mustache specs, lambdas, pipes, diagnostics, markdown tests
 ```
 
+### Benchmark
+
+```bash
+cd thor
+odin build bench -o:speed
+./bench.bin                    # 250 iterations, prints timing
+./bench.bin --dump output.html # render once, write to file for diff validation
+./bench.bin 1000               # custom iteration count
+```
+
 ## Mustache engine
 
 Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the implementation specification, `mustache/EXTENSIONS.md` for non-standard extensions (pipes), and `mustache/diagnostic.odin` for the rust-style error formatter.
@@ -341,11 +353,11 @@ Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the imp
 
 | File | Responsibility |
 |---|---|
-| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), renderer (`render_nodes`, takes `Template` by value), template inheritance (`merge_block_overrides`), `delete_template`/`delete_partials`. Pipe support in Variable/Unescaped/Section/Inverted tags. |
+| `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), renderer (`render_nodes` with `Indent_State` for partial indentation), template inheritance (`merge_block_overrides`), `delete_template`/`delete_partials`. Pipe support in Variable/Unescaped/Section/Inverted tags. |
 | `tokenizer.odin` | Tokenizer (template string → `[]Token`), standalone whitespace detection |
 | `data.odin` | Reflection-based data model: `base_value` (peels union/any/nested-any layers), `lookup_in` (structs + maps, handles `Type_Info_Any` value kind in maps), `resolve_name`, `is_truthy`, `any_to_string`, `list_info`, `extract_list_element`, `call_interp_lambda`/`call_section_lambda` |
 | `pipes.odin` | Pipes extension: `Pipe_Filter` AST, `parse_pipeline` (takes `pos`), `apply_pipeline`, `apply_filter` (switch dispatch: `group_by` + `format`), `apply_group_by`, `apply_format`. Stored on `Node.filters`; render-scoped results in temp allocator. |
-| `diagnostic.odin` | Rust-style error formatter: `format_error` (multi-line context, ANSI colors via `core:terminal/ansi`, `colorize` param), `format_render_error` (dispatch on `Render_Error`), `line_col`, `line_text`, `context_extent`, `count_lines`, `digit_count`, `should_colorize`. |
+| `diagnostic.odin` | Rust-style error formatter: `format_error` (multi-line context, ANSI colors via `core:terminal/ansi`, `colorize` param), `format_render_error` (formats `Error`), `line_col`, `line_text`, `context_extent`, `count_lines`, `digit_count`, `should_colorize`. |
 | `suggest.odin` | Strict-warning helpers: `validate_key_path` (walks dotted path, crosses maps silently), `suggest_correction` (Levenshtein via `core:strings/levenshtein_distance`), `collect_struct_keys` (via reflection, recurses into `using`), `struct_has_field` (distinguishes missing field from nil value — needed for `Maybe(bool)`), `collect_partial_names`, `collect_block_names`. |
 | `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case. Uses `log.nil_logger()` to suppress expected warnings. |
 | `lambda_test.odin` | Spec lambda tests |
@@ -361,7 +373,7 @@ render(tmpl, data, partials) → render_nodes (walks flat node array against con
 ```
 
 - **Two-phase API**: `parse()` produces a reusable `Template`, `render()` walks it against data. Templates parsed once, rendered many times.
-- **Flat `[dynamic]Node` array** with `first_child`/`child_count` indices — pre-order layout. Each `Node` carries `pos: int` (byte offset into source) for diagnostics.
+- **Flat `[dynamic]Node` array** with `children: []Node` slices (pre-order layout; slices point into the backing array). Each `Node` carries `pos: int` (byte offset into source) for diagnostics.
 - **`Template`** carries `source` and `path` — used by diagnostics to show file location and source context.
 - **Context stack**: `^[dynamic]any` with `append`/`pop` for section push/pop.
 - **`render_nodes` takes `Template` by value** (not `^Template`) — Odin's calling convention promotes to pointer when efficient. Eliminates "local copy" patterns at call sites.
@@ -370,12 +382,13 @@ render(tmpl, data, partials) → render_nodes (walks flat node array against con
 - **`lookup_in`** resolves keys on structs (via `reflect.struct_field_value_by_name` with `allow_using = true`) and maps. Detects `Type_Info_Any` value kind in maps and reads the inner any directly to avoid double-wrap.
 - **Template inheritance**: `{{<parent}}` loads parent from partials, `{{$block}}` defines overridable sections. `merge_block_overrides` propagates overrides through multi-level chains.
 - **Dynamic partial names**: `{{>*key}}` resolves partial name from data context at render time.
+- **Render-time partial indentation**: `Indent_State` threads `at_line_start` through `render_nodes` so partial indent is applied at render time (via `write_indented` on Text nodes) instead of reparsing the partial's source. `render_template` writes initial indent, creates state, calls `render_nodes`. Data-injected newlines don't pick up indent (Variables don't update `at_line_start`).
 
 ### Diagnostics
 
 Rust-style error messages with multi-line source context, caret underlines, and Levenshtein suggestions. ANSI colors via `core:terminal/ansi`, gated on `should_colorize()` (TTY detection on stderr).
 
-**Error types**: `Syntax_Error{msg, pos}` and `Data_Error{msg, pos}` — both carry byte offset into template source. (`Partial_Error` was removed — dead code.)
+**Error types**: `Error_Body{msg, pos, kind}` where `kind` is `Error_Kind.Syntax` (parse-time) or `Error_Kind.Data` (render-time). `Error` is a single-variant union wrapping `Error_Body` (nilable for `!= nil` / `or_return`).
 
 **Strict-by-default warnings** — `render_nodes` emits `log.warnf` diagnostics for:
 - Unknown keys in `{{k}}`, `{{{k}}}`, `{{#k}}`, `{{^k}}` (via `validate_key_path` + `suggest_correction`)
@@ -424,7 +437,6 @@ See `mustache/EXTENSIONS.md`.
 
 You may never, *ever* remove `TODO:` or `FIXME:` comments. Those are for humans, not machines.
 See `HUGO.md` for analysis of why thor doesn't need Hugo's shortcode context isolation.
-See `mustache/PARTIAL_INDENT.md` for whitespace handling analysis.
 See `mustache/SPEC.md` for the original implementation specification.
 See `mustache/EXTENSIONS.md` for non-standard extensions (pipes).
 

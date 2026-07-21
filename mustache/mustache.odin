@@ -81,6 +81,14 @@ Block_Override :: struct {
 	source: Template,
 }
 
+// Indent_State threads partial-indent tracking through render_nodes so
+// the renderer can apply indentation at render time instead of reparsing
+// the partial's source with indentation baked in.
+Indent_State :: struct {
+	indent:        string,
+	at_line_start: bool,
+}
+
 delete_template :: proc(tmpl: ^Template) {
 	if tmpl != nil && len(tmpl.nodes) > 0 {
 		delete(tmpl.nodes)
@@ -393,20 +401,29 @@ find_common_indent :: proc(children: []Node) -> string {
 			text := children[i].text
 			if len(text) > 0 {
 				line_start := 0
-				for j in 0 ..= len(text) {
-					if j == len(text) || text[j] == '\n' {
-						line := text[line_start:j]
-						if len(strings.trim_space(line)) > 0 {
-							ws := leading_whitespace(line)
-							if !found {
-								common = ws
-								found = true
-							} else if len(ws) < len(common) {
-								common = ws
-							}
-						}
-						line_start = j + 1
+				for {
+					// Bulk-scan to next newline (AVX2-backed) instead of byte-by-byte.
+					rel := strings.index_byte(text[line_start:], '\n')
+					line_end: int
+					if rel < 0 {
+						line_end = len(text)
+					} else {
+						line_end = line_start + rel
 					}
+					line := text[line_start:line_end]
+					if len(strings.trim_space(line)) > 0 {
+						ws := leading_whitespace(line)
+						if !found {
+							common = ws
+							found = true
+						} else if len(ws) < len(common) {
+							common = ws
+						}
+					}
+					if rel < 0 {
+						break
+					}
+					line_start = line_end + 1
 				}
 			}
 		}
@@ -442,16 +459,19 @@ remove_line_indent :: proc(s: string, indent: string, allocator := context.alloc
 		if at_line_start {
 			if i + len(indent) <= len(s) && s[i:i + len(indent)] == indent {
 				i += len(indent)
-				at_line_start = false
-				continue
 			}
 			at_line_start = false
 		}
-		append(&buf, s[i])
-		if s[i] == '\n' {
-			at_line_start = true
+		// Bulk-append up to and including the next newline (AVX2-backed).
+		rel := strings.index_byte(s[i:], '\n')
+		if rel < 0 {
+			append(&buf, s[i:])
+			break
 		}
-		i += 1
+		next := i + rel
+		append(&buf, s[i:next + 1])
+		i = next + 1
+		at_line_start = true
 	}
 
 	return string(buf[:])
@@ -461,34 +481,6 @@ remove_line_indent :: proc(s: string, indent: string, allocator := context.alloc
 // Indentation helpers
 // ---------------------------------------------------------------------------
 
-indent_lines :: proc(source: string, indent: string) -> string {
-	if len(indent) == 0 || len(source) == 0 {
-		return source
-	}
-	b: strings.Builder
-	strings.builder_init(&b, context.temp_allocator)
-	write_indented(&b, indent, source)
-	return strings.to_string(b)
-}
-
-write_indented :: proc(b: ^strings.Builder, indent: string, content: string) {
-	if len(indent) == 0 || len(content) == 0 {
-		strings.write_string(b, content)
-		return
-	}
-	at_line_start := true
-	for i in 0 ..< len(content) {
-		if at_line_start {
-			strings.write_string(b, indent)
-			at_line_start = false
-		}
-		strings.write_byte(b, content[i])
-		if content[i] == '\n' {
-			at_line_start = true
-		}
-	}
-}
-
 render_template :: proc(
 	pt: Template,
 	ctx: ^[dynamic]any,
@@ -497,21 +489,36 @@ render_template :: proc(
 	blocks: map[string]Block_Override,
 	indent: string,
 ) -> Error {
-	if len(indent) > 0 && len(pt.source) > 0 {
-		// Per Mustache spec: the partial's source is indented before rendering,
-		// not its output. This is necessary so that data-injected newlines
-		// (e.g. from `{{{content}}}` where content contains `\n`) do NOT pick
-		// up the indent — only source-level line breaks do.
-		indented := indent_lines(pt.source, indent)
-		reparse := parse(
-			indented,
-			pt.path,
-			context.temp_allocator,
-			context.temp_allocator,
-		) or_return
-		return render_nodes(reparse, reparse.nodes[:], ctx, partials, b, blocks)
+	if len(indent) > 0 {
+		state := Indent_State{indent = indent, at_line_start = false}
+		strings.write_string(b, indent) // first line always gets indent
+		return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, &state)
 	}
-	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks)
+	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, nil)
+}
+
+write_indented :: proc(b: ^strings.Builder, indent: string, content: string, at_line_start: ^bool) {
+	if len(indent) == 0 || len(content) == 0 {
+		strings.write_string(b, content)
+		return
+	}
+	i := 0
+	for i < len(content) {
+		if at_line_start^ {
+			strings.write_string(b, indent)
+			at_line_start^ = false
+		}
+		// Bulk-write up to and including the next newline (AVX2-backed).
+		rel := strings.index_byte(content[i:], '\n')
+		if rel < 0 {
+			strings.write_string(b, content[i:])
+			return
+		}
+		next := i + rel
+		strings.write_string(b, content[i:next + 1])
+		i = next + 1
+		at_line_start^ = true
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -525,16 +532,25 @@ render_nodes :: proc(
 	partials: map[string]Template,
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override = nil,
+	indent_state: ^Indent_State = nil,
 ) -> Error {
 	i := 0
 	for i < len(nodes) {
 		node := nodes[i]
 		switch node.kind {
 		case .Text:
-			strings.write_string(b, node.text)
+			if indent_state != nil {
+				write_indented(b, indent_state.indent, node.text, &indent_state.at_line_start)
+			} else {
+				strings.write_string(b, node.text)
+			}
 			i += 1
 
 		case .Variable:
+			if indent_state != nil && indent_state.at_line_start {
+				strings.write_string(b, indent_state.indent)
+				indent_state.at_line_start = false
+			}
 			val := resolve_name(node.key, ctx[:])
 			if val == nil {
 				warn_unknown_key(current, ctx[:], node)
@@ -563,6 +579,7 @@ render_nodes :: proc(
 					partials,
 					&temp,
 					blocks,
+					nil,
 				) or_return
 				write_value(b, strings.to_string(temp), escape = true)
 				}
@@ -572,6 +589,10 @@ render_nodes :: proc(
 			i += 1
 
 		case .Unescaped:
+			if indent_state != nil && indent_state.at_line_start {
+				strings.write_string(b, indent_state.indent)
+				indent_state.at_line_start = false
+			}
 			val := resolve_name(node.key, ctx[:])
 			if val == nil {
 				warn_unknown_key(current, ctx[:], node)
@@ -600,6 +621,7 @@ render_nodes :: proc(
 					partials,
 					&temp,
 					blocks,
+					nil,
 				) or_return
 				write_value(b, strings.to_string(temp), escape = false)
 				}
@@ -635,6 +657,7 @@ render_nodes :: proc(
 					partials,
 					b,
 					blocks,
+					nil,
 				) or_return
 				}
 		} else if is_truthy(val) {
@@ -652,12 +675,13 @@ render_nodes :: proc(
 						partials,
 						b,
 						blocks,
+						indent_state,
 					) or_return
 				}
 			} else {
 				append(ctx, val)
 				defer pop(ctx)
-				render_nodes(current, children, ctx, partials, b, blocks) or_return
+				render_nodes(current, children, ctx, partials, b, blocks, indent_state) or_return
 			}
 		}
 		i += 1 + len(node.children)
@@ -675,7 +699,7 @@ render_nodes :: proc(
 				val = transformed
 			}
 		if !is_truthy(val) {
-			render_nodes(current, node.children, ctx, partials, b, blocks) or_return
+			render_nodes(current, node.children, ctx, partials, b, blocks, indent_state) or_return
 		}
 		i += 1 + len(node.children)
 
@@ -690,6 +714,9 @@ render_nodes :: proc(
 				warn_missing_partial(current, partials, node, name)
 			} else {
 				render_template(pt, ctx, partials, b, nil, node.indent) or_return
+				if indent_state != nil {
+					indent_state.at_line_start = false
+				}
 			}
 			i += 1
 
@@ -720,8 +747,10 @@ render_nodes :: proc(
 				partials,
 				&temp,
 				content_blocks,
+				nil,
 			) or_return
-			write_indented(b, node.indent, strings.to_string(temp))
+			at_ls := true
+			write_indented(b, node.indent, strings.to_string(temp), &at_ls)
 		} else {
 			render_nodes(
 				render_current,
@@ -730,6 +759,7 @@ render_nodes :: proc(
 				partials,
 				b,
 				content_blocks,
+				indent_state,
 			) or_return
 		}
 		i += 1 + len(node.children)
@@ -743,6 +773,9 @@ render_nodes :: proc(
 		} else {
 			warn_unmatched_block_overrides(current, pt, parent_children)
 			render_template(pt, ctx, partials, b, merged, node.indent) or_return
+			if indent_state != nil {
+				indent_state.at_line_start = false
+			}
 		}
 		i += 1 + len(node.children)
 		}
