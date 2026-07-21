@@ -179,11 +179,29 @@ parse_section :: proc(
 			pos^ += 1
 
 		case .Variable:
-			append(nodes, Node{kind = .Variable, key = tok.value, first_child = -1})
+			idx := len(nodes)
+			append(nodes, Node{kind = .Variable, first_child = -1})
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters)
+			if perr != nil {
+				return Syntax_Error {
+					msg = fmt.tprintf("pipe parse error in '{{%s}}': %v", tok.value, perr),
+					pos = tok.pos,
+				}
+			}
+			nodes[idx].key = pipe_key
 			pos^ += 1
 
 		case .Unescaped:
-			append(nodes, Node{kind = .Unescaped, key = tok.value, first_child = -1})
+			idx := len(nodes)
+			append(nodes, Node{kind = .Unescaped, first_child = -1})
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters)
+			if perr != nil {
+				return Syntax_Error {
+					msg = fmt.tprintf("pipe parse error in '{{&%s}}': %v", tok.value, perr),
+					pos = tok.pos,
+				}
+			}
+			nodes[idx].key = pipe_key
 			pos^ += 1
 
 		case .Comment:
@@ -487,6 +505,13 @@ render_nodes :: proc(
 
 		case .Variable:
 			val := resolve_name(node.key, ctx[:])
+			if len(node.filters) > 0 {
+				transformed, perr := apply_pipeline(val, node.filters[:])
+				if perr != nil {
+					return perr
+				}
+				val = transformed
+			}
 			if result_str, ok := call_interp_lambda(val); ok {
 				sub_tpl, perr := parse(result_str, context.temp_allocator, context.temp_allocator)
 				if perr == nil {
@@ -509,6 +534,13 @@ render_nodes :: proc(
 
 		case .Unescaped:
 			val := resolve_name(node.key, ctx[:])
+			if len(node.filters) > 0 {
+				transformed, perr := apply_pipeline(val, node.filters[:])
+				if perr != nil {
+					return perr
+				}
+				val = transformed
+			}
 			if result_str, ok := call_interp_lambda(val); ok {
 				sub_tpl, perr := parse(result_str, context.temp_allocator, context.temp_allocator)
 				if perr == nil {

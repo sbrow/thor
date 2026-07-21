@@ -11,12 +11,11 @@ import "core:time"
 import "core:time/datetime"
 
 Page_Context :: struct {
-	permalink:    string,
-	title:        string,
-	starred:      bool,
-	date_iso:     string,
-	date_display: string,
-	year:         string,
+	permalink: string,
+	title:     string,
+	starred:   bool,
+	date:      string,
+	year:      string,
 }
 
 Base_Data :: struct {
@@ -29,10 +28,9 @@ Base_Data :: struct {
 }
 
 Page_Data :: struct {
-	using base:   Base_Data,
-	page_title:   string,
-	date_iso:     string,
-	date_display: string,
+	using base: Base_Data,
+	page_title: string,
+	date:       string,
 }
 
 Home_Data :: struct {
@@ -51,8 +49,7 @@ build_page_context :: proc(page: Page) -> Page_Context {
 		permalink = page.permalink,
 		title = page.title,
 		starred = page.is_starred,
-		date_iso = page.date,
-		date_display = format_date(page.date),
+		date = page.date,
 		year = get_year(page.date),
 	}
 }
@@ -261,8 +258,7 @@ render_page_html :: proc(
 	data.title = fmt.tprintf("%s | %s", page.title, site.title)
 	data.page_title = page.title
 	data.body = page.body_html
-	data.date_iso = page.date
-	data.date_display = format_date(page.date)
+	data.date = page.date
 	data.og = og_for_page(site.og, page)
 	return render_template(content_tpl, data, partials)
 }
@@ -358,14 +354,6 @@ load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 		partials[key] = tpl
 	}
 	return partials
-}
-
-format_date :: proc(iso: string) -> string {
-	if len(iso) < 10 {
-		return ""
-	}
-	date, _, _, _ := time.iso8601_to_components(iso)
-	return fmt.aprintf("%s %d, %d", time.Month(date.month), date.day, date.year)
 }
 
 get_year :: proc(iso: string) -> string {

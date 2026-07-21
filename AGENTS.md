@@ -196,7 +196,7 @@ Templates use Mustache with template inheritance (`{{<base}}` / `{{$block}}`):
 {{/base}}
 ```
 
-Data is passed as **typed structs** (not `map[string]any`). Mustache resolves struct fields via Odin reflection, including `using`-embedded fields. Date presence is checked via string truthiness (`{{#date_iso}}`) — no separate `has_date` bool needed.
+Data is passed as **typed structs** (not `map[string]any`). Mustache resolves struct fields via Odin reflection, including `using`-embedded fields. Date presence is checked via string truthiness (`{{#date}}`) — no separate `has_date` bool needed. Dates are stored as raw ISO strings; presentation formatting happens in the template via the `format` pipe (see Pipes extension below).
 
 ```odin
 Base_Data :: struct {
@@ -207,10 +207,9 @@ Base_Data :: struct {
     og:     Open_Graph,
 }
 Page_Data :: struct {
-    using base:   Base_Data,  // fields promoted via reflection fallback
-    page_title:   string,
-    date_iso:     string,
-    date_display: string,
+    using base: Base_Data,  // fields promoted via reflection fallback
+    page_title: string,
+    date:       string,     // raw ISO 8601; formatted via `| format` in templates
 }
 Home_Data :: struct {
     using base: Base_Data,
@@ -227,15 +226,18 @@ Section_Data :: struct {
 
 ### Pipes extension
 
-Section tags may transform the resolved value before iteration:
+Section tags and interpolation tags may transform the resolved value before rendering:
 
 ```handlebars
 {{#posts | group_by year}}
   {{key}}: {{#items}}{{title}}, {{/items}}
 {{/posts}}
+
+<!-- Interpolation pipe: format a date for display -->
+<time datetime="{{date}}">{{date | format}}</time>
 ```
 
-Currently only `group_by <field>` is implemented. Filter results live in `context.temp_allocator` (render-scoped). See `mustache/EXTENSIONS.md` for syntax details, caps (`MAX_PIPES`, `MAX_PIPE_ARGS`), and the `Group` struct shape.
+Currently implemented: `group_by <field>` (list → list-of-groups) and `format` (ISO date string → display string). Filter results live in `context.temp_allocator` (render-scoped). See `mustache/EXTENSIONS.md` for syntax details, caps (`MAX_PIPES`, `MAX_PIPE_ARGS`), and the `Group` struct shape.
 
 ### Comments
 

@@ -1,7 +1,9 @@
 package mustache
 
 import "core:fmt"
+import "core:reflect"
 import "core:strings"
+import "core:time"
 
 // MAX_PIPES was chosen arbitrarily. It holds no performance or logical
 // significance.
@@ -39,7 +41,11 @@ parse_pipeline :: proc(
 	filter_count := len(segments) - 1
 	if filter_count > MAX_PIPES {
 		return "", Syntax_Error {
-			msg = fmt.tprintf("pipe expression has %d filters, max is %d", filter_count, MAX_PIPES),
+			msg = fmt.tprintf(
+				"pipe expression has %d filters, max is %d",
+				filter_count,
+				MAX_PIPES,
+			),
 		}
 	}
 
@@ -104,9 +110,49 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter) -> (any, Render_Error) {
 	switch filter.op {
 	case "group_by":
 		return apply_group_by(value, filter.args[:])
+	case "format":
+		str, ok := reflect.as_string(value)
+		if !ok {
+			return value, Data_Error{msg = "format may only be used on dates"}
+		} else {
+			return apply_format(str, filter.args[:])
+		}
 	case:
 		return nil, Data_Error{msg = fmt.tprintf("unknown pipe op '%s'", filter.op)}
 	}
+}
+
+// apply_format formats an ISO 8601 date string as a display string
+// (e.g. "2026-03-15T08:49:54-04:00" → "15 Mar 2026"). Invalid input
+// (empty, too-short, or unparseable) returns a `Data_Error`. Templates
+// that need to skip dateless pages should gate with a section:
+//   {{#date}}<time datetime="{{.}}">{{. | format}}</time>{{/date}}
+// The section's truthiness check catches empty before the filter runs.
+//
+// Currently ignores args; planned to accept Go reference-date format
+// strings in the future.
+//
+// Accepts any of these ISO 8601 forms (date prefix is invariant):
+//   2023-10-15T13:18:50-07:00
+//   2023-10-15T13:18:50-0700
+//   2023-10-15T13:18:50Z
+//   2023-10-15T13:18:50
+//   2023-10-15
+apply_format :: proc(iso: string, args: []string) -> (result: any, err: Render_Error) {
+	if len(iso) < 10 {
+		return nil, Data_Error{msg = "format may only be used on dates"}
+	}
+
+	year := iso[:4]
+	month_num := (int(iso[5]) - 0x30) * 10 + (int(iso[6]) - 0x30)
+	day_num := (int(iso[8]) - 0x30) * 10 + (int(iso[9]) - 0x30)
+
+	if month_num < 1 || month_num > 12 {
+		return nil, Data_Error{msg = fmt.tprintf("invalid date: \"%s\"", iso)}
+	}
+
+	month := fmt.tprintf("%s", time.Month(month_num))[:3]
+	return fmt.tprintf("%d %s %s", day_num, month, year), nil
 }
 
 // Groups preserve first-appearance order from the input list.
@@ -154,3 +200,4 @@ apply_group_by :: proc(value: any, args: []string) -> (result: any, err: Render_
 
 	return groups, nil
 }
+
