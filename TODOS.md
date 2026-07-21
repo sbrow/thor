@@ -18,29 +18,38 @@
 - [ ] Add overloads for every extension - accept ^strings.Builder.
 - [ ] Add conventional (Hugo style) footnotes option.
 - [ ] Add heading ids as a default on extension.
+- [ ] Add opt-in deflist support.
+- [ ] Decide if lambdas actually provide any value.
+- [ ] configure date format as a partial
 
 ## General 
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Avoid `json.Value` / `json.Object` where possible.
+- [ ] Add page params
+- [ ] We must remove all mention of `posts` from the odin code.
+      At present, "posts" are a user-level construct defined as pages in a
+      particular collection.
 - [ ] running ./thor/thor still logs the debug message: using config /home/spencer/github.com/sbrow.github.io/thor.json
   - wrong cwd?
 - [ ] Clean up the default layouts
+- [ ] if no `html` tag detected in output, re-render output with base template
+      (or whatever template is next in the chain)
 - [ ] Add `-production` flag
   - sets `-minify`
-- [x] Open Graph
-  - [x] mustache data keys for opengraph, etc.
-  - [x] OpenGraph meta tags — verify all fields match production site
-  - [x] set opengraph tags / description automatically if unset. (Like hugo does)
-  - [x] We can't use avatar.jpg as the default site image.
-  - [x] Add `og Open_Graph` to `Config_File`.
+- [x] Mustache diagnostics
+  - [x] Rust-style error messages: position tracking on Node/Template/Data_Error, `diagnostic.odin` with `format_error`, ANSI colors via `core:terminal/ansi` (Phase 1+2+3)
+  - [x] Unknown-key detection with Levenshtein suggestions (`core:strings/levenshtein_distance`); warning severity (Phase 4+5)
+  - [x] Strict-by-default posture: warn on missing keys in `{{k}}`/`{{{k}}}`/`{{#k}}`/`{{^k}}`, missing partials, missing parents, unmatched block overrides
+  - [x] Block-override source-template tracking: warnings inside overrides point at the override's source file, not the parent template
+  - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
+  - [ ] Could be better error message when missing a closing (or opening) brace
 - [ ] Author should be a struct adhering to https://schema.org/author
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] follow symlinks in `scan_content`?
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
-- [ ] Add Opt-in deflist support.
 - [x] We need to be able to do `Year_Section` in a non-magical, unprivileged way. Implemented via the pipes extension to mustache — see [mustache/EXTENSIONS.md](mustache/EXTENSIONS.md).
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
