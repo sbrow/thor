@@ -22,8 +22,8 @@ test_lambda_interpolation :: proc(t: ^testing.T) {
 	data := Interp_Data {
 		lambda = proc() -> string {return "world"},
 	}
-	tpl, _ := parse("Hello, {{lambda}}!", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("Hello, {{lambda}}!", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "Hello, world!")
 }
 
@@ -36,8 +36,8 @@ test_lambda_interpolation_expansion :: proc(t: ^testing.T) {
 		lambda = proc() -> string {return "{{planet}}"},
 		planet = "world",
 	}
-	tpl, _ := parse("Hello, {{lambda}}!", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("Hello, {{lambda}}!", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "Hello, world!")
 }
 
@@ -55,8 +55,8 @@ test_lambda_interpolation_multiple_calls :: proc(t: ^testing.T) {
 	data := Interp_Data_Int {
 		lambda = counter_lambda,
 	}
-	tpl, _ := parse("{{lambda}} == {{{lambda}}} == {{lambda}}", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("{{lambda}} == {{{lambda}}} == {{lambda}}", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "1 == 2 == 3")
 }
 
@@ -68,8 +68,8 @@ test_lambda_escaping :: proc(t: ^testing.T) {
 	data := Interp_Data {
 		lambda = proc() -> string {return ">"},
 	}
-	tpl, _ := parse("<{{lambda}}{{{lambda}}}", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("<{{lambda}}{{{lambda}}}", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "<&gt;>")
 }
 
@@ -90,8 +90,8 @@ test_lambda_section :: proc(t: ^testing.T) {
 		},
 		x = "Error!",
 	}
-	tpl, _ := parse("<{{#lambda}}{{x}}{{/lambda}}>", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("<{{#lambda}}{{x}}{{/lambda}}>", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "<yes>")
 }
 
@@ -106,8 +106,8 @@ test_lambda_section_expansion :: proc(t: ^testing.T) {
 		},
 		planet = "Earth",
 	}
-	tpl, _ := parse("<{{#lambda}}-{{/lambda}}>", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("<{{#lambda}}-{{/lambda}}>", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "<-Earth->")
 }
 
@@ -121,8 +121,12 @@ test_lambda_section_multiple_calls :: proc(t: ^testing.T) {
 			return fmt.tprintf("__%s__", text)
 		},
 	}
-	tpl, _ := parse("{{#lambda}}FILE{{/lambda}} != {{#lambda}}LINE{{/lambda}}", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse(
+		"{{#lambda}}FILE{{/lambda}} != {{#lambda}}LINE{{/lambda}}",
+		"<test>",
+		context.temp_allocator,
+	)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "__FILE__ != __LINE__")
 }
 
@@ -140,8 +144,8 @@ test_lambda_inverted_section :: proc(t: ^testing.T) {
 		lambda = proc(text: string) -> bool {return false},
 		static = "static",
 	}
-	tpl, _ := parse("<{{^lambda}}{{static}}{{/lambda}}>", context.temp_allocator)
-	result, _ := render(tpl, data, allocator = context.temp_allocator)
+	tpl, _ := parse("<{{^lambda}}{{static}}{{/lambda}}>", "<test>", context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "<>")
 }
 
