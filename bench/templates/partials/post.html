@@ -1,0 +1,9 @@
+<li class="post">
+    <article>
+        <h3><a href="{{url}}">{{title}}</a></h3>
+        <time datetime="{{date}}">{{date | format}}</time>
+        <p class="excerpt">{{excerpt}}</p>
+        {{#author}}<address>{{author}}</address>{{/author}}
+        {{#tags}}<a href="/tag/{{slug}}" class="tag">{{name}}</a>{{/tags}}
+    </article>
+</li>

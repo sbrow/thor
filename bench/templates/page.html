@@ -1,0 +1,45 @@
+{{<base}}
+{{$title}}Archive{{/title}}
+{{$head}}
+    <meta name="description" content="Post archive">
+{{/head}}
+{{$nav}}
+    <nav>
+        <ul>
+            {{#nav_items}}
+            <li><a href="{{url}}">{{label}}</a></li>
+            {{/nav_items}}
+        </ul>
+    </nav>
+{{/nav}}
+{{$content}}
+    <main>
+        <h1>Archive</h1>
+        {{#posts | group_by year}}
+        <section class="year">
+            <h2>{{key}}</h2>
+            <ul>
+                {{#items}}
+                {{> post}}
+                {{/items}}
+            </ul>
+        </section>
+        {{/posts}}
+    </main>
+{{/content}}
+{{$sidebar}}
+    <aside>
+        <h3>Recent Comments</h3>
+        <ul>
+            {{#comments}}
+            {{> comment}}
+            {{/comments}}
+        </ul>
+    </aside>
+{{/sidebar}}
+{{$footer}}
+    <footer>
+        <p>Generated {{now}}</p>
+    </footer>
+{{/footer}}
+{{/base}}
