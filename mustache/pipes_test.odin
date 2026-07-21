@@ -359,6 +359,28 @@ test_format_inside_section_skips_when_empty :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_format_context_date_format_weekday :: proc(t: ^testing.T) {
+	data := Format_Data {
+		date        = "2026-01-01T00:00:00Z",
+		date_format = "Monday, January 2, 2006",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "Thursday, January 1, 2026")
+}
+
+@(test)
+test_format_context_date_format_time_of_day :: proc(t: ^testing.T) {
+	data := Format_Data {
+		date        = "2026-01-01T15:30:00Z",
+		date_format = "3:04 PM",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "3:30 PM")
+}
+
+@(test)
 test_format_handles_all_iso8601_variants :: proc(t: ^testing.T) {
 	cases := [5]struct {
 		input, expected: string,

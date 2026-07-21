@@ -1,11 +1,9 @@
 package main
 
 import "base:runtime"
-import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:prof/spall"
-import "core:strings"
 import "core:sync"
 import "core:time"
 
@@ -36,7 +34,7 @@ main :: proc() {
 
 	logger_opts: log.Options =
 		(log.Default_Console_Logger_Opts - log.Full_Timestamp_Opts - {.Short_File_Path})
-	console_logger := log.create_console_logger(.Debug, logger_opts)
+	console_logger := log.create_console_logger(.Info, logger_opts)
 	context.logger = console_logger
 	defer log.destroy_console_logger(console_logger)
 

@@ -13,6 +13,14 @@
 - [ ] Not sure whether to use temp allocator or site_allocator in opengraph.odin.
 - [ ] Not sure whether to use temp allocator or site_allocator in `site_load_content`.
 - [ ] Might not need to allocate in `strip_html_tags`
+- [ ] Fix `apply_filter`'s `format` case (`mustache/pipes.odin`) boxing `apply_format`'s
+      `string` result into `any` via bare `return`, which materializes a hidden
+      header temp in `apply_filter`'s own stack frame. Dangling once the frame
+      returns; caused the `-o:speed` segfault in `write_value`. Fix: box explicitly
+      with `any{new_clone(formatted, context.temp_allocator), typeid_of(string)}`.
+- [ ] Same pattern in `apply_group_by` (`mustache/pipes.odin`): `return groups, nil`
+      boxes a freshly-built `[dynamic]Group` as bare `any` — same latent
+      stack-temp UB, hasn't crashed yet but should get the same treatment.
 
 ## Markdown
 - [ ] Add overloads for every extension - accept ^strings.Builder.
@@ -20,13 +28,20 @@
 - [ ] Add heading ids as a default on extension.
 - [ ] Add opt-in deflist support.
 - [ ] Decide if lambdas actually provide any value.
-- [ ] configure date format as a partial
+
+## Dates
+- [ ] Accept "strings"
+- [ ] Accept keys
+- [ ] handle timezones
+- [ ] display an error when no part of the date appears in the output.
+- [x] use `date.format` as the default format.
 
 ## General 
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] Avoid `json.Value` / `json.Object` where possible.
+- [ ] Create a json schema file for `thor.json`.
 - [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.
 - [ ] Add page params
 - [ ] We must remove all mention of `posts` from the odin code.
@@ -46,6 +61,16 @@
   - [x] Block-override source-template tracking: warnings inside overrides point at the override's source file, not the parent template
   - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
   - [ ] Could be better error message when missing a closing (or opening) brace
+  - [ ] Error message doesn't show position of faulty pipe name correctly.
+  ```bash
+  [ERROR] --- [138:render_template()] unknown pipe op 'formats'
+ --> /home/spencer/github.com/sbrow.github.io/layouts/home.html:1:1
+  |
+1 | {{<base}}
+  | ^^^^^^^^^
+2 | {{$content}}
+3 | <main>
+```
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] follow symlinks in `scan_content`?

@@ -149,6 +149,8 @@
               cmark
               tree-sitter
 
+              gdb
+
               # IDE
               unstable.helix
               typescript-language-server
