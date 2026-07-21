@@ -45,7 +45,6 @@
   - [x] Block-override source-template tracking: warnings inside overrides point at the override's source file, not the parent template
   - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
   - [ ] Could be better error message when missing a closing (or opening) brace
-- [ ] Author should be a struct adhering to https://schema.org/author
 - [ ] Block attributes on code fences (`{ #ex-1 }`) — hello-world.md
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] follow symlinks in `scan_content`?

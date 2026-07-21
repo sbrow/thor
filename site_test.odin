@@ -25,8 +25,8 @@ test_load_config_file :: proc(t: ^testing.T) {
 			"title":"Test Site",
 			"description":"Test desc",
 			"base_url":"https://example.com",
-			"author":"Tester",
 			"params":{
+				"author":"Tester",
 				"social":[
 					{"name":"github","url":"https://github.com/test"},
 					{"name":"rss","url":"/index.xml"}]
@@ -42,10 +42,14 @@ test_load_config_file :: proc(t: ^testing.T) {
 	testing.expect_value(t, cfg.title, "Test Site")
 	testing.expect_value(t, cfg.description, "Test desc")
 	testing.expect_value(t, cfg.base_url, "https://example.com")
-	testing.expect_value(t, cfg.author, "Tester")
 
 	params, has_params := cfg.params.(json.Object)
 	testing.expect(t, has_params)
+
+	author_val := params["author"]
+	author, has_author := author_val.(json.String)
+	testing.expect(t, has_author)
+	testing.expect_value(t, author, "Tester")
 
 	social_val := params["social"]
 	social, has_social := social_val.(json.Array)
@@ -94,7 +98,6 @@ test_load_config_file_partial :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	testing.expect_value(t, cfg.title, "Partial")
 	testing.expect_value(t, cfg.description, "")
-	testing.expect_value(t, cfg.author, "")
 	testing.expect(t, cfg.params == nil)
 }
 
@@ -143,7 +146,7 @@ test_init_site_flag_overrides_default :: proc(t: ^testing.T) {
 test_init_site_full_pipeline :: proc(t: ^testing.T) {
 	path := write_temp_config(
 		"pipeline",
-		`{"title":"Pipeline Test","description":"Full","base_url":"https://config.com","author":"Author"}`,
+		`{"title":"Pipeline Test","description":"Full","base_url":"https://config.com"}`,
 	)
 	defer os.remove(path)
 
@@ -154,7 +157,6 @@ test_init_site_full_pipeline :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, site.title, "Pipeline Test")
 	testing.expect_value(t, site.description, "Full")
-	testing.expect_value(t, site.author, "Author")
 	testing.expect(t, .Drafts in site.features)
 	testing.expect_value(t, site.base_url, "https://config.com")
 }
@@ -162,7 +164,12 @@ test_init_site_full_pipeline :: proc(t: ^testing.T) {
 @(test)
 test_init_site_md_enable_disable :: proc(t: ^testing.T) {
 	site: Site
-	args := []string{"thor", "-config:./nonexistent.json", "-ext:highlight,sections", "-no-ext:emoji"}
+	args := []string {
+		"thor",
+		"-config:./nonexistent.json",
+		"-ext:highlight,sections",
+		"-no-ext:emoji",
+	}
 	init_site(&site, args)
 	defer destroy_site(&site)
 

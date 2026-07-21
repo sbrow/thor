@@ -5,7 +5,7 @@ Thor is a static site generator written in [Odin](https://odin-lang.org), replac
 ## Architecture
 
 ```
-thor.json          ← site config (title, base_url, author, params, modules)
+thor.json          ← site config (title, base_url, params, modules)
 content/           ← markdown and HTML content files
 layouts/           ← Mustache templates + partials (user overrides)
 assets/            ← CSS (Tufte-based), JS, fonts, images
@@ -129,7 +129,6 @@ Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
 {
   "title": "...",
   "base_url": "...",
-  "author": "...",
   "modules": ["../path/to/module"],
   "markdown_extensions": {
     "emoji": true,
@@ -139,6 +138,7 @@ Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
     "sections": true
   },
   "params": {
+    "author": "...",
     "social": [
       { "name": "github", "url": "...", "icon": "icons/github" }
     ]
@@ -201,7 +201,6 @@ Data is passed as **typed structs** (not `map[string]any`). Mustache resolves st
 ```odin
 Base_Data :: struct {
     now:    datetime.DateTime,
-    author: string,
     params: json.Value,
     body:   string,
     title:  string,

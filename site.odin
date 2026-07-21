@@ -19,7 +19,6 @@ Site :: struct {
 	vfs:                 VFS,
 	title:               string,
 	description:         string,
-	author:              string,
 	base_url:            string,
 	config_path:         string,
 	content_dir:         string,
@@ -44,7 +43,6 @@ Config_File :: struct {
 	title:               string,
 	description:         string,
 	base_url:            string,
-	author:              string,
 	content_dir:         string,
 	assets_dir:          string,
 	output_dir:          string,
@@ -136,7 +134,6 @@ load_config_file :: proc(
 site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) {
 	if config.title != "" do site.title = config.title
 	if config.description != "" do site.description = config.description
-	if config.author != "" do site.author = config.author
 	if config.base_url != "" do site.base_url = config.base_url
 
 	site.content_dir =
