@@ -1,7 +1,7 @@
 package main
 
 import "core:encoding/json"
-import "core:fmt"
+import "core:log"
 import "core:strings"
 
 Frontmatter :: struct {
@@ -38,7 +38,7 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 
 	value, err := json.parse_string(json_str, spec = .JSON)
 	if err != nil {
-		fmt.eprintfln("failed to parse frontmatter JSON: %v", err)
+		log.errorf("failed to parse frontmatter JSON: %v", err)
 		return
 	}
 	defer json.destroy_value(value)

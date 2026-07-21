@@ -20,7 +20,7 @@ main :: proc() {
 	when SPALL {
 		ctx, ok := spall.context_create_with_scale("thor.spall", false, 1.0)
 		if !ok {
-			fmt.eprintln("Failed to create spall trace file")
+			log.fatal("Failed to create spall trace file")
 			os.exit(1)
 		}
 		spall_ctx = ctx

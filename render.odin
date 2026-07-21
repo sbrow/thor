@@ -397,7 +397,7 @@ write_page :: proc(output_dir: string, permalink: string, html: string) {
 
 	dir := fmt.tprintf("%s/%s", output_dir, rel)
 	if err := os.make_directory_all(dir); err != nil && err != .Exist {
-		fmt.eprintfln("cannot create %s: %v", dir, err)
+		log.errorf("cannot create %s: %v", dir, err)
 		return
 	}
 
@@ -407,7 +407,7 @@ write_page :: proc(output_dir: string, permalink: string, html: string) {
 
 write_file :: proc(path: string, html: string) {
 	if err := os.write_entire_file_from_string(path, html); err != nil {
-		fmt.eprintfln("cannot write %s: %v", path, err)
+		log.errorf("cannot write %s: %v", path, err)
 	}
 }
 
