@@ -47,25 +47,24 @@ Node_Kind :: enum {
 }
 
 Node :: struct {
-	kind:        Node_Kind,
-	text:        string,
-	key:         string,
-	filters:     [dynamic; MAX_PIPES]Pipe_Filter,
-	is_dynamic:  bool,
-	indent:      string,
-	first_child: int,
-	child_count: int,
-	content:     string,
-	pos:         int,
+	kind:       Node_Kind,
+	text:       string,
+	key:        string,
+	filters:    [dynamic; MAX_PIPES]Pipe_Filter,
+	is_dynamic: bool,
+	indent:     string,
+	children:   []Node,
+	content:    string,
+	pos:        int,
 }
 
 // node_span returns the number of flat-array entries a node occupies:
-// 1 for leaf nodes, 1 + child_count for container nodes (whose children
+// 1 for leaf nodes, 1 + len(children) for container nodes (whose children
 // are stored contiguously after them in the array).
 node_span :: proc(n: Node) -> int {
 	#partial switch n.kind {
 	case .Section, .Inverted, .Parent, .Block:
-		return 1 + n.child_count
+		return 1 + len(n.children)
 	case:
 		return 1
 	}
@@ -78,10 +77,8 @@ Template :: struct {
 }
 
 Block_Override :: struct {
-	all_nodes: []Node,
-	first:     int,
-	count:     int,
-	source:    Template,
+	nodes:  []Node,
+	source: Template,
 }
 
 delete_template :: proc(tmpl: ^Template) {
@@ -122,7 +119,7 @@ parse :: proc(
 	}
 	tmpl.source = source
 	tmpl.path = path
-	deindent_blocks(tmpl.nodes[:], 0, len(tmpl.nodes), allocator)
+	deindent_blocks(tmpl.nodes[:], allocator)
 	return tmpl, nil
 }
 
@@ -144,7 +141,7 @@ render :: proc(
 	append(&ctx, data)
 
 	all_nodes := tmpl.nodes[:]
-	err = render_nodes(tmpl, all_nodes, all_nodes, &ctx, partials, &builder)
+	err = render_nodes(tmpl, all_nodes, &ctx, partials, &builder)
 	if err != nil {
 		return result, err
 	}
@@ -170,6 +167,7 @@ parse_tokens :: proc(
 	nodes = make([dynamic]Node, 0, len(tokens), allocator)
 	pos := 0
 	err = parse_section(tokens, &pos, &nodes, "", source, allocator, 0)
+	assert(len(nodes) <= cap(nodes))
 	return
 }
 
@@ -187,12 +185,12 @@ parse_section :: proc(
 
 		switch tok.kind {
 		case .Text:
-			append(nodes, Node{kind = .Text, text = tok.value, first_child = -1, pos = tok.pos})
+			append(nodes, Node{kind = .Text, text = tok.value, pos = tok.pos})
 			pos^ += 1
 
 		case .Variable:
 			idx := len(nodes)
-			append(nodes, Node{kind = .Variable, first_child = -1})
+			append(nodes, Node{kind = .Variable})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
 				return Error_Body {
@@ -206,7 +204,7 @@ parse_section :: proc(
 
 		case .Unescaped:
 			idx := len(nodes)
-			append(nodes, Node{kind = .Unescaped, first_child = -1})
+			append(nodes, Node{kind = .Unescaped})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
 				return Error_Body {
@@ -226,7 +224,7 @@ parse_section :: proc(
 			idx := len(nodes)
 			content_start := 0
 			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
-			append(nodes, Node{kind = .Section, first_child = -1, pos = tok.pos})
+			append(nodes, Node{kind = .Section, pos = tok.pos})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
 				return Error_Body {
@@ -239,8 +237,7 @@ parse_section :: proc(
 			parse_section(tokens, pos, nodes, pipe_key, source, allocator, tok.pos) or_return
 			close_pos := 0
 			if pos^ - 1 >= 0 && pos^ - 1 < len(tokens) {close_pos = tokens[pos^ - 1].pos}
-			nodes[idx].first_child = idx + 1
-			nodes[idx].child_count = len(nodes) - idx - 1
+			nodes[idx].children = nodes[idx + 1:len(nodes)]
 			nodes[idx].content = source[content_start:close_pos]
 
 		case .Inverted_Open:
@@ -248,7 +245,7 @@ parse_section :: proc(
 			idx := len(nodes)
 			content_start := 0
 			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
-			append(nodes, Node{kind = .Inverted, first_child = -1, pos = tok.pos})
+			append(nodes, Node{kind = .Inverted, pos = tok.pos})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
 				return Error_Body {
@@ -261,8 +258,7 @@ parse_section :: proc(
 			parse_section(tokens, pos, nodes, pipe_key, source, allocator, tok.pos) or_return
 			close_pos := 0
 			if pos^ - 1 >= 0 && pos^ - 1 < len(tokens) {close_pos = tokens[pos^ - 1].pos}
-			nodes[idx].first_child = idx + 1
-			nodes[idx].child_count = len(nodes) - idx - 1
+			nodes[idx].children = nodes[idx + 1:len(nodes)]
 			nodes[idx].content = source[content_start:close_pos]
 
 		case .Section_Close:
@@ -301,7 +297,6 @@ parse_section :: proc(
 					key = tok.value,
 					is_dynamic = tok.is_dynamic,
 					indent = tok.indent,
-					first_child = -1,
 					pos = tok.pos,
 				},
 			)
@@ -316,13 +311,11 @@ parse_section :: proc(
 					kind = .Parent,
 					key = tok.value,
 					indent = tok.indent,
-					first_child = -1,
 					pos = tok.pos,
 				},
 			)
 			parse_section(tokens, pos, nodes, tok.value, source, allocator, tok.pos) or_return
-			nodes[idx].first_child = idx + 1
-			nodes[idx].child_count = len(nodes) - idx - 1
+			nodes[idx].children = nodes[idx + 1:len(nodes)]
 
 		case .Block_Open:
 			pos^ += 1
@@ -333,13 +326,11 @@ parse_section :: proc(
 					kind = .Block,
 					key = tok.value,
 					indent = tok.indent,
-					first_child = -1,
 					pos = tok.pos,
 				},
 			)
 			parse_section(tokens, pos, nodes, tok.value, source, allocator, tok.pos) or_return
-			nodes[idx].first_child = idx + 1
-			nodes[idx].child_count = len(nodes) - idx - 1
+			nodes[idx].children = nodes[idx + 1:len(nodes)]
 		}
 	}
 
@@ -357,43 +348,38 @@ parse_section :: proc(
 // Post-parse: de-indent block content
 // ---------------------------------------------------------------------------
 
-deindent_blocks :: proc(all_nodes: []Node, start: int, end: int, allocator := context.allocator) {
-	i := start
-	for i < end {
-		#partial switch all_nodes[i].kind {
+deindent_blocks :: proc(nodes: []Node, allocator := context.allocator) {
+	i := 0
+	for i < len(nodes) {
+		#partial switch nodes[i].kind {
 		case .Block:
-			if all_nodes[i].child_count > 0 {
-				cs := all_nodes[i].first_child
-				ce := cs + all_nodes[i].child_count
-				deindent_blocks(all_nodes, cs, ce, allocator)
-
-				children := all_nodes[cs:ce]
+			if len(nodes[i].children) > 0 {
+				children := nodes[i].children
+				deindent_blocks(children, allocator)
 				common := find_common_indent(children)
 				if len(common) > 0 {
-					if len(all_nodes[i].indent) == 0 {
-						all_nodes[i].indent = common
+					if len(nodes[i].indent) == 0 {
+						nodes[i].indent = common
 					}
-					for j := cs; j < ce; {
-						if all_nodes[j].kind == .Text && len(all_nodes[j].text) > 0 {
-							all_nodes[j].text = remove_line_indent(
-								all_nodes[j].text,
+					for j := 0; j < len(children); {
+						if children[j].kind == .Text && len(children[j].text) > 0 {
+							children[j].text = remove_line_indent(
+								children[j].text,
 								common,
 								allocator,
 							)
 						}
-						j += node_span(all_nodes[j])
+						j += node_span(children[j])
 					}
 				}
 			}
 
 		case .Section, .Inverted, .Parent:
-			if all_nodes[i].child_count > 0 {
-				cs := all_nodes[i].first_child
-				ce := cs + all_nodes[i].child_count
-				deindent_blocks(all_nodes, cs, ce, allocator)
+			if len(nodes[i].children) > 0 {
+				deindent_blocks(nodes[i].children, allocator)
 			}
 		}
-		i += node_span(all_nodes[i])
+		i += node_span(nodes[i])
 	}
 }
 
@@ -523,9 +509,9 @@ render_template :: proc(
 			context.temp_allocator,
 			context.temp_allocator,
 		) or_return
-		return render_nodes(reparse, reparse.nodes[:], reparse.nodes[:], ctx, partials, b, blocks)
+		return render_nodes(reparse, reparse.nodes[:], ctx, partials, b, blocks)
 	}
-	return render_nodes(pt, pt.nodes[:], pt.nodes[:], ctx, partials, b, blocks)
+	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks)
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +520,6 @@ render_template :: proc(
 
 render_nodes :: proc(
 	current: Template,
-	all_nodes: []Node,
 	nodes: []Node,
 	ctx: ^[dynamic]any,
 	partials: map[string]Template,
@@ -571,16 +556,15 @@ render_nodes :: proc(
 				if perr == nil {
 					temp: strings.Builder
 					strings.builder_init(&temp, context.temp_allocator)
-					render_nodes(
-						sub_tpl,
-						sub_tpl.nodes[:],
-						sub_tpl.nodes[:],
-						ctx,
-						partials,
-						&temp,
-						blocks,
-					) or_return
-					write_value(b, strings.to_string(temp), escape = true)
+				render_nodes(
+					sub_tpl,
+					sub_tpl.nodes[:],
+					ctx,
+					partials,
+					&temp,
+					blocks,
+				) or_return
+				write_value(b, strings.to_string(temp), escape = true)
 				}
 			} else {
 				write_value(b, val, escape = true)
@@ -609,16 +593,15 @@ render_nodes :: proc(
 				if perr == nil {
 					temp: strings.Builder
 					strings.builder_init(&temp, context.temp_allocator)
-					render_nodes(
-						sub_tpl,
-						sub_tpl.nodes[:],
-						sub_tpl.nodes[:],
-						ctx,
-						partials,
-						&temp,
-						blocks,
-					) or_return
-					write_value(b, strings.to_string(temp), escape = false)
+				render_nodes(
+					sub_tpl,
+					sub_tpl.nodes[:],
+					ctx,
+					partials,
+					&temp,
+					blocks,
+				) or_return
+				write_value(b, strings.to_string(temp), escape = false)
 				}
 			} else {
 				write_value(b, val, escape = false)
@@ -645,41 +628,39 @@ render_nodes :: proc(
 					context.temp_allocator,
 				)
 				if perr == nil {
+				render_nodes(
+					sub_tpl,
+					sub_tpl.nodes[:],
+					ctx,
+					partials,
+					b,
+					blocks,
+				) or_return
+				}
+		} else if is_truthy(val) {
+			children := node.children
+			elem_info, count, data := list_info(val)
+			if elem_info != nil {
+				for j in 0 ..< count {
+					elem := extract_list_element(elem_info, data, j)
+					append(ctx, elem)
+					defer pop(ctx)
 					render_nodes(
-						sub_tpl,
-						sub_tpl.nodes[:],
-						sub_tpl.nodes[:],
+						current,
+						children,
 						ctx,
 						partials,
 						b,
 						blocks,
 					) or_return
 				}
-			} else if is_truthy(val) {
-				children := all_nodes[node.first_child:node.first_child + node.child_count]
-				elem_info, count, data := list_info(val)
-				if elem_info != nil {
-					for j in 0 ..< count {
-						elem := extract_list_element(elem_info, data, j)
-						append(ctx, elem)
-						defer pop(ctx)
-						render_nodes(
-							current,
-							all_nodes,
-							children,
-							ctx,
-							partials,
-							b,
-							blocks,
-						) or_return
-					}
-				} else {
-					append(ctx, val)
-					defer pop(ctx)
-					render_nodes(current, all_nodes, children, ctx, partials, b, blocks) or_return
-				}
+			} else {
+				append(ctx, val)
+				defer pop(ctx)
+				render_nodes(current, children, ctx, partials, b, blocks) or_return
 			}
-			i += 1 + node.child_count
+		}
+		i += 1 + len(node.children)
 
 		case .Inverted:
 			val := resolve_name(node.key, ctx[:])
@@ -693,11 +674,10 @@ render_nodes :: proc(
 				}
 				val = transformed
 			}
-			if !is_truthy(val) {
-				children := all_nodes[node.first_child:node.first_child + node.child_count]
-				render_nodes(current, all_nodes, children, ctx, partials, b, blocks) or_return
-			}
-			i += 1 + node.child_count
+		if !is_truthy(val) {
+			render_nodes(current, node.children, ctx, partials, b, blocks) or_return
+		}
+		i += 1 + len(node.children)
 
 		case .Partial:
 			name := node.key
@@ -713,63 +693,58 @@ render_nodes :: proc(
 			}
 			i += 1
 
-		case .Block:
-			content_nodes: []Node
-			content_pool: []Node
-			content_blocks := blocks
-			render_current := current
+	case .Block:
+		content_nodes: []Node
+		content_blocks := blocks
+		render_current := current
 
-			found_override := false
-			if blocks != nil {
-				if o, ok := blocks[node.key]; ok {
-					content_nodes = o.all_nodes[o.first:o.first + o.count]
-					content_pool = o.all_nodes
-					found_override = true
-					render_current = o.source
-				}
+		found_override := false
+		if blocks != nil {
+			if o, ok := blocks[node.key]; ok {
+				content_nodes = o.nodes
+				found_override = true
+				render_current = o.source
 			}
-			if !found_override {
-				content_nodes = all_nodes[node.first_child:node.first_child + node.child_count]
-				content_pool = all_nodes
-			}
+		}
+		if !found_override {
+			content_nodes = node.children
+		}
 
-			if len(node.indent) > 0 {
-				temp: strings.Builder
-				strings.builder_init(&temp, context.temp_allocator)
-				render_nodes(
-					render_current,
-					content_pool,
-					content_nodes,
-					ctx,
-					partials,
-					&temp,
-					content_blocks,
-				) or_return
-				write_indented(b, node.indent, strings.to_string(temp))
-			} else {
-				render_nodes(
-					render_current,
-					content_pool,
-					content_nodes,
-					ctx,
-					partials,
-					b,
-					content_blocks,
-				) or_return
-			}
-			i += 1 + node.child_count
+		if len(node.indent) > 0 {
+			temp: strings.Builder
+			strings.builder_init(&temp, context.temp_allocator)
+			render_nodes(
+				render_current,
+				content_nodes,
+				ctx,
+				partials,
+				&temp,
+				content_blocks,
+			) or_return
+			write_indented(b, node.indent, strings.to_string(temp))
+		} else {
+			render_nodes(
+				render_current,
+				content_nodes,
+				ctx,
+				partials,
+				b,
+				content_blocks,
+			) or_return
+		}
+		i += 1 + len(node.children)
 
-		case .Parent:
-			parent_children := all_nodes[node.first_child:node.first_child + node.child_count]
-			merged := merge_block_overrides(parent_children, all_nodes, blocks, current)
-			pt, found := partials[node.key]
-			if !found {
-				warn_missing_partial(current, partials, node, node.key)
-			} else {
-				warn_unmatched_block_overrides(current, pt, parent_children)
-				render_template(pt, ctx, partials, b, merged, node.indent) or_return
-			}
-			i += 1 + node.child_count
+	case .Parent:
+		parent_children := node.children
+		merged := merge_block_overrides(parent_children, blocks, current)
+		pt, found := partials[node.key]
+		if !found {
+			warn_missing_partial(current, partials, node, node.key)
+		} else {
+			warn_unmatched_block_overrides(current, pt, parent_children)
+			render_template(pt, ctx, partials, b, merged, node.indent) or_return
+		}
+		i += 1 + len(node.children)
 		}
 	}
 	return nil
@@ -777,7 +752,6 @@ render_nodes :: proc(
 
 merge_block_overrides :: proc(
 	children: []Node,
-	all_nodes: []Node,
 	existing: map[string]Block_Override,
 	source: Template,
 ) -> map[string]Block_Override {
@@ -793,10 +767,8 @@ merge_block_overrides :: proc(
 		if child.kind == .Block {
 			if _, exists := result[child.key]; !exists {
 				result[child.key] = Block_Override {
-					all_nodes = all_nodes,
-					first     = child.first_child,
-					count     = child.child_count,
-					source    = source,
+					nodes  = child.children,
+					source = source,
 				}
 			}
 		}
