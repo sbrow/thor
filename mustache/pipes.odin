@@ -30,7 +30,7 @@ parse_pipeline :: proc(
 	pos: int,
 ) -> (
 	key: string,
-	err: Render_Error,
+	err: Error,
 ) {
 	if !strings.contains(content, "|") {
 		key = strings.trim_space(content)
@@ -41,19 +41,20 @@ parse_pipeline :: proc(
 
 	filter_count := len(segments) - 1
 	if filter_count > MAX_PIPES {
-		return "", Syntax_Error {
+		return "", Error_Body {
 			msg = fmt.tprintf(
 				"pipe expression has %d filters, max is %d",
 				filter_count,
 				MAX_PIPES,
 			),
 			pos = pos,
+			kind = .Syntax,
 		}
 	}
 
 	key = strings.trim_space(segments[0])
 	if len(key) == 0 {
-		return "", Syntax_Error{msg = "pipe expression missing key", pos = pos}
+		return "", Error_Body{msg = "pipe expression missing key", pos = pos, kind = .Syntax}
 	}
 
 	if filter_count == 0 {
@@ -63,17 +64,17 @@ parse_pipeline :: proc(
 	for i in 0 ..< filter_count {
 		seg := strings.trim_space(segments[i + 1])
 		if len(seg) == 0 {
-			return "", Syntax_Error{msg = "empty filter", pos = pos}
+			return "", Error_Body{msg = "empty filter", pos = pos, kind = .Syntax}
 		}
 
 		tokens := strings.fields(seg)
 		if len(tokens) == 0 {
-			return "", Syntax_Error{msg = "filter missing op name", pos = pos}
+			return "", Error_Body{msg = "filter missing op name", pos = pos, kind = .Syntax}
 		}
 
 		arg_count := len(tokens) - 1
 		if arg_count > MAX_PIPE_ARGS {
-			return "", Syntax_Error {
+			return "", Error_Body {
 				msg = fmt.tprintf(
 					"filter '%s' has %d args, max is %d",
 					tokens[0],
@@ -81,6 +82,7 @@ parse_pipeline :: proc(
 					MAX_PIPE_ARGS,
 				),
 				pos = pos,
+				kind = .Syntax,
 			}
 		}
 
@@ -97,7 +99,7 @@ parse_pipeline :: proc(
 	return key, nil
 }
 
-apply_pipeline :: proc(value: any, filters: []Pipe_Filter, pos: int) -> (any, Render_Error) {
+apply_pipeline :: proc(value: any, filters: []Pipe_Filter, pos: int) -> (any, Error) {
 	current := value
 	for &filter in filters {
 		result, err := apply_filter(current, &filter, pos)
@@ -109,28 +111,33 @@ apply_pipeline :: proc(value: any, filters: []Pipe_Filter, pos: int) -> (any, Re
 	return current, nil
 }
 
-apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int) -> (any, Render_Error) {
+apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int) -> (any, Error) {
 	switch filter.op {
 	case "group_by":
 		return apply_group_by(value, filter.args[:], pos)
 	case "format":
 		str, ok := reflect.as_string(value)
 		if !ok {
-			return value, Data_Error{msg = "format may only be used on dates", pos = pos}
+			return value, Error_Body{
+				msg = "format may only be used on dates",
+				pos = pos,
+				kind = .Data,
+			}
 		} else {
 			return apply_format(str, filter.args[:], pos)
 		}
 	case:
-		return nil, Data_Error{
+		return nil, Error_Body{
 			msg = fmt.tprintf("unknown pipe op '%s'", filter.op),
 			pos = pos,
+			kind = .Data,
 		}
 	}
 }
 
 // apply_format formats an ISO 8601 date string as a display string
 // (e.g. "2026-03-15T08:49:54-04:00" → "15 Mar 2026"). Invalid input
-// (empty, too-short, or unparseable) returns a `Data_Error`. Templates
+// (empty, too-short, or unparseable) returns a Data-kind `Error`. Templates
 // that need to skip dateless pages should gate with a section:
 //   {{#date}}<time datetime="{{.}}">{{. | format}}</time>{{/date}}
 // The section's truthiness check catches empty before the filter runs.
@@ -144,9 +151,13 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int) -> (any, Render
 //   2023-10-15T13:18:50Z
 //   2023-10-15T13:18:50
 //   2023-10-15
-apply_format :: proc(iso: string, args: []string, pos: int) -> (result: any, err: Render_Error) {
+apply_format :: proc(iso: string, args: []string, pos: int) -> (result: any, err: Error) {
 	if len(iso) < 10 {
-		return nil, Data_Error{msg = "format may only be used on dates", pos = pos}
+		return nil, Error_Body{
+			msg = "format may only be used on dates",
+			pos = pos,
+			kind = .Data,
+		}
 	}
 
 	year := iso[:4]
@@ -154,7 +165,11 @@ apply_format :: proc(iso: string, args: []string, pos: int) -> (result: any, err
 	day_num := (int(iso[8]) - 0x30) * 10 + (int(iso[9]) - 0x30)
 
 	if month_num < 1 || month_num > 12 {
-		return nil, Data_Error{msg = fmt.tprintf("invalid date: \"%s\"", iso), pos = pos}
+		return nil, Error_Body{
+			msg = fmt.tprintf("invalid date: \"%s\"", iso),
+			pos = pos,
+			kind = .Data,
+		}
 	}
 
 	month := fmt.tprintf("%s", time.Month(month_num))[:3]
@@ -162,20 +177,22 @@ apply_format :: proc(iso: string, args: []string, pos: int) -> (result: any, err
 }
 
 // Groups preserve first-appearance order from the input list.
-apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, err: Render_Error) {
+apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, err: Error) {
 	if len(args) != 1 {
-		return nil, Data_Error{
+		return nil, Error_Body{
 			msg = fmt.tprintf("group_by expects 1 argument, got %d", len(args)),
 			pos = pos,
+			kind = .Data,
 		}
 	}
 	field := args[0]
 
 	elem_info, count, data := list_info(value)
 	if elem_info == nil {
-		return nil, Data_Error{
+		return nil, Error_Body{
 			msg = "group_by expects a list",
 			pos = pos,
+			kind = .Data,
 		}
 	}
 
@@ -189,16 +206,18 @@ apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, er
 
 		key_val, found := lookup_in(elem, field)
 		if !found {
-			return nil, Data_Error {
+			return nil, Error_Body {
 				msg = fmt.tprintf("group_by: element missing field '%s'", field),
 				pos = pos,
+				kind = .Data,
 			}
 		}
 		key_str := any_to_string(key_val)
 		if len(key_str) == 0 {
-			return nil, Data_Error{
+			return nil, Error_Body{
 				msg = fmt.tprintf("group_by: field '%s' is empty", field),
 				pos = pos,
+				kind = .Data,
 			}
 		}
 

@@ -307,26 +307,17 @@ write_gutter :: proc(sb: ^strings.Builder, width: int, faint: string, reset: str
 	strings.write_byte(sb, '\n')
 }
 
-// format_render_error dispatches on Render_Error variant and produces a
-// diagnostic for it. Returns "" for nil errors.
-format_render_error :: proc(err: Render_Error, tmpl: Template, colorize: bool = false) -> string {
+// format_render_error produces a diagnostic for an Error value using the
+// template's path and source for context. Returns "" for nil errors.
+format_render_error :: proc(err: Error, tmpl: Template, colorize: bool = false) -> string {
 	if err == nil {
 		return ""
 	}
-	switch e in err {
-	case Syntax_Error:
-		path := tmpl.path
-		if path == "" {
-			path = "<input>"
-		}
-		return format_error(path, tmpl.source, e.pos, e.msg, colorize = colorize)
-	case Data_Error:
-		path := tmpl.path
-		if path == "" {
-			path = "<input>"
-		}
-		return format_error(path, tmpl.source, e.pos, e.msg, colorize = colorize)
+	path := tmpl.path
+	if path == "" {
+		path = "<input>"
 	}
-	return ""
+	b := body(err)
+	return format_error(path, tmpl.source, b.pos, b.msg, colorize = colorize)
 }
 

@@ -28,7 +28,7 @@ tokenize :: proc(
 	allocator := context.allocator,
 ) -> (
 	tokens: [dynamic]Token,
-	err: Render_Error,
+	err: Error,
 ) {
 	tokens = make([dynamic]Token, 0, 8, allocator)
 
@@ -47,9 +47,10 @@ tokenize :: proc(
 				content_start := i + 3
 				idx := strings.index(src[content_start:], "}}}")
 				if idx < 0 {
-					return tokens, Syntax_Error {
+					return tokens, Error_Body {
 						msg = "unclosed triple mustache '{{{'",
 						pos = tag_pos,
+						kind = .Syntax,
 					}
 				}
 				close := content_start + idx
@@ -89,9 +90,13 @@ tokenize :: proc(
 				}
 
 				close_idx := strings.index(src[key_start:], "}}")
-				if close_idx < 0 {
-					return tokens, Syntax_Error{msg = "unclosed tag '{{'", pos = tag_pos}
+			if close_idx < 0 {
+				return tokens, Error_Body {
+					msg = "unclosed tag '{{'",
+					pos = tag_pos,
+					kind = .Syntax,
 				}
+			}
 				close := key_start + close_idx
 
 				content := src[key_start:close]

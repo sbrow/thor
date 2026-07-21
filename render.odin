@@ -63,31 +63,17 @@ load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
 	source := string(data)
 	tpl, err := mustache.parse(source, entry.fs_path)
 	if err != nil {
-		switch e in err {
-		// TODO: Find a way to merge these branches.
-		case mustache.Syntax_Error:
-			log.errorf(
-				"%s",
-				mustache.format_error(
-					entry.fs_path,
-					source,
-					e.pos,
-					e.msg,
-					colorize = mustache.should_colorize(),
-				),
-			)
-		case mustache.Data_Error:
-			log.errorf(
-				"%s",
-				mustache.format_error(
-					entry.fs_path,
-					source,
-					e.pos,
-					e.msg,
-					colorize = mustache.should_colorize(),
-				),
-			)
-		}
+		b := mustache.body(err)
+		log.errorf(
+			"%s",
+			mustache.format_error(
+				entry.fs_path,
+				source,
+				b.pos,
+				b.msg,
+				colorize = mustache.should_colorize(),
+			),
+		)
 		os.exit(1)
 	}
 	return tpl
@@ -375,31 +361,17 @@ load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 		source := string(data)
 		tpl, err := mustache.parse(source, entry.fs_path)
 		if err != nil {
-			// TODO: Find a way to merge these branches.
-			switch e in err {
-			case mustache.Syntax_Error:
-				log.errorf(
-					"%s",
-					mustache.format_error(
-						entry.fs_path,
-						source,
-						e.pos,
-						e.msg,
-						colorize = mustache.should_colorize(),
-					),
-				)
-			case mustache.Data_Error:
-				log.errorf(
-					"%s",
-					mustache.format_error(
-						entry.fs_path,
-						source,
-						e.pos,
-						e.msg,
-						colorize = mustache.should_colorize(),
-					),
-				)
-			}
+			b := mustache.body(err)
+			log.errorf(
+				"%s",
+				mustache.format_error(
+					entry.fs_path,
+					source,
+					b.pos,
+					b.msg,
+					colorize = mustache.should_colorize(),
+				),
+			)
 			os.exit(1)
 		}
 		partials[key] = tpl

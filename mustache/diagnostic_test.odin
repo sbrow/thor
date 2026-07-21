@@ -425,12 +425,10 @@ test_format_render_error_dispatch :: proc(t: ^testing.T) {
 		return
 	}
 
-	#partial switch e in parse_err {
-	case Syntax_Error:
-		out := format_error("test.html", src, e.pos, e.msg, colorize = false)
-		testing.expect(t, strings.contains(out, "unclosed section"), out)
-		testing.expect(t, strings.contains(out, "test.html:"), out)
-	}
+	b := body(parse_err)
+	out := format_error("test.html", src, b.pos, b.msg, colorize = false)
+	testing.expect(t, strings.contains(out, "unclosed section"), out)
+	testing.expect(t, strings.contains(out, "test.html:"), out)
 }
 
 @(test)
@@ -469,19 +467,17 @@ test_parse_error_expected_got_keeps_double_braces :: proc(t: ^testing.T) {
 	if err == nil {
 		return
 	}
-	#partial switch e in err {
-	case Syntax_Error:
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{/content}}"),
-			fmt.tprintf("msg should contain literal {{/content}}, got %q", e.msg),
-		)
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{/cotent}}"),
-			fmt.tprintf("msg should contain literal {{/cotent}}, got %q", e.msg),
-		)
-	}
+	b := body(err)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{/content}}"),
+		fmt.tprintf("msg should contain literal {{/content}}, got %q", b.msg),
+	)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{/cotent}}"),
+		fmt.tprintf("msg should contain literal {{/cotent}}, got %q", b.msg),
+	)
 }
 
 @(test)
@@ -492,14 +488,12 @@ test_parse_error_unclosed_section_keeps_double_braces :: proc(t: ^testing.T) {
 	if err == nil {
 		return
 	}
-	#partial switch e in err {
-	case Syntax_Error:
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{#content}}"),
-			fmt.tprintf("msg should contain literal {{#content}}, got %q", e.msg),
-		)
-	}
+	b := body(err)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{#content}}"),
+		fmt.tprintf("msg should contain literal {{#content}}, got %q", b.msg),
+	)
 }
 
 @(test)
@@ -510,14 +504,12 @@ test_parse_error_unexpected_close_keeps_double_braces :: proc(t: ^testing.T) {
 	if err == nil {
 		return
 	}
-	#partial switch e in err {
-	case Syntax_Error:
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{/content}}"),
-			fmt.tprintf("msg should contain literal {{/content}}, got %q", e.msg),
-		)
-	}
+	b := body(err)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{/content}}"),
+		fmt.tprintf("msg should contain literal {{/content}}, got %q", b.msg),
+	)
 }
 
 @(test)
@@ -528,14 +520,12 @@ test_parse_error_pipe_in_close_tag_keeps_double_braces :: proc(t: ^testing.T) {
 	if err == nil {
 		return
 	}
-	#partial switch e in err {
-	case Syntax_Error:
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{/"),
-			fmt.tprintf("msg should contain literal '{{/', got %q", e.msg),
-		)
-	}
+	b := body(err)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{/"),
+		fmt.tprintf("msg should contain literal '{{/', got %q", b.msg),
+	)
 }
 
 @(test)
@@ -546,14 +536,12 @@ test_parse_error_pipe_parse_in_section_keeps_double_braces :: proc(t: ^testing.T
 	if err == nil {
 		return
 	}
-	#partial switch e in err {
-	case Syntax_Error:
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{#"),
-			fmt.tprintf("msg should contain literal '{{#', got %q", e.msg),
-		)
-	}
+	b := body(err)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{#"),
+		fmt.tprintf("msg should contain literal '{{#', got %q", b.msg),
+	)
 }
 
 @(test)
@@ -564,13 +552,11 @@ test_parse_error_pipe_parse_in_inverted_keeps_double_braces :: proc(t: ^testing.
 	if err == nil {
 		return
 	}
-	#partial switch e in err {
-	case Syntax_Error:
-		testing.expect(
-			t,
-			strings.contains(e.msg, "{{^"),
-			fmt.tprintf("msg should contain literal '{{^', got %q", e.msg),
-		)
-	}
+	b := body(err)
+	testing.expect(
+		t,
+		strings.contains(b.msg, "{{^"),
+		fmt.tprintf("msg should contain literal '{{^', got %q", b.msg),
+	)
 }
 

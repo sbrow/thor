@@ -66,13 +66,9 @@ test_pipe_group_by_missing_field_fails :: proc(t: ^testing.T) {
 	defer delete_template(&tpl)
 	_, err := render(tpl, data)
 	testing.expect(t, err != nil, "missing field should error")
-
-	is_data_err := false
-	#partial switch e in err {
-	case Data_Error:
-		is_data_err = len(e.msg) > 0
-	}
-	testing.expect(t, is_data_err, "error should be Data_Error")
+	b := body(err)
+	testing.expect(t, b.kind == .Data, "error should be Data kind")
+	testing.expect(t, len(b.msg) > 0, "error should have non-empty msg")
 }
 
 @(test)

@@ -8,20 +8,27 @@ import "core:strings"
 // Error types
 // ---------------------------------------------------------------------------
 
-// TODO: I don't think this is the best way to do our errors.
-Syntax_Error :: struct {
-	msg: string,
-	pos: int,
+Error_Kind :: enum {
+	Syntax, // parse-time: malformed template
+	Data,   // render-time: template fine, data wrong (e.g. filter misuse)
 }
 
-Data_Error :: struct {
-	msg: string,
-	pos: int,
+Error_Body :: struct {
+	msg:  string,
+	pos:  int,
+	kind: Error_Kind,
 }
 
-Render_Error :: union {
-	Syntax_Error,
-	Data_Error,
+// Error is nil when no error occurred.
+Error :: union { Error_Body }
+
+// body unwraps the Error_Body from a non-nil Error.
+// Precondition: err != nil.
+body :: proc(err: Error) -> Error_Body {
+	switch e in err {
+	case Error_Body: return e
+	case: return {}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +108,7 @@ parse :: proc(
 	tokens_allocator := context.temp_allocator,
 ) -> (
 	tmpl: Template,
-	err: Render_Error,
+	err: Error,
 ) {
 	tokens, terr := tokenize(source, tokens_allocator)
 	if terr != nil {
@@ -126,7 +133,7 @@ render :: proc(
 	allocator := context.allocator,
 ) -> (
 	result: string,
-	err: Render_Error,
+	err: Error,
 ) {
 	builder: strings.Builder
 	strings.builder_init(&builder, allocator)
@@ -158,7 +165,7 @@ parse_tokens :: proc(
 	allocator := context.allocator,
 ) -> (
 	nodes: [dynamic]Node,
-	err: Render_Error,
+	err: Error,
 ) {
 	nodes = make([dynamic]Node, 0, len(tokens), allocator)
 	pos := 0
@@ -174,7 +181,7 @@ parse_section :: proc(
 	source: string,
 	allocator := context.allocator,
 	open_pos: int = 0,
-) -> Render_Error {
+) -> Error {
 	for pos^ < len(tokens) {
 		tok := tokens[pos^]
 
@@ -188,9 +195,10 @@ parse_section :: proc(
 			append(nodes, Node{kind = .Variable, first_child = -1})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
-				return Syntax_Error {
+				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{%s}}}}': %v", tok.value, perr),
 					pos = tok.pos,
+					kind = .Syntax,
 				}
 			}
 			nodes[idx].key = pipe_key
@@ -201,9 +209,10 @@ parse_section :: proc(
 			append(nodes, Node{kind = .Unescaped, first_child = -1})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
-				return Syntax_Error {
+				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{&%s}}}}': %v", tok.value, perr),
 					pos = tok.pos,
+					kind = .Syntax,
 				}
 			}
 			nodes[idx].key = pipe_key
@@ -220,9 +229,10 @@ parse_section :: proc(
 			append(nodes, Node{kind = .Section, first_child = -1, pos = tok.pos})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
-				return Syntax_Error {
+				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{#%s}}}}': %v", tok.value, perr),
 					pos = tok.pos,
+					kind = .Syntax,
 				}
 			}
 			nodes[idx].key = pipe_key
@@ -241,9 +251,10 @@ parse_section :: proc(
 			append(nodes, Node{kind = .Inverted, first_child = -1, pos = tok.pos})
 			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
 			if perr != nil {
-				return Syntax_Error {
+				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{^%s}}}}': %v", tok.value, perr),
 					pos = tok.pos,
+					kind = .Syntax,
 				}
 			}
 			nodes[idx].key = pipe_key
@@ -256,27 +267,30 @@ parse_section :: proc(
 
 		case .Section_Close:
 			if strings.contains(tok.value, "|") {
-				return Syntax_Error {
-					msg = fmt.tprintf(
-						"pipe expression not allowed in close tag '{{{{/%s}}}}' — use the bare key",
-						tok.value,
-					),
-					pos = tok.pos,
-				}
+			return Error_Body {
+				msg = fmt.tprintf(
+					"pipe expression not allowed in close tag '{{{{/%s}}}}' — use the bare key",
+					tok.value,
+				),
+				pos = tok.pos,
+				kind = .Syntax,
+			}
 			}
 			if end_tag != "" && tok.value == end_tag {
 				pos^ += 1
 				return nil
 			}
 			if end_tag == "" {
-				return Syntax_Error {
+				return Error_Body {
 					msg = fmt.tprintf("unexpected {{{{/%s}}}}", tok.value),
 					pos = tok.pos,
+					kind = .Syntax,
 				}
 			}
-			return Syntax_Error {
+			return Error_Body {
 				msg = fmt.tprintf("expected {{{{/%s}}}}, got {{{{/%s}}}}", end_tag, tok.value),
 				pos = tok.pos,
+				kind = .Syntax,
 			}
 
 		case .Partial:
@@ -330,9 +344,10 @@ parse_section :: proc(
 	}
 
 	if end_tag != "" {
-		return Syntax_Error {
+		return Error_Body {
 			msg = fmt.tprintf("unclosed section '{{{{#%s}}}}'", end_tag),
 			pos = open_pos,
+			kind = .Syntax,
 		}
 	}
 	return nil
@@ -495,7 +510,7 @@ render_template :: proc(
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override,
 	indent: string,
-) -> Render_Error {
+) -> Error {
 	if len(indent) > 0 && len(pt.source) > 0 {
 		// Per Mustache spec: the partial's source is indented before rendering,
 		// not its output. This is necessary so that data-injected newlines
@@ -525,7 +540,7 @@ render_nodes :: proc(
 	partials: map[string]Template,
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override = nil,
-) -> Render_Error {
+) -> Error {
 	i := 0
 	for i < len(nodes) {
 		node := nodes[i]
