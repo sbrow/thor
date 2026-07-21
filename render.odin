@@ -20,12 +20,13 @@ Page_Context :: struct {
 }
 
 Base_Data :: struct {
-	now:    datetime.DateTime,
-	author: string,
-	params: json.Value,
-	body:   string,
-	title:  string,
-	og:     Open_Graph,
+	now:         datetime.DateTime,
+	author:      string,
+	params:      json.Value,
+	body:        string,
+	title:       string,
+	description: string,
+	og:          Open_Graph,
 }
 
 Page_Data :: struct {
@@ -147,10 +148,11 @@ render_site :: proc(site: ^Site) {
 
 	// Build base data once
 	base := Base_Data {
-		now    = now,
-		author = site.author,
-		params = site.params,
-		og     = site.og,
+		now         = now,
+		author      = site.author,
+		params      = site.params,
+		description = site.description,
+		og          = site.og,
 	}
 
 	// Find home page
