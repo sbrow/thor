@@ -6,7 +6,7 @@ import "core:strings"
 // collect_struct_keys enumerates the visible field names of a struct value,
 // including fields promoted via `using`-embedded structs.
 collect_struct_keys :: proc(val: any, allocator := context.temp_allocator) -> []string {
-	out: [dynamic]string
+	out := make([dynamic]string, 0, 0, allocator)
 	collect_struct_keys_into(val, &out, allocator)
 	return out[:]
 }
@@ -111,7 +111,7 @@ validate_key_path :: proc(
 	}
 
 	if !found {
-		keys: [dynamic]string
+		keys := make([dynamic]string, 0, 4, allocator)
 		for i := len(ctx) - 1; i >= 0; i -= 1 {
 			collect_struct_keys_into(ctx[i], &keys, allocator)
 		}
@@ -178,7 +178,7 @@ collect_partial_names :: proc(
 	partials: map[string]Template,
 	allocator := context.temp_allocator,
 ) -> []string {
-	out: [dynamic]string
+	out := make([dynamic]string, 0, 0, allocator)
 	for name in partials {
 		append(&out, name)
 	}
@@ -191,7 +191,7 @@ collect_block_names :: proc(
 	tmpl: Template,
 	allocator := context.temp_allocator,
 ) -> []string {
-	out: [dynamic]string
+	out := make([dynamic]string, 0, 0, allocator)
 	seen := make(map[string]bool, allocator)
 	defer delete(seen)
 	for &node in tmpl.nodes {

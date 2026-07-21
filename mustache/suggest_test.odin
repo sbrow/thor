@@ -139,6 +139,7 @@ test_validate_map_path_silent :: proc(t: ^testing.T) {
 	data := Params_Data {
 		params = {"social" = "x"},
 	}
+	defer delete(data.params)
 	ctx := make([dynamic]any, 0, 1, context.temp_allocator)
 	append(&ctx, data)
 

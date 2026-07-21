@@ -365,7 +365,6 @@ test_gutter_pipes_align_with_source_pipe :: proc(t: ^testing.T) {
 	// For width=1: source line is "N | ...", so "|" at col 2.
 	// Empty gutter is "  |" (width+1 spaces + "|"), so "|" at col 2.
 	lines := strings.split(out, "\n", context.temp_allocator)
-	defer delete(lines)
 	pipe_col := -1
 	for line in lines {
 		idx := strings.index(line, "|")
@@ -387,7 +386,6 @@ test_arrow_points_at_pipe :: proc(t: ^testing.T) {
 	// For width=1: arrow line is " --> ..." so ">" at col 3.
 	// Pipe lines are "  |" so "|" at col 2.
 	lines := strings.split(out, "\n", context.temp_allocator)
-	defer delete(lines)
 
 	pipe_col := -1
 	for line in lines {

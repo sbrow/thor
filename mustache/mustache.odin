@@ -846,7 +846,6 @@ warn_missing_partial :: proc(
 ) {
 	hint := ""
 	available := collect_partial_names(partials)
-	defer delete(available)
 	suggestion := suggest_correction(available, name)
 	if suggestion != "" {
 		hint = fmt.tprintf("did you mean '%s'?", suggestion)
@@ -872,7 +871,6 @@ warn_unmatched_block_overrides :: proc(
 		return
 	}
 	available := collect_block_names(parent)
-	defer delete(available)
 	parent_path := parent.path
 	if parent_path == "" {
 		parent_path = "<input>"
