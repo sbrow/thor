@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:prof/spall"
+import "core:strings"
 import "core:sync"
 import "core:time"
 
@@ -39,6 +40,7 @@ main :: proc() {
 
 	for {
 		defer free_all(context.temp_allocator)
+		tick := time.tick_now()
 		site: Site
 		init_site(&site, os.args)
 		defer destroy_site(&site)
@@ -48,6 +50,7 @@ main :: proc() {
 
 		site_load_content(&site)
 		render_site(&site)
+		log.infof("Built site in %s", time.tick_since(tick))
 
 		(.Watch in site.features) or_break
 		time.sleep(5 * time.Second)
