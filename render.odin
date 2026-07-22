@@ -256,7 +256,7 @@ render_site :: proc(site: ^Site) {
 	if !has_home {
 		total += 1
 	}
-	fmt.printfln("Rendered %d pages to %s", total, site.output_dir)
+	log.infof("Rendered %d pages to %s", total, site.output_dir)
 }
 
 render_page_html :: proc(

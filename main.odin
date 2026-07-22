@@ -34,7 +34,9 @@ main :: proc() {
 		defer spall.buffer_destroy(&spall_ctx, &spall_buffer)
 	}
 
-	console_logger := log.create_console_logger()
+	logger_opts: log.Options =
+		(log.Default_Console_Logger_Opts - log.Full_Timestamp_Opts - {.Short_File_Path})
+	console_logger := log.create_console_logger(.Debug, logger_opts)
 	context.logger = console_logger
 	defer log.destroy_console_logger(console_logger)
 
