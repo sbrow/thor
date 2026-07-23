@@ -207,10 +207,12 @@ test_delete_template_doesnt_leak :: proc(t: ^testing.T) {
 @(test)
 test_interp_pipe_basic :: proc(t: ^testing.T) {
 	Scalar_Data :: struct {
-		name: string,
+		name:        string,
+		date_format: string,
 	}
 	data := Scalar_Data {
 		name = "2026-03-15T08:49:54-04:00",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("[{{name | format}}]", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
@@ -220,10 +222,12 @@ test_interp_pipe_basic :: proc(t: ^testing.T) {
 @(test)
 test_interp_pipe_unescaped :: proc(t: ^testing.T) {
 	Scalar_Data :: struct {
-		name: string,
+		name:        string,
+		date_format: string,
 	}
 	data := Scalar_Data {
 		name = "2025-12-25T00:00:00Z",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("[{{&name | format}}]", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
@@ -233,10 +237,12 @@ test_interp_pipe_unescaped :: proc(t: ^testing.T) {
 @(test)
 test_interp_pipe_dot_current :: proc(t: ^testing.T) {
 	List_Data :: struct {
-		items: [3]string,
+		items:       [3]string,
+		date_format: string,
 	}
 	data := List_Data {
 		items = {"2026-01-06T00:00:00Z", "2026-06-15T00:00:00Z", "2026-10-15T00:00:00Z"},
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("{{#items}}[{{. | format}}]{{/items}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
@@ -248,13 +254,15 @@ test_interp_pipe_dot_current :: proc(t: ^testing.T) {
 // ---------------------------------------------------------------------------
 
 Format_Data :: struct {
-	date: string,
+	date:        string,
+	date_format: string,
 }
 
 @(test)
 test_format_typical_iso :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "2026-03-15T08:49:54-04:00",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
@@ -265,6 +273,7 @@ test_format_typical_iso :: proc(t: ^testing.T) {
 test_format_short_date_only :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "2026-06-06",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
@@ -275,6 +284,7 @@ test_format_short_date_only :: proc(t: ^testing.T) {
 test_format_empty_input_errors :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("[{{date | format}}]", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
@@ -286,6 +296,7 @@ test_format_empty_input_errors :: proc(t: ^testing.T) {
 test_format_non_date_string_errors :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "abc",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("[{{date | format}}]", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
@@ -311,6 +322,7 @@ test_format_non_string_value_errors :: proc(t: ^testing.T) {
 test_format_invalid_month_errors :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "2023-13-15",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	defer delete_template(&tpl)
@@ -324,6 +336,7 @@ test_format_inside_section_renders :: proc(t: ^testing.T) {
 	// partial uses {{.}} for ISO attr and {{. | format}} for display.
 	data := Format_Data {
 		date = "2025-12-25T00:00:00Z",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse(
 		"{{#date}}<time datetime=\"{{.}}\">{{. | format}}</time>{{/date}}",
@@ -338,6 +351,7 @@ test_format_inside_section_renders :: proc(t: ^testing.T) {
 test_format_inside_section_skips_when_empty :: proc(t: ^testing.T) {
 	data := Format_Data {
 		date = "",
+		date_format = "2 Jan 2006",
 	}
 	tpl, _ := parse("[{{#date}}<time>{{. | format}}</time>{{/date}}]", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
@@ -358,6 +372,7 @@ test_format_handles_all_iso8601_variants :: proc(t: ^testing.T) {
 	for &c in cases {
 		data := Format_Data {
 			date = c.input,
+			date_format = "2 Jan 2006",
 		}
 		tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 		result, _ := render(tpl, data, {}, context.temp_allocator)

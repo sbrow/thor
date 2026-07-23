@@ -25,6 +25,7 @@ Base_Data :: struct {
 	title:       string,
 	description: string,
 	og:          Open_Graph,
+	date_format: string,
 }
 
 Page_Data :: struct {
@@ -163,6 +164,7 @@ render_site :: proc(site: ^Site) {
 		params      = site.params,
 		description = site.description,
 		og          = site.og,
+		date_format = site.date.format,
 	}
 
 	// Find home page

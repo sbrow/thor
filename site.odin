@@ -29,6 +29,12 @@ Site :: struct {
 	features:            bit_set[Feature],
 	markdown_extensions: bit_set[md.Extension],
 	og:                  Open_Graph,
+	date:                Date_Preferences,
+}
+
+Date_Preferences :: struct {
+	format:   string,
+	timezone: string,
 }
 
 Feature :: enum {
@@ -51,6 +57,7 @@ Config_File :: struct {
 	params:              json.Value,
 	modules:             json.Value,
 	og:                  Open_Graph,
+	date:                Date_Preferences,
 }
 
 // Configuration loaded from command line arguments. Gets folded in to Site
@@ -163,6 +170,7 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 	}
 
 	site.og = config.og
+	site.date = config.date
 }
 
 site_apply_path_defaults :: proc(site: ^Site, config_dir: string) {
