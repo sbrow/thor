@@ -56,13 +56,16 @@ Errors (returned as `Data_Error` at render time):
 - Any element is missing the named field.
 - Any element has an empty value for the named field.
 
-#### `format` (no args yet)
+#### `format`
 
 Formats an ISO 8601 date string as a display string. Takes a string, returns a string (e.g. `"2026-03-15T08:49:54-04:00"` → `"15 Mar 2026"`). Invalid input (empty, too-short, non-string, or unparseable) returns a `Data_Error`. Templates that need to skip dateless pages should gate with a section — `{{#date}}<time datetime="{{.}}">{{. | format}}</time>{{/date}}` — so the section's truthiness check catches empty before the filter runs. Commonly used inline as `{{date | format}}` to render a display string while keeping the raw ISO available via `{{date}}` for the `datetime=` attribute.
 
 Internally: parses the invariant `YYYY-MM-DD` prefix by char offset, stringifies `time.Month(month_num)` and slices `[:3]` for the abbreviation. Accepts any of these ISO 8601 forms (the date prefix is what matters): `2023-10-15T13:18:50-07:00`, `2023-10-15T13:18:50-0700`, `2023-10-15T13:18:50Z`, `2023-10-15T13:18:50`, `2023-10-15`.
 
-Future: will accept Go reference-date format strings (e.g. `{{date | format "Mon Jan 2 2006"}}`) and pull default format/timezone from site configuration.
+Takes an optional arg for the Go reference-date layout to use:
+- A double-quoted literal, spaces allowed: `{{date | format "Mon Jan 2 2006"}}`.
+- A bare key, resolved from context like any other field: `{{date | format long}}` uses the value of `long` (e.g. a site-config field) as the layout.
+- No arg: falls back to the `date_format` context key (typically `date.format` from `thor.json`).
 
 ### Memory ownership
 

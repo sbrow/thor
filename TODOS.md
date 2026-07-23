@@ -30,11 +30,12 @@
 - [ ] Decide if lambdas actually provide any value.
 
 ## Dates
-- [ ] Accept "strings"
-- [ ] Accept keys
+- [x] Accept "strings"
+- [x] Accept keys
 - [ ] handle timezones
 - [ ] display an error when no part of the date appears in the output.
 - [x] use `date.format` as the default format.
+- [ ] Handle 0 and whitespace padding i.e. "_2" -> " 2"
 
 ## General 
 - [ ] Integrity hash
@@ -62,6 +63,12 @@
   - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
   - [ ] Could be better error message when missing a closing (or opening) brace
   - [ ] Error message doesn't show position of faulty pipe name correctly.
+  - [ ] `render_template` (`render.odin`) blanks the *entire page* to `""` on any
+        mustache render error and only `log.errorf`s it — a single bad tag/pipe
+        anywhere on the page silently kills the whole output with no visible
+        signal outside the terminal log. Should at least be scoped to the
+        failing tag/section, or surfaced somewhere the person building the
+        site will actually see it.
   ```bash
   [ERROR] --- [138:render_template()] unknown pipe op 'formats'
  --> /home/spencer/github.com/sbrow.github.io/layouts/home.html:1:1

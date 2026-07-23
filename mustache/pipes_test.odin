@@ -358,6 +358,72 @@ test_format_inside_section_skips_when_empty :: proc(t: ^testing.T) {
 	testing.expect_value(t, result, "[]")
 }
 
+// ---------------------------------------------------------------------------
+// format filter args: quoted literal strings and bare context keys
+// ---------------------------------------------------------------------------
+
+@(test)
+test_format_quoted_literal_arg :: proc(t: ^testing.T) {
+	data := Format_Data {
+		date        = "2026-03-15T08:49:54-04:00",
+		date_format = "2 Jan 2006",
+	}
+	tpl, _ := parse(`{{date | format "Jan 2, 2006"}}`, "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "Mar 15, 2026")
+}
+
+Key_Format_Data :: struct {
+	date: string,
+	long: string,
+}
+
+@(test)
+test_format_bare_key_arg_resolves_from_context :: proc(t: ^testing.T) {
+	data := Key_Format_Data {
+		date = "2026-03-15T08:49:54-04:00",
+		long = "2 January 2006",
+	}
+	tpl, _ := parse("{{date | format long}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "15 March 2026")
+}
+
+@(test)
+test_format_bare_key_arg_missing_errors :: proc(t: ^testing.T) {
+	data := Key_Format_Data {
+		date = "2026-03-15T08:49:54-04:00",
+		long = "2 January 2006",
+	}
+	tpl, _ := parse("{{date | format missing}}", "<test>", allocator = context.temp_allocator)
+	defer delete_template(&tpl)
+	_, err := render(tpl, data, {}, context.temp_allocator)
+	testing.expect(t, err != nil, "unresolved format key should error")
+}
+
+@(test)
+test_format_bare_key_arg_non_string_errors :: proc(t: ^testing.T) {
+	Int_Key_Data :: struct {
+		date:  string,
+		count: int,
+	}
+	data := Int_Key_Data {
+		date  = "2026-03-15T08:49:54-04:00",
+		count = 42,
+	}
+	tpl, _ := parse("{{date | format count}}", "<test>", allocator = context.temp_allocator)
+	defer delete_template(&tpl)
+	_, err := render(tpl, data, {}, context.temp_allocator)
+	testing.expect(t, err != nil, "non-string format key should error")
+}
+
+@(test)
+test_format_unterminated_quote_arg_is_parse_error :: proc(t: ^testing.T) {
+	src := `{{date | format "Jan 2, 2006}}`
+	_, err := parse(src)
+	testing.expect(t, err != nil, "unterminated string literal should fail to parse")
+}
+
 @(test)
 test_format_context_date_format_weekday :: proc(t: ^testing.T) {
 	data := Format_Data {
@@ -402,3 +468,18 @@ test_format_handles_all_iso8601_variants :: proc(t: ^testing.T) {
 	}
 }
 
+
+@(test)
+test_format_bare_numeric_arg_treated_as_key_not_literal :: proc(t: ^testing.T) {
+	// "2006" happens to also be a valid Go layout token — make sure an
+	// unquoted arg is still resolved as a context key (and fails, since
+	// no field is named "2006"), not silently used as the literal layout.
+	data := Format_Data {
+		date        = "2026-03-15T08:49:54-04:00",
+		date_format = "2 Jan 2006",
+	}
+	tpl, _ := parse("{{date | format 2006}}", "<test>", allocator = context.temp_allocator)
+	defer delete_template(&tpl)
+	_, err := render(tpl, data, {}, context.temp_allocator)
+	testing.expect(t, err != nil, "bare numeric-looking arg should error as an unresolved key")
+}

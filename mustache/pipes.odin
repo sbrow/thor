@@ -25,6 +25,51 @@ Group :: struct {
 	items: [dynamic]any,
 }
 
+// is_pipe_space reports whether c is whitespace for the purposes of
+// tokenizing a filter segment.
+is_pipe_space :: proc(c: u8) -> bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// tokenize_fields splits seg on whitespace like strings.fields, but a
+// double-quoted span (spaces allowed inside) becomes a single token. The
+// quote characters are kept in the token (not stripped) so callers can
+// distinguish a quoted literal from a bare key name. No escape sequences.
+tokenize_fields :: proc(seg: string, pos: int) -> (tokens: [dynamic]string, err: Error) {
+	i := 0
+	for i < len(seg) {
+		for i < len(seg) && is_pipe_space(seg[i]) {
+			i += 1
+		}
+		if i >= len(seg) {
+			break
+		}
+		if seg[i] == '"' {
+			start := i
+			j := i + 1
+			for j < len(seg) && seg[j] != '"' {
+				j += 1
+			}
+			if j >= len(seg) {
+				return tokens, Error_Body {
+					msg  = fmt.tprintf("unterminated string literal: %s", seg),
+					pos  = pos,
+					kind = .Syntax,
+				}
+			}
+			append(&tokens, seg[start:j + 1])
+			i = j + 1
+		} else {
+			start := i
+			for i < len(seg) && !is_pipe_space(seg[i]) {
+				i += 1
+			}
+			append(&tokens, seg[start:i])
+		}
+	}
+	return tokens, nil
+}
+
 // Returned strings are slices into content — no cloning, lifetime bound to
 // the caller's source.
 parse_pipeline :: proc(
@@ -70,7 +115,11 @@ parse_pipeline :: proc(
 			return "", Error_Body{msg = "empty filter", pos = pos, kind = .Syntax}
 		}
 
-		tokens := strings.fields(seg)
+		tokens, terr := tokenize_fields(seg, pos)
+		if terr != nil {
+			delete(tokens)
+			return "", terr
+		}
 		if len(tokens) == 0 {
 			return "", Error_Body{msg = "filter missing op name", pos = pos, kind = .Syntax}
 		}
@@ -119,6 +168,30 @@ apply_pipeline :: proc(
 	return
 }
 
+// resolve_format_string looks up name as a context key and returns its
+// string value. Used both for an explicit bare-key filter arg (e.g.
+// `format long`) and for the implicit "date_format" fallback when no arg
+// is given.
+resolve_format_string :: proc(name: string, ctx: []any, pos: int) -> (string, Error) {
+	raw := resolve_name(name, ctx)
+	if raw == nil {
+		return "", Error_Body {
+			msg  = fmt.tprintf("unable to resolve date format key '%s'", name),
+			pos  = pos,
+			kind = .Data,
+		}
+	}
+	str, ok := reflect.as_string(raw)
+	if !ok {
+		return "", Error_Body {
+			msg  = fmt.tprintf("date format key '%s' is not a string", name),
+			pos  = pos,
+			kind = .Data,
+		}
+	}
+	return str, nil
+}
+
 // TODO: diagnostics don't  show anything relevent
 apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> (any, Error) {
 	switch filter.op {
@@ -137,26 +210,22 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 		date_format: string
 
 		if len(filter.args) > 0 {
-			date_format = filter.args[0]
-		} else {
-			date_format_raw := resolve_name("date_format", ctx)
-			if date_format_raw == nil {
-				return value, Error_Body {
-					msg = "Unable to determine date format",
-					pos = pos,
-					kind = .Data,
-				}
+			arg := filter.args[0]
+			if len(arg) >= 2 && arg[0] == '"' && arg[len(arg) - 1] == '"' {
+				date_format = arg[1:len(arg) - 1]
 			} else {
-				valid: bool
-				date_format, valid = reflect.as_string(date_format_raw)
-				if !valid {
-					return value, Error_Body {
-						msg = "date format is not a string",
-						pos = pos,
-						kind = .Data,
-					}
+				df, ferr := resolve_format_string(arg, ctx, pos)
+				if ferr != nil {
+					return value, ferr
 				}
+				date_format = df
 			}
+		} else {
+			df, ferr := resolve_format_string("date_format", ctx, pos)
+			if ferr != nil {
+				return value, ferr
+			}
+			date_format = df
 		}
 
 		str2, err := apply_format(str, filter.args[:], pos, date_format)
