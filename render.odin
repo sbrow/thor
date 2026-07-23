@@ -19,7 +19,7 @@ Page_Context :: struct {
 }
 
 Base_Data :: struct {
-	now:         datetime.DateTime,
+	now:         string,
 	params:      json.Value,
 	body:        string,
 	title:       string,
@@ -145,6 +145,7 @@ render_template :: proc(
 }
 
 render_site :: proc(site: ^Site) {
+	allocator := site_allocator(site)
 	pages := site.pages[:]
 	sort_pages_by_date(pages)
 
@@ -155,7 +156,9 @@ render_site :: proc(site: ^Site) {
 	template_cache: map[string]mustache.Template
 	defer delete(template_cache)
 
-	now, ok := time.time_to_datetime(time.now())
+	// TODO: CAlculate offset
+	offset := 0
+	now, ok := time.time_to_rfc3339(time.now(), offset, false, allocator)
 	assert(ok)
 
 	// Build base data once
