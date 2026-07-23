@@ -99,26 +99,31 @@ parse_pipeline :: proc(
 	return key, nil
 }
 
-apply_pipeline :: proc(value: any, filters: []Pipe_Filter, pos: int) -> (any, Error) {
-	current := value
+apply_pipeline :: proc(
+	value: any,
+	filters: []Pipe_Filter,
+	pos: int,
+	ctx: []any,
+) -> (
+	current: any,
+	err: Error,
+) {
+	current = value
 	for &filter in filters {
-		result, err := apply_filter(current, &filter, pos)
-		if err != nil {
-			return nil, err
-		}
-		current = result
+		current = apply_filter(current, &filter, pos, ctx) or_return
 	}
-	return current, nil
+	return
 }
 
-apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int) -> (any, Error) {
+// TODO: diagnostics don't  show anything relevent
+apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> (any, Error) {
 	switch filter.op {
 	case "group_by":
 		return apply_group_by(value, filter.args[:], pos)
 	case "format":
 		str, ok := reflect.as_string(value)
 		if !ok {
-			return value, Error_Body{
+			return value, Error_Body {
 				msg = "format may only be used on dates",
 				pos = pos,
 				kind = .Data,

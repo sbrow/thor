@@ -2,6 +2,7 @@ package mustache
 
 import "core:fmt"
 import "core:log"
+import "core:reflect"
 import "core:strings"
 
 // ---------------------------------------------------------------------------
@@ -556,7 +557,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
 					return perr
 				}
@@ -598,7 +599,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
 					return perr
 				}
@@ -636,7 +637,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
 					return perr
 				}
@@ -692,7 +693,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
 					return perr
 				}
