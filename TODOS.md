@@ -6,6 +6,7 @@
   - [ ] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
 - [ ] consider adding a limit to the context stack in mustache.
+- [ ] better diagnostics for syntax errors in treesitter.
 
 ## Performance
 
@@ -51,6 +52,7 @@
   - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
 
 ## General 
+- [ ] get rid of the global variables in the `treesitter` package.
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting

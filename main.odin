@@ -7,6 +7,8 @@ import "core:prof/spall"
 import "core:sync"
 import "core:time"
 
+import "treesitter"
+
 SPALL :: #config(SPALL, false)
 
 when SPALL {
@@ -47,6 +49,9 @@ main :: proc() {
 		// TODO: Make it so this isn't necessary
 		context.allocator = site_allocator(&site)
 		build_vfs(&site)
+
+		treesitter.grammar_dir = site.grammars
+		treesitter.query_dir = site.queries
 
 		site_load_content(&site)
 		render_site(&site)

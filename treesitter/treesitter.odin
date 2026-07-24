@@ -6,8 +6,8 @@ import "core:log"
 import "core:os"
 import "core:strings"
 
-GRAPHS_PATH: string = "/home/spencer/.config/helix/runtime/grammars"
-QUERIES_PATH: string = "/nix/store/n9da8d007ygbgsx983jr3ar3wb1fsh6q-helix-25.07.1/lib/runtime/queries"
+grammar_dir: string
+query_dir:   string
 
 Language :: distinct rawptr
 Parser :: distinct rawptr
@@ -152,12 +152,12 @@ ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 	if builtin, ok := builtin_language(lang); ok {
 		language = builtin
 	} else {
-		if GRAPHS_PATH == "" {
-			log.warnf("treesitter: no grammars path set, skipping %s", lang)
+		if grammar_dir == "" {
+			log.warnf("treesitter: no grammar path set, skipping %s", lang)
 			return nil
 		}
 
-		so_path := fmt.tprintf("%s/%s.so", GRAPHS_PATH, lang)
+		so_path := fmt.tprintf("%s/%s.so", grammar_dir, lang)
 		so_c := strings.clone_to_cstring(so_path)
 		defer delete(so_c)
 		handle := dlopen(so_c, RTLD_LAZY)
@@ -208,13 +208,13 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 		return nil
 	}
 
-	if QUERIES_PATH == "" {
-		log.warnf("treesitter: no queries path set, skipping %s", lang)
+	if query_dir == "" {
+		log.warnf("treesitter: no query path set, skipping %s", lang)
 		gc.query_failed = true
 		return nil
 	}
 
-	query_path := fmt.tprintf("%s/%s/highlights.scm", QUERIES_PATH, lang)
+	query_path := fmt.tprintf("%s/%s/highlights.scm", query_dir, lang)
 	query_src, err := os.read_entire_file_from_path(query_path, context.allocator)
 	if err != nil {
 		log.warnf("treesitter: cannot load query %s", query_path)
@@ -262,7 +262,7 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 
 		_, is_builtin := builtin_language(lang)
 		if !is_builtin {
-			so_path := fmt.tprintf("%s/%s.so", GRAPHS_PATH, lang)
+			so_path := fmt.tprintf("%s/%s.so", grammar_dir, lang)
 			gram_v := helix_version_from_path(so_path)
 			query_v := helix_version_from_path(query_path)
 			gram_note := "(version unknown)"

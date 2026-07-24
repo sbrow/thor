@@ -33,6 +33,8 @@ Site :: struct {
 	og:                  Open_Graph,
 	date:                Date_Preferences,
 	tz:                  ^datetime.TZ_Region,
+	grammars:            string,
+	queries:             string,
 }
 
 Date_Preferences :: struct {
@@ -61,6 +63,8 @@ Config_File :: struct {
 	modules:             json.Value,
 	og:                  Open_Graph,
 	date:                Date_Preferences,
+	grammars:            string,
+	queries:             string,
 }
 
 // Configuration loaded from command line arguments. Gets folded in to Site
@@ -188,6 +192,19 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 
 	site.og = config.og
 	site.date = config.date
+
+	site.grammars = expand_path(config.grammars, site_allocator(site))
+	site.queries = expand_path(config.queries, site_allocator(site))
+}
+
+// expand_path replaces a leading ~/ with $HOME/.
+expand_path :: proc(path: string, allocator := context.allocator) -> string {
+	if len(path) >= 2 && path[0] == '~' && path[1] == '/' {
+		if home := os.get_env_alloc("HOME", allocator); home != "" {
+			return fmt.aprintf("%s%s", home, path[1:])
+		}
+	}
+	return strings.clone(path, allocator)
 }
 
 site_apply_path_defaults :: proc(site: ^Site, config_dir: string) {
