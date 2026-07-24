@@ -7,10 +7,10 @@ import "core:os"
 import "core:strings"
 
 grammar_dir: string
-query_dir:   string
+query_dir: string
 
 HTML_HIGHLIGHTS :: #load(#directory + "queries/html/highlights.scm", string)
-CSS_HIGHLIGHTS  :: #load(#directory + "queries/css/highlights.scm", string)
+CSS_HIGHLIGHTS :: #load(#directory + "queries/css/highlights.scm", string)
 
 Language :: distinct rawptr
 Parser :: distinct rawptr
@@ -121,6 +121,7 @@ Grammar_Cache :: struct {
 	language:     Language,
 	parser:       Parser,
 	query:        Query,
+	cursor:       Query_Cursor,
 	query_failed: bool,
 }
 
@@ -184,19 +185,15 @@ ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 			return nil
 		}
 
-		so_path := fmt.tprintf("%s/%s.so", grammar_dir, lang)
-		so_c := strings.clone_to_cstring(so_path)
-		defer delete(so_c)
-		handle := dlopen(so_c, RTLD_LAZY)
+		so_path := fmt.caprintf("%s/%s.so", grammar_dir, lang, allocator = context.temp_allocator)
+		handle := dlopen(so_path, RTLD_LAZY)
 		if handle == nil {
 			log.warnf("treesitter: cannot load grammar %s (%s)", lang, so_path)
 			return nil
 		}
 
-		sym_name := fmt.tprintf("tree_sitter_%s", lang)
-		sym_c := strings.clone_to_cstring(sym_name)
-		defer delete(sym_c)
-		sym := dlsym(handle, sym_c)
+		sym_name := fmt.caprintf("tree_sitter_%s", lang, allocator = context.temp_allocator)
+		sym := dlsym(handle, sym_name)
 		if sym == nil {
 			log.errorf("treesitter: cannot find symbol %s in %s", sym_name, so_path)
 			return nil
@@ -240,8 +237,7 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 		gc.query_failed = true
 		return nil
 	}
-	query_c := strings.clone_to_cstring(query_src)
-	defer delete(query_c)
+	query_c := strings.clone_to_cstring(query_src, context.temp_allocator)
 
 	err_offset: u32
 	err_type: Query_Error
@@ -299,6 +295,7 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 	}
 
 	gc.query = query
+	gc.cursor = query_cursor_new()
 	return gc
 }
 

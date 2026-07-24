@@ -179,3 +179,24 @@ test_init_site_md_enable_disable :: proc(t: ^testing.T) {
 	testing.expect(t, .Sidenotes in site.markdown_extensions)
 }
 
+@(test)
+test_init_site_config_paths :: proc(t: ^testing.T) {
+	path := write_temp_config("paths", `{
+		"content_dir": "/custom/content",
+		"assets_dir": "/custom/assets",
+		"output_dir": "/custom/output",
+		"layouts_dir": "/custom/layouts"
+	}`)
+	defer os.remove(path)
+
+	site: Site
+	args := []string{"thor", fmt.tprintf("-config:%s", path)}
+	init_site(&site, args)
+	defer destroy_site(&site)
+
+	testing.expect_value(t, site.content_dir, "/custom/content")
+	testing.expect_value(t, site.assets_dir, "/custom/assets")
+	testing.expect_value(t, site.output_dir, "/custom/output")
+	testing.expect_value(t, site.layouts_dir, "/custom/layouts")
+}
+

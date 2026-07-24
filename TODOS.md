@@ -17,9 +17,15 @@
 - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] Use spall to find ways to reduce run time.
 - [ ] Consider using `#soa` for Page lists.
+- [ ] too many `write_string` calls in `highlight_block`
+- [ ] return `src: cstring` from `load_query`.
+- [ ] Improve `unescape_html` with simd.
+- [ ] generate summary before syntax highlighting.
+
 
 ## Memory Management
 
+- [ ] Leaks in highlighter code.
 - [ ] Not sure whether to use temp allocator or site_allocator in opengraph.odin.
 - [ ] Not sure whether to use temp allocator or site_allocator in `site_load_content`.
 - [ ] Might not need to allocate in `strip_html_tags`

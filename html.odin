@@ -29,7 +29,7 @@ strip_html_tags :: proc(s: string, allocator := context.allocator) -> string {
 }
 
 unescape_html :: proc(s: string) -> string {
-	sb := strings.builder_make()
+	sb := strings.builder_make_len(len(s))
 	defer strings.builder_destroy(&sb)
 
 	start := 0
@@ -41,15 +41,21 @@ unescape_html :: proc(s: string) -> string {
 		if semi < 0 {
 			break
 		}
-		entity := s[i : i + semi + 1]
+		entity := s[i:i + semi + 1]
 		replacement := ""
 		switch entity {
-		case "&amp;":  replacement = "&"
-		case "&lt;":   replacement = "<"
-		case "&gt;":   replacement = ">"
-		case "&quot;": replacement = "\""
-		case "&#39;", "&apos;": replacement = "'"
-		case: continue
+		case "&amp;":
+			replacement = "&"
+		case "&lt;":
+			replacement = "<"
+		case "&gt;":
+			replacement = ">"
+		case "&quot;":
+			replacement = "\""
+		case "&#39;", "&apos;":
+			replacement = "'"
+		case:
+			continue
 		}
 		if i > start {
 			strings.write_string(&sb, s[start:i])
@@ -77,7 +83,7 @@ generate_summary :: proc(html: string, max_words: int = 70) -> string {
 	separated, _ = strings.replace_all(separated, "</h1>", "\n\n")
 	separated, _ = strings.replace_all(separated, "</h2>", "\n\n")
 	separated, _ = strings.replace_all(separated, "</h3>", "\n\n")
-	separated,_ = strings.replace_all(separated, "</h4>", "\n\n")
+	separated, _ = strings.replace_all(separated, "</h4>", "\n\n")
 	separated, _ = strings.replace_all(separated, "</h5>", "\n\n")
 	separated, _ = strings.replace_all(separated, "</h6>", "\n\n")
 	separated, _ = strings.replace_all(separated, "</li>", "\n\n")
@@ -135,3 +141,4 @@ generate_summary :: proc(html: string, max_words: int = 70) -> string {
 
 	return strings.to_string(sb)
 }
+

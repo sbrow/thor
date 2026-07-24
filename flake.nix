@@ -133,7 +133,7 @@
 
             buildPhase = ''
               runHook preBuild
-              odin build . -o:speed -out:${pname}-keep
+              odin build . -o:speed -no-bounds-check -out:${pname}-keep
               runHook postBuild
             '';
 

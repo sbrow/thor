@@ -16,7 +16,7 @@ find_first_error_line :: proc(root: ts.Node) -> int {
 	if ts.node_is_error(root) {
 		return int(ts.node_start_point(root).row) + 1
 	}
-	for i in 0..<ts.node_child_count(root) {
+	for i in 0 ..< ts.node_child_count(root) {
 		child := ts.node_child(root, u32(i))
 		if ts.node_has_error(child) {
 			line := find_first_error_line(child)
@@ -28,55 +28,66 @@ find_first_error_line :: proc(root: ts.Node) -> int {
 	return 0
 }
 
-capture_name_to_css :: proc(name: string) -> string {
-	sb := strings.builder_make()
-	seg := strings.builder_make()
+write_span_open :: proc(b: ^strings.Builder, buf: ^[128]u8, name: string) {
+	pos := 0
+
+	prefix := "<span class=\""
+	for i in 0 ..< len(prefix) {
+		buf[pos] = prefix[i]
+		pos += 1
+	}
+
 	first := true
-	for i in 0..<len(name) {
+	for i in 0 ..< len(name) {
 		if name[i] == '.' {
-			if !first do strings.write_byte(&sb, ' ')
+			if !first {buf[pos] = ' '; pos += 1}
 			first = false
-			strings.write_string(&sb, "hl-")
-			strings.write_string(&sb, strings.to_string(seg))
-			strings.write_byte(&seg, '-')
-		} else {
-			strings.write_byte(&seg, name[i])
+			buf[pos] = 'h'; buf[pos + 1] = 'l'; buf[pos + 2] = '-'; pos += 3
+			for j in 0 ..< i {
+				buf[pos] = '-' if name[j] == '.' else name[j]
+				pos += 1
+			}
 		}
 	}
-	if !first do strings.write_byte(&sb, ' ')
-	strings.write_string(&sb, "hl-")
-	strings.write_string(&sb, strings.to_string(seg))
-	return strings.to_string(sb)
+	if !first {buf[pos] = ' '; pos += 1}
+	buf[pos] = 'h'; buf[pos + 1] = 'l'; buf[pos + 2] = '-'; pos += 3
+	for j in 0 ..< len(name) {
+		buf[pos] = '-' if name[j] == '.' else name[j]
+		pos += 1
+	}
+	buf[pos] = '"'; pos += 1
+	buf[pos] = '>'; pos += 1
+
+	strings.write_string(b, string(buf[:pos]))
 }
 
-escape_html :: proc(s: string) -> string {
-	sb := strings.builder_make()
-	defer strings.builder_destroy(&sb)
-
+write_escaped :: proc(b: ^strings.Builder, s: string) {
 	start := 0
-	for i in 0..<len(s) {
+	for i in 0 ..< len(s) {
 		switch s[i] {
 		case '&':
-			if i > start do strings.write_string(&sb, s[start:i])
-			strings.write_string(&sb, "&amp;")
+			if i > start do strings.write_string(b, s[start:i])
+			strings.write_string(b, "&amp;")
 			start = i + 1
 		case '<':
-			if i > start do strings.write_string(&sb, s[start:i])
-			strings.write_string(&sb, "&lt;")
+			if i > start do strings.write_string(b, s[start:i])
+			strings.write_string(b, "&lt;")
 			start = i + 1
 		case '>':
-			if i > start do strings.write_string(&sb, s[start:i])
-			strings.write_string(&sb, "&gt;")
+			if i > start do strings.write_string(b, s[start:i])
+			strings.write_string(b, "&gt;")
 			start = i + 1
 		case '"':
-			if i > start do strings.write_string(&sb, s[start:i])
-			strings.write_string(&sb, "&quot;")
+			if i > start do strings.write_string(b, s[start:i])
+			strings.write_string(b, "&quot;")
 			start = i + 1
 		}
 	}
-	if start == 0 do return s
-	if start < len(s) do strings.write_string(&sb, s[start:])
-	return strings.to_string(sb)
+	if start == 0 {
+		strings.write_string(b, s)
+	} else if start < len(s) {
+		strings.write_string(b, s[start:])
+	}
 }
 
 unescape_html :: proc(s: string) -> string {
@@ -84,19 +95,25 @@ unescape_html :: proc(s: string) -> string {
 	defer strings.builder_destroy(&sb)
 
 	start := 0
-	for i in 0..<len(s) {
+	for i in 0 ..< len(s) {
 		if s[i] != '&' do continue
 		semi := strings.index(s[i:], ";")
 		if semi < 0 do break
-		entity := s[i : i + semi + 1]
+		entity := s[i:i + semi + 1]
 		replacement := ""
 		switch entity {
-		case "&amp;":  replacement = "&"
-		case "&lt;":   replacement = "<"
-		case "&gt;":   replacement = ">"
-		case "&quot;": replacement = "\""
-		case "&#39;", "&apos;": replacement = "'"
-		case: continue
+		case "&amp;":
+			replacement = "&"
+		case "&lt;":
+			replacement = "<"
+		case "&gt;":
+			replacement = ">"
+		case "&quot;":
+			replacement = "\""
+		case "&#39;", "&apos;":
+			replacement = "'"
+		case:
+			continue
 		}
 		if i > start do strings.write_string(&sb, s[start:i])
 		strings.write_string(&sb, replacement)
@@ -128,21 +145,25 @@ highlight_block :: proc(code: string, lang: string, file_path: string) -> string
 	if ts.node_has_error(root) {
 		line := find_first_error_line(root)
 		if line > 0 {
-			log.warnf("highlight: syntax errors in %s code block at line %d (%s)", lang, line, file_path)
+			log.warnf(
+				"highlight: syntax errors in %s code block at line %d (%s)",
+				lang,
+				line,
+				file_path,
+			)
 		} else {
 			log.warnf("highlight: syntax errors in %s code block (%s)", lang, file_path)
 		}
 	}
 
-	cursor := ts.query_cursor_new()
+	cursor := gc.cursor
 	if cursor == nil {
 		return code
 	}
-	defer ts.query_cursor_delete(cursor)
 
 	ts.query_cursor_exec(cursor, gc.query, root)
 
-	captures: [dynamic]Capture
+	captures := make([dynamic]Capture, 0, 64, context.temp_allocator)
 	defer delete(captures)
 
 	match: ts.Query_Match
@@ -162,29 +183,34 @@ highlight_block :: proc(code: string, lang: string, file_path: string) -> string
 		if len(name_full) > int(name_len) {
 			name = name_full[:int(name_len)]
 		}
-		append(&captures, Capture{
-			start = ts.node_start_byte(cap.node),
-			end = ts.node_end_byte(cap.node),
-			name = name,
-		})
+		append(
+			&captures,
+			Capture {
+				start = ts.node_start_byte(cap.node),
+				end = ts.node_end_byte(cap.node),
+				name = name,
+			},
+		)
 	}
 
 	if len(captures) == 0 {
 		return code
 	}
 
-	sb := strings.builder_make()
+	sb := strings.builder_make_len(len(code) * 2)
 
 	last_pos: u32 = 0
-	stack: [dynamic]Capture
+	stack := make([dynamic]Capture, 0, 16, context.temp_allocator)
 	defer delete(stack)
+
+	buf: [128]u8
 
 	for cap in captures {
 		for len(stack) > 0 {
 			top := stack[len(stack) - 1]
 			if top.end <= cap.start {
 				if top.end > last_pos {
-					strings.write_string(&sb, escape_html(raw_code[last_pos:top.end]))
+					write_escaped(&sb, raw_code[last_pos:top.end])
 				}
 				strings.write_string(&sb, "</span>")
 				last_pos = top.end
@@ -195,26 +221,25 @@ highlight_block :: proc(code: string, lang: string, file_path: string) -> string
 		}
 
 		if cap.start > last_pos {
-			strings.write_string(&sb, escape_html(raw_code[last_pos:cap.start]))
+			write_escaped(&sb, raw_code[last_pos:cap.start])
 			last_pos = cap.start
 		}
 
-		css_class := capture_name_to_css(cap.name)
-		strings.write_string(&sb, fmt.tprintf("<span class=\"%s\">", css_class))
+		write_span_open(&sb, &buf, cap.name)
 		append(&stack, cap)
 	}
 
 	for len(stack) > 0 {
 		top := pop(&stack)
 		if top.end > last_pos {
-			strings.write_string(&sb, escape_html(raw_code[last_pos:top.end]))
+			write_escaped(&sb, raw_code[last_pos:top.end])
 		}
 		strings.write_string(&sb, "</span>")
 		last_pos = top.end
 	}
 
 	if int(last_pos) < len(raw_code) {
-		strings.write_string(&sb, escape_html(raw_code[last_pos:]))
+		write_escaped(&sb, raw_code[last_pos:])
 	}
 
 	return strings.to_string(sb)
@@ -266,7 +291,7 @@ highlight_code :: proc(html: string, file_path: string) -> string {
 
 		code := html[code_start:end_idx]
 		highlighted := highlight_block(code, lang, file_path)
-		strings.write_string(&sb, fmt.tprintf(`<pre><code class="language-%s">%s</code></pre>`, lang, highlighted))
+		fmt.sbprintf(&sb, `<pre><code class="language-%s">%s</code></pre>`, lang, highlighted)
 
 		pos = end_idx + len(CODE_END)
 	}
@@ -280,3 +305,4 @@ highlight_code :: proc(html: string, file_path: string) -> string {
 	}
 	return strings.to_string(sb)
 }
+
