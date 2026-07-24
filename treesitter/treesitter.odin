@@ -9,6 +9,9 @@ import "core:strings"
 grammar_dir: string
 query_dir:   string
 
+HTML_HIGHLIGHTS :: #load(#directory + "queries/html/highlights.scm", string)
+CSS_HIGHLIGHTS  :: #load(#directory + "queries/css/highlights.scm", string)
+
 Language :: distinct rawptr
 Parser :: distinct rawptr
 Tree :: distinct rawptr
@@ -137,6 +140,30 @@ builtin_language :: proc(lang: string) -> (language: Language, ok: bool) {
 	return
 }
 
+// load_query returns the highlight query source for a language. Builtin
+// languages (html/css) are baked into the binary via `#load`; all others are
+// read from the runtime `query_dir`. `path` is the on-disk location for
+// diagnostics ("(builtin)" for embedded queries). Mirrors `ensure_parser`.
+load_query :: proc(lang: string) -> (src: string, path: string, ok: bool) {
+	switch lang {
+	case "html":
+		return HTML_HIGHLIGHTS, "(builtin)", true
+	case "css":
+		return CSS_HIGHLIGHTS, "(builtin)", true
+	}
+	if query_dir == "" {
+		log.warnf("treesitter: no query path set, skipping %s", lang)
+		return "", "", false
+	}
+	path = fmt.tprintf("%s/%s/highlights.scm", query_dir, lang)
+	raw, err := os.read_entire_file_from_path(path, context.allocator)
+	if err != nil {
+		log.warnf("treesitter: cannot load query %s", path)
+		return "", "", false
+	}
+	return string(raw), path, true
+}
+
 ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 	if grammar_cache == nil {
 		grammar_cache = make(map[string]^Grammar_Cache)
@@ -208,28 +235,19 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 		return nil
 	}
 
-	if query_dir == "" {
-		log.warnf("treesitter: no query path set, skipping %s", lang)
+	query_src, query_path, ok := load_query(lang)
+	if !ok {
 		gc.query_failed = true
 		return nil
 	}
-
-	query_path := fmt.tprintf("%s/%s/highlights.scm", query_dir, lang)
-	query_src, err := os.read_entire_file_from_path(query_path, context.allocator)
-	if err != nil {
-		log.warnf("treesitter: cannot load query %s", query_path)
-		gc.query_failed = true
-		return nil
-	}
-	query_str := string(query_src)
-	query_c := strings.clone_to_cstring(query_str)
+	query_c := strings.clone_to_cstring(query_src)
 	defer delete(query_c)
 
 	err_offset: u32
 	err_type: Query_Error
 	query := query_new(gc.language, query_c, u32(len(query_src)), &err_offset, &err_type)
 	if query == nil {
-		tok := extract_query_token(query_src, err_offset)
+		tok := extract_query_token(transmute([]byte)query_src, err_offset)
 		cause := fmt.tprintf("query error at byte %d (type %v)", err_offset, err_type)
 		#partial switch err_type {
 		case .NodeType:

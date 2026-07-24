@@ -53,6 +53,20 @@
 
 ## General 
 - [ ] get rid of the global variables in the `treesitter` package.
+- [ ] Consider using `or_else` when applying default values to structs. i.e.
+```odin
+package main
+
+X :: struct {
+  foo: string
+}
+
+main :: proc () {
+  x: X  
+
+  x.foo = x.foo or_else "bar"
+}
+```
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
