@@ -209,3 +209,104 @@ test_format_date_combined_go_reference_layout :: proc(t: ^testing.T) {
 	result := format_date(dt, "Mon Jan 2 15:04:05 MST 2006")
 	testing.expect_value(t, result, "Sun Oct 15 13:18:50 UTC 2023")
 }
+
+// ---------------------------------------------------------------------------
+// format_offset
+// ---------------------------------------------------------------------------
+
+@(test)
+test_format_offset_zero :: proc(t: ^testing.T) {
+	testing.expect_value(t, format_offset(0), "UTC")
+}
+
+@(test)
+test_format_offset_negative :: proc(t: ^testing.T) {
+	testing.expect_value(t, format_offset(-14400), "UTC-04:00")
+}
+
+@(test)
+test_format_offset_positive :: proc(t: ^testing.T) {
+	testing.expect_value(t, format_offset(19800), "UTC+05:30")
+}
+
+// ---------------------------------------------------------------------------
+// get_cached_tz / convert_to_tz (require system zoneinfo)
+// ---------------------------------------------------------------------------
+
+@(test)
+test_get_cached_tz_utc_returns_nil :: proc(t: ^testing.T) {
+	tz, ok := get_cached_tz("UTC")
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, tz == nil, true)
+}
+
+@(test)
+test_get_cached_tz_empty_returns_nil :: proc(t: ^testing.T) {
+	tz, ok := get_cached_tz("")
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, tz == nil, true)
+}
+
+@(test)
+test_get_cached_tz_loads_named_region :: proc(t: ^testing.T) {
+	tz, ok := get_cached_tz("America/New_York")
+	defer destroy_tz_cache()
+	if !ok do return
+	testing.expect(t, tz != nil, "should load TZ_Region for America/New_York")
+}
+
+@(test)
+test_convert_to_tz_no_offset_assumes_target :: proc(t: ^testing.T) {
+	tz, tz_ok := get_cached_tz("America/New_York")
+	defer destroy_tz_cache()
+	if !tz_ok do return
+
+	c := Date_Components{
+		year = 2026, month = 3, day = 15,
+		hour = 8, minute = 49, second = 54,
+	}
+	result, ok := convert_to_tz(c, tz)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result.hour, 8)
+	testing.expect_value(t, result.minute, 49)
+	testing.expect(t, len(result.tz_abbr) > 0, "should resolve abbreviation")
+}
+
+@(test)
+test_convert_to_tz_with_offset_converts :: proc(t: ^testing.T) {
+	tz, tz_ok := get_cached_tz("America/New_York")
+	defer destroy_tz_cache()
+	if !tz_ok do return
+
+	// 2026-03-15T12:49:54Z (UTC) → 08:49:54 EDT (UTC-4)
+	c := Date_Components{
+		year = 2026, month = 3, day = 15,
+		hour = 12, minute = 49, second = 54,
+		offset_seconds = 0,
+		has_offset = true,
+	}
+	result, ok := convert_to_tz(c, tz)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result.hour, 8)
+	testing.expect_value(t, result.minute, 49)
+	testing.expect_value(t, result.tz_abbr, "EDT")
+}
+
+@(test)
+test_convert_to_tz_with_negative_offset_converts :: proc(t: ^testing.T) {
+	tz, tz_ok := get_cached_tz("America/New_York")
+	defer destroy_tz_cache()
+	if !tz_ok do return
+
+	// 2026-03-15T08:49:54-04:00 → UTC 12:49:54 → EDT 08:49:54
+	c := Date_Components{
+		year = 2026, month = 3, day = 15,
+		hour = 8, minute = 49, second = 54,
+		offset_seconds = -14400,
+		has_offset = true,
+	}
+	result, ok := convert_to_tz(c, tz)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result.hour, 8)
+	testing.expect_value(t, result.tz_abbr, "EDT")
+}

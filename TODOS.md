@@ -36,6 +36,7 @@
 - [ ] display an error when no part of the date appears in the output.
 - [x] use `date.format` as the default format.
 - [ ] Handle 0 and whitespace padding i.e. "_2" -> " 2"
+- [ ] Do we *need* mustache.Date_Components, or can we use core:time/datetime.DateTime?
 
 ## General 
 - [ ] Integrity hash

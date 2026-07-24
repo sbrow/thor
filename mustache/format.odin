@@ -5,6 +5,7 @@ import "core:log"
 import "core:strings"
 import "core:time"
 import "core:time/datetime"
+import "core:time/timezone"
 
 Date_Components :: struct {
 	year:           int,
@@ -98,7 +99,7 @@ parse_offset :: proc(iso: string, c: ^Date_Components) {
 		c.offset_seconds = sign * (hours * 3600 + minutes * 60)
 		c.has_offset = true
 	case:
-		// no recognizable offset
+	// no recognizable offset
 	}
 }
 
@@ -224,5 +225,103 @@ emit_am_pm :: proc(b: ^strings.Builder, dt: Date_Components) {
 
 emit_am_pm_lower :: proc(b: ^strings.Builder, dt: Date_Components) {
 	strings.write_string(b, "pm" if dt.hour >= 12 else "am")
+}
+
+// ---------------------------------------------------------------------------
+// Timezone conversion infrastructure
+// ---------------------------------------------------------------------------
+
+format_offset :: proc(offset_seconds: int) -> string {
+	if offset_seconds == 0 do return "UTC"
+	sign := "+" if offset_seconds > 0 else "-"
+	abs_val := abs(offset_seconds)
+	hours := abs_val / 3600
+	minutes := (abs_val % 3600) / 60
+	return fmt.tprintf("UTC%s%02d:%02d", sign, hours, minutes)
+}
+
+// tz_cache caches loaded TZ_Region pointers by timezone name.
+// Entries persist until destroy_tz_cache is called.
+tz_cache: map[string]^datetime.TZ_Region
+
+get_cached_tz :: proc(name: string) -> (^datetime.TZ_Region, bool) {
+	if name == "" || name == "UTC" {
+		return nil, true
+	}
+	if cached, ok := tz_cache[name]; ok {
+		return cached, true
+	}
+	tz, ok := timezone.region_load(name)
+	if !ok {
+		return nil, false
+	}
+	tz_cache[name] = tz
+	return tz, true
+}
+
+destroy_tz_cache :: proc() {
+	for _, tz in tz_cache {
+		if tz != nil {
+			timezone.region_destroy(tz)
+		}
+	}
+	delete(tz_cache)
+	tz_cache = nil
+}
+
+// convert_to_tz converts date components from their source timezone to a
+// target timezone.
+//
+// If the source has no offset (has_offset=false), the components are
+// assumed to be in the target timezone — only the abbreviation is resolved.
+//
+// If the source has an offset, the components are first adjusted to true
+// UTC, then converted to the target timezone.
+//
+// Precondition: target_tz != nil.
+convert_to_tz :: proc(
+	c: Date_Components,
+	target_tz: ^datetime.TZ_Region,
+) -> (
+	result: Date_Components,
+	ok: bool,
+) {
+	result = c
+	dt := datetime.DateTime {
+		year   = i64(c.year),
+		month  = i8(c.month),
+		day    = i8(c.day),
+		hour   = i8(c.hour),
+		minute = i8(c.minute),
+		second = i8(c.second),
+	}
+
+	if !c.has_offset {
+		dt.tz = target_tz
+		abbr, _ := timezone.shortname(dt)
+		result.tz_abbr = abbr
+		return result, true
+	}
+
+	tm := time.datetime_to_time(dt) or_return
+
+	secs := time.time_to_unix(tm) - i64(c.offset_seconds)
+	tm = time.unix(secs, 0)
+
+	dt_utc := time.time_to_datetime(tm) or_return
+	dt_out := timezone.datetime_to_tz(dt_utc, target_tz) or_return
+
+	abbr, _ := timezone.shortname(dt_out)
+
+	return {
+			year = int(dt_out.year),
+			month = int(dt_out.month),
+			day = int(dt_out.day),
+			hour = int(dt_out.hour),
+			minute = int(dt_out.minute),
+			second = int(dt_out.second),
+			tz_abbr = abbr,
+		},
+		true
 }
 
