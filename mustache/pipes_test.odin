@@ -511,3 +511,76 @@ test_timezone_empty_when_not_set :: proc(t: ^testing.T) {
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "[]")
 }
+
+// ---------------------------------------------------------------------------
+// format pipe with timezone conversion
+// ---------------------------------------------------------------------------
+
+@(test)
+test_format_with_timezone_summer :: proc(t: ^testing.T) {
+	tz, tz_ok := get_cached_tz("America/New_York")
+	defer destroy_tz_cache()
+	if !tz_ok || tz == nil do return
+
+	data := Format_Data {
+		date        = "2026-03-15T12:49:54Z",
+		date_format = "15:04 MST",
+		timezone    = "America/New_York",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "08:49 EDT")
+}
+
+@(test)
+test_format_with_timezone_winter :: proc(t: ^testing.T) {
+	tz, tz_ok := get_cached_tz("America/New_York")
+	defer destroy_tz_cache()
+	if !tz_ok || tz == nil do return
+
+	data := Format_Data {
+		date        = "2026-01-15T12:49:54Z",
+		date_format = "15:04 MST",
+		timezone    = "America/New_York",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "07:49 EST")
+}
+
+@(test)
+test_format_mst_offset_no_timezone :: proc(t: ^testing.T) {
+	data := Format_Data {
+		date        = "2026-03-15T08:49:54-04:00",
+		date_format = "MST",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "UTC-04:00")
+}
+
+@(test)
+test_format_mst_no_offset_no_timezone :: proc(t: ^testing.T) {
+	data := Format_Data {
+		date        = "2026-03-15",
+		date_format = "MST",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "UTC")
+}
+
+@(test)
+test_format_invalid_timezone_errors :: proc(t: ^testing.T) {
+	defer destroy_tz_cache()
+
+	data := Format_Data {
+		date        = "2026-03-15",
+		date_format = "2 Jan 2006",
+		timezone    = "Invalid/Zone",
+	}
+	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
+	defer delete_template(&tpl)
+	_, err := render(tpl, data, {}, context.temp_allocator)
+	testing.expect(t, err != nil, "invalid timezone should error")
+}
