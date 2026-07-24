@@ -12,7 +12,7 @@
         </ul>
     </nav>
 {{/nav}}
-{{$content}}
+{{$main}}
     <main>
         <h1>Archive</h1>
         {{#posts | group_by year}}
@@ -26,7 +26,7 @@
         </section>
         {{/posts}}
     </main>
-{{/content}}
+{{/main}}
 {{$sidebar}}
     <aside>
         <h3>Recent Comments</h3>

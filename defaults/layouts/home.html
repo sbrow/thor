@@ -1,8 +1,8 @@
 {{<base}}
-{{$content}}
+{{$main}}
 <main>
   <header>
-    {{&body}}
+    {{&content}}
   </header>
   <ul>
     {{#pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date_iso}}<time
@@ -11,5 +11,5 @@
     {{/pages}}
   </ul>
 </main>
-{{/content}}
+{{/main}}
 {{/base}}

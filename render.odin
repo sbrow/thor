@@ -21,7 +21,7 @@ Page_Context :: struct {
 Base_Data :: struct {
 	now:          string,
 	params:       json.Value,
-	body:         string,
+	content:      string,
 	title:        string,
 	description:  string,
 	og:           Open_Graph,
@@ -279,7 +279,7 @@ render_page_html :: proc(
 	}
 	data.title = fmt.tprintf("%s | %s", page.title, site.title)
 	data.page_title = page.title
-	data.body = page.body_html
+	data.content = page.body_html
 	data.date = page.date
 	data.og = og_for_page(site.og, page)
 	return render_template(content_tpl, data, partials)
@@ -305,7 +305,7 @@ render_home_html :: proc(
 		base = base,
 	}
 	data.title = site.title
-	data.body = home.body_html
+	data.content = home.body_html
 	data.pages = list_pages
 	data.og = og_for_page(site.og, home)
 	return render_template(content_tpl, data, partials)
@@ -333,7 +333,7 @@ render_section :: proc(
 		base = base,
 	}
 	if has_index {
-		data.body = section_index.body_html
+		data.content = section_index.body_html
 		data.page_title = section_index.title
 		data.title = fmt.tprintf("%s | %s", section_index.title, site.title)
 		data.og = og_for_page(site.og, section_index)

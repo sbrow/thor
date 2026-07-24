@@ -45,6 +45,7 @@
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
+- [ ] try to combine render_page_html and render_home_html?
 - [ ] Avoid `json.Value` / `json.Object` where possible.
 - [ ] Create a json schema file for `thor.json`.
 - [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.

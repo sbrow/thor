@@ -1,8 +1,8 @@
 {{<base}}
-{{$content}}
+{{$main}}
 <main>
   <h1>{{page_title}}</h1>
-  {{&body}}
+  {{&content}}
   {{#posts | group_by year}}
   <section>
     <h2>{{key}}</h2>
@@ -15,5 +15,5 @@
   </section>
   {{/posts}}
 </main>
-{{/content}}
+{{/main}}
 {{/base}}
