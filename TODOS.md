@@ -1,3 +1,12 @@
+## High priority
+
+- Polish existing features before moving on to new ones.
+- [ ] Improve diagnostics
+- [ ] Simplify / unify template context stack. Come up with a name for it.
+  - [ ] `render_template` should accept `Template_Context`, not `any`
+- [ ] Load grammars dynamically
+- [ ] consider adding a limit to the context stack in mustache.
+
 ## Performance
 
 - [ ] See if we can disable bounds checks in `write_indented` and elsewhere.
