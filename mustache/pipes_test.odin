@@ -209,6 +209,7 @@ test_interp_pipe_basic :: proc(t: ^testing.T) {
 	Scalar_Data :: struct {
 		name:        string,
 		date_format: string,
+		timezone:    string,
 	}
 	data := Scalar_Data {
 		name = "2026-03-15T08:49:54-04:00",
@@ -222,8 +223,9 @@ test_interp_pipe_basic :: proc(t: ^testing.T) {
 @(test)
 test_interp_pipe_unescaped :: proc(t: ^testing.T) {
 	Scalar_Data :: struct {
-		name:        string,
-		date_format: string,
+		name:         string,
+		date_format:  string,
+		date_timezone: string,
 	}
 	data := Scalar_Data {
 		name = "2025-12-25T00:00:00Z",
@@ -239,6 +241,7 @@ test_interp_pipe_dot_current :: proc(t: ^testing.T) {
 	List_Data :: struct {
 		items:       [3]string,
 		date_format: string,
+		timezone:    string,
 	}
 	data := List_Data {
 		items = {"2026-01-06T00:00:00Z", "2026-06-15T00:00:00Z", "2026-10-15T00:00:00Z"},
@@ -254,8 +257,9 @@ test_interp_pipe_dot_current :: proc(t: ^testing.T) {
 // ---------------------------------------------------------------------------
 
 Format_Data :: struct {
-	date:        string,
+	date:       string,
 	date_format: string,
+	timezone:  string,
 }
 
 @(test)
@@ -482,4 +486,28 @@ test_format_bare_numeric_arg_treated_as_key_not_literal :: proc(t: ^testing.T) {
 	defer delete_template(&tpl)
 	_, err := render(tpl, data, {}, context.temp_allocator)
 	testing.expect(t, err != nil, "bare numeric-looking arg should error as an unresolved key")
+}
+
+@(test)
+test_timezone_resolves_from_context :: proc(t: ^testing.T) {
+	TZ_Data :: struct {
+		timezone: string,
+	}
+	data := TZ_Data {
+		timezone = "America/New_York",
+	}
+	tpl, _ := parse("[{{timezone}}]", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "[America/New_York]")
+}
+
+@(test)
+test_timezone_empty_when_not_set :: proc(t: ^testing.T) {
+	TZ_Data :: struct {
+		timezone: string,
+	}
+	data := TZ_Data {}
+	tpl, _ := parse("[{{timezone}}]", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "[]")
 }
