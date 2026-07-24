@@ -5,6 +5,7 @@ import "core:log"
 import "core:reflect"
 import "core:strings"
 import "core:time"
+import "core:time/datetime"
 
 // MAX_PIPES was chosen arbitrarily. It holds no performance or logical
 // significance.
@@ -228,15 +229,8 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 			date_format = df
 		}
 
-		// Resolve timezone (optional — empty is fine, means display as-is)
-		tz_name := ""
-		if raw := resolve_name("timezone", ctx); raw != nil {
-			if s, s_ok := reflect.as_string(raw); s_ok {
-				tz_name = s
-			}
-		}
-
-		str2, err := apply_format(str, filter.args[:], pos, date_format, tz_name)
+		tz := resolve_tz(ctx)
+		str2, err := apply_format(str, filter.args[:], pos, date_format, tz)
 		if err != nil {
 			return value, err
 		} else {
@@ -257,7 +251,7 @@ apply_format :: proc(
 	args: []string,
 	pos: int,
 	date_format: string,
-	timezone_name: string,
+	tz: ^datetime.TZ_Region,
 ) -> (
 	result: string,
 	err: Error,
@@ -279,22 +273,12 @@ apply_format :: proc(
 		}
 	}
 
-	target_tz, tz_ok := get_cached_tz(timezone_name)
-	if !tz_ok {
-		return "", Error_Body {
-			msg = fmt.tprintf("unable to load timezone '%s'", timezone_name),
-			pos = pos,
-			kind = .Data,
-		}
-	}
-
-	if target_tz != nil {
-		components, _ = convert_to_tz(components, target_tz)
+	if tz != nil {
+		components, _ = convert_to_tz(components, tz)
 	} else if components.has_offset {
 		components.tz_abbr = format_offset(components.offset_seconds)
 	}
 
-	log.debugf("date: '%s' format: '%s' tz: '%s'", iso, date_format, timezone_name)
 	return format_date(components, fmt_str), nil
 }
 

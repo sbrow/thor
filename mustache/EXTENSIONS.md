@@ -67,6 +67,26 @@ Takes an optional arg for the Go reference-date layout to use:
 - A bare key, resolved from context like any other field: `{{date | format long}}` uses the value of `long` (e.g. a site-config field) as the layout.
 - No arg: falls back to the `date_format` context key (typically `date.format` from `thor.json`).
 
+#### Timezone conversion
+
+When the `timezone` context key is set (typically `date.timezone` from `thor.json`, an IANA name like `"America/New_York"`), the `format` pipe converts dates to that timezone before formatting:
+
+- **Date has offset + target tz**: adjusts to true UTC, then converts to the target timezone (DST-aware).
+- **Date has no offset + target tz**: assumes the date is already in the target timezone — no conversion, only resolves the abbreviation.
+- **Date has offset + no target tz**: displays in the source offset.
+- **Date has no offset + no target tz**: displays as-is, assumes UTC.
+
+The `MST` token reflects the active timezone:
+
+| Config tz | ISO has offset | `MST` output |
+|---|---|---|
+| `"America/New_York"` | yes | `"EST"` or `"EDT"` (DST-aware) |
+| `"America/New_York"` | no | `"EST"` or `"EDT"` |
+| not set | yes | `"UTC-04:00"` (from source offset) |
+| not set | no | `"UTC"` |
+
+Timezone data is loaded once by `init_site` via `core:time/timezone.region_load`, using the site arena allocator. The resolved `^datetime.TZ_Region` pointer is stored on `Site.tz` and passed to templates through `Base_Data.timezone`. The arena frees it automatically on `destroy_site`.
+
 ### Memory ownership
 
 - **Parsed pipe filters** (`Pipe_Filter` values) are stored inline on each `Node` via `[dynamic; MAX_PIPES]Pipe_Filter`, and `args` is inline on each `Pipe_Filter` via `[dynamic; MAX_PIPE_ARGS]string`. Both use Odin's fixed-capacity dynamic array type, so no per-tag heap allocations occur at parse time. The storage dies with the `Template` when `delete_template` is called.

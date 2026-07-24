@@ -25,8 +25,8 @@ Base_Data :: struct {
 	title:        string,
 	description:  string,
 	og:           Open_Graph,
-	date_format: string,
-	timezone:     string,
+	date_format:  string,
+	timezone:     ^datetime.TZ_Region,
 }
 
 Page_Data :: struct {
@@ -157,10 +157,10 @@ render_site :: proc(site: ^Site) {
 	template_cache: map[string]mustache.Template
 	defer delete(template_cache)
 
-	// TODO: CAlculate offset
-	offset := 0
-	now, ok := time.time_to_rfc3339(time.now(), offset, false, allocator)
+	offset, ok := mustache.compute_utc_offset(site.tz)
 	assert(ok)
+	now, ok2 := time.time_to_rfc3339(time.now(), offset, false, allocator)
+	assert(ok2)
 
 	// Build base data once
 	base := Base_Data {
@@ -168,8 +168,8 @@ render_site :: proc(site: ^Site) {
 		params       = site.params,
 		description  = site.description,
 		og           = site.og,
-		date_format = site.date.format,
-		timezone     = site.date.timezone,
+		date_format  = site.date.format,
+		timezone     = site.tz,
 	}
 
 	// Find home page

@@ -2,6 +2,7 @@
 package mustache
 
 import "core:testing"
+import "core:time/timezone"
 
 // ---------------------------------------------------------------------------
 // parse_iso_date
@@ -230,36 +231,15 @@ test_format_offset_positive :: proc(t: ^testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// get_cached_tz / convert_to_tz (require system zoneinfo)
+// convert_to_tz (require system zoneinfo)
 // ---------------------------------------------------------------------------
 
 @(test)
-test_get_cached_tz_utc_returns_nil :: proc(t: ^testing.T) {
-	tz, ok := get_cached_tz("UTC")
-	testing.expect_value(t, ok, true)
-	testing.expect_value(t, tz == nil, true)
-}
-
-@(test)
-test_get_cached_tz_empty_returns_nil :: proc(t: ^testing.T) {
-	tz, ok := get_cached_tz("")
-	testing.expect_value(t, ok, true)
-	testing.expect_value(t, tz == nil, true)
-}
-
-@(test)
-test_get_cached_tz_loads_named_region :: proc(t: ^testing.T) {
-	tz, ok := get_cached_tz("America/New_York")
-	defer destroy_tz_cache()
-	if !ok do return
-	testing.expect(t, tz != nil, "should load TZ_Region for America/New_York")
-}
-
-@(test)
 test_convert_to_tz_no_offset_assumes_target :: proc(t: ^testing.T) {
-	tz, tz_ok := get_cached_tz("America/New_York")
-	defer destroy_tz_cache()
+	tz, tz_ok := timezone.region_load("America/New_York", context.temp_allocator)
+	testing.expect(t, tz_ok, "should load timezone")
 	if !tz_ok do return
+	defer timezone.region_destroy(tz, context.temp_allocator)
 
 	c := Date_Components{
 		year = 2026, month = 3, day = 15,
@@ -274,9 +254,10 @@ test_convert_to_tz_no_offset_assumes_target :: proc(t: ^testing.T) {
 
 @(test)
 test_convert_to_tz_with_offset_converts :: proc(t: ^testing.T) {
-	tz, tz_ok := get_cached_tz("America/New_York")
-	defer destroy_tz_cache()
+	tz, tz_ok := timezone.region_load("America/New_York", context.temp_allocator)
+	testing.expect(t, tz_ok, "should load timezone")
 	if !tz_ok do return
+	defer timezone.region_destroy(tz, context.temp_allocator)
 
 	// 2026-03-15T12:49:54Z (UTC) → 08:49:54 EDT (UTC-4)
 	c := Date_Components{
@@ -294,9 +275,10 @@ test_convert_to_tz_with_offset_converts :: proc(t: ^testing.T) {
 
 @(test)
 test_convert_to_tz_with_negative_offset_converts :: proc(t: ^testing.T) {
-	tz, tz_ok := get_cached_tz("America/New_York")
-	defer destroy_tz_cache()
+	tz, tz_ok := timezone.region_load("America/New_York", context.temp_allocator)
+	testing.expect(t, tz_ok, "should load timezone")
 	if !tz_ok do return
+	defer timezone.region_destroy(tz, context.temp_allocator)
 
 	// 2026-03-15T08:49:54-04:00 → UTC 12:49:54 → EDT 08:49:54
 	c := Date_Components{

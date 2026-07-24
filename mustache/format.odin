@@ -240,33 +240,30 @@ format_offset :: proc(offset_seconds: int) -> string {
 	return fmt.tprintf("UTC%s%02d:%02d", sign, hours, minutes)
 }
 
-// tz_cache caches loaded TZ_Region pointers by timezone name.
-// Entries persist until destroy_tz_cache is called.
-tz_cache: map[string]^datetime.TZ_Region
-
-get_cached_tz :: proc(name: string) -> (^datetime.TZ_Region, bool) {
-	if name == "" || name == "UTC" {
-		return nil, true
+// resolve_tz looks up the `tz` field from the context stack and returns
+// the ^TZ_Region pointer, or nil if not set.
+resolve_tz :: proc(ctx: []any) -> ^datetime.TZ_Region {
+	raw := resolve_name("timezone", ctx)
+	if raw == nil do return nil
+	switch v in raw {
+	case ^datetime.TZ_Region:
+		return v
+	case:
+		return nil
 	}
-	if cached, ok := tz_cache[name]; ok {
-		return cached, true
-	}
-	tz, ok := timezone.region_load(name)
-	if !ok {
-		return nil, false
-	}
-	tz_cache[name] = tz
-	return tz, true
 }
 
-destroy_tz_cache :: proc() {
-	for _, tz in tz_cache {
-		if tz != nil {
-			timezone.region_destroy(tz)
-		}
-	}
-	delete(tz_cache)
-	tz_cache = nil
+// compute_utc_offset returns the UTC offset (in seconds) for the given
+// timezone at the current time. Returns (0, true) if tz is nil.
+compute_utc_offset :: proc(tz: ^datetime.TZ_Region) -> (offset: int, ok: bool) {
+	if tz == nil do return 0, true
+	tm := time.now()
+	dt_utc := time.time_to_datetime(tm) or_return
+	dt_local := timezone.datetime_to_tz(dt_utc, tz) or_return
+	tm_utc := time.datetime_to_time(dt_utc) or_return
+	tm_local := time.datetime_to_time(dt_local) or_return
+	offset = int(time.time_to_unix(tm_local) - time.time_to_unix(tm_utc))
+	return offset, true
 }
 
 // convert_to_tz converts date components from their source timezone to a

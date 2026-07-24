@@ -7,6 +7,8 @@ import "core:log"
 import "core:mem"
 import "core:os"
 import "core:strings"
+import "core:time/datetime"
+import "core:time/timezone"
 
 import md "markdown"
 
@@ -30,6 +32,7 @@ Site :: struct {
 	markdown_extensions: bit_set[md.Extension],
 	og:                  Open_Graph,
 	date:                Date_Preferences,
+	tz:                  ^datetime.TZ_Region,
 }
 
 Date_Preferences :: struct {
@@ -115,8 +118,22 @@ init_site :: proc(site: ^Site, args: []string) {
 	site_apply_cli_flags(site, _flags)
 	site.config_path = path
 
-	// Build the resolved site-level OG now that every other field is set.
 	site.og = og_for_site(site)
+
+	tz_name := site.date.timezone
+	if tz_name == "" {
+		log.warnf("no timezone configured, falling back to local system timezone")
+		tz_name = "local"
+	}
+	tz, tz_ok := timezone.region_load(tz_name, alloc)
+	if tz_ok {
+		site.tz = tz
+		if site.date.timezone == "" {
+			log.debugf("detected local timezone: %s", tz.name)
+		}
+	} else if site.date.timezone != "" {
+		log.warnf("unable to load timezone '%s'", site.date.timezone)
+	}
 }
 
 load_config_file :: proc(

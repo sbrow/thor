@@ -222,11 +222,14 @@ Data is passed as **typed structs** (not `map[string]any`). Mustache resolves st
 
 ```odin
 Base_Data :: struct {
-    now:    datetime.DateTime,
-    params: json.Value,
-    body:   string,
-    title:  string,
-    og:     Open_Graph,
+    now:          string,        // UTC ISO 8601 build timestamp
+    params:       json.Value,
+    body:         string,
+    title:        string,
+    description:  string,
+    og:           Open_Graph,
+    date_format:  string,        // from site.date.format (thor.json)
+    timezone:     ^datetime.TZ_Region,  // loaded from site.date.timezone or local, owned by Site
 }
 Page_Data :: struct {
     using base: Base_Data,  // fields promoted via reflection fallback
@@ -259,7 +262,7 @@ Section tags and interpolation tags may transform the resolved value before rend
 <time datetime="{{date}}">{{date | format}}</time>
 ```
 
-Currently implemented: `group_by <field>` (list → list-of-groups) and `format` (ISO date string → display string like "15 Mar 2026"). Filter results live in `context.temp_allocator` (render-scoped). See `mustache/EXTENSIONS.md` for syntax details, caps (`MAX_PIPES`, `MAX_PIPE_ARGS`), and the `Group` struct shape.
+Currently implemented: `group_by <field>` (list → list-of-groups) and `format` (ISO date string → display string like "15 Mar 2026"). The `format` pipe resolves `date_format` (string) and `timezone` (`^datetime.TZ_Region`) from the data context. When `timezone` is non-nil, dates are DST-aware converted before formatting. The `MST` token reflects the active timezone abbreviation (e.g. `"EST"`/`"EDT"`) or the source offset (e.g. `"UTC-04:00"`) when no target tz is configured. TZ data is loaded once by `init_site` via `timezone.region_load` using the site arena allocator, stored on `Site.tz`, and freed when the arena is destroyed. Filter results live in `context.temp_allocator` (render-scoped). See `mustache/EXTENSIONS.md` for syntax details, caps (`MAX_PIPES`, `MAX_PIPE_ARGS`), and the `Group` struct shape.
 
 ### Comments
 

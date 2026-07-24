@@ -33,11 +33,13 @@
 - [x] Accept "strings"
 - [x] Accept keys
 - [x] handle timezones
-- [ ] Fix TZ cache leak in parallel tests: `tz_cache` uses `context.allocator` (tracking allocator in tests), but it's global state shared across parallel test threads. Race causes leak warnings. Fix: use heap allocator for TZ cache.
 - [ ] display an error when no part of the date appears in the output.
 - [x] use `date.format` as the default format.
 - [ ] Handle 0 and whitespace padding i.e. "_2" -> " 2"
 - [ ] Do we *need* mustache.Date_Components, or can we use core:time/datetime.DateTime?
+- [ ] show a proper diagnostic for timezones
+  - currently "unable to load timezone 'America/New_Yorkskie'"
+  - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
 
 ## General 
 - [ ] Integrity hash
