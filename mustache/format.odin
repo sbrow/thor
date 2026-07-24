@@ -7,12 +7,15 @@ import "core:time"
 import "core:time/datetime"
 
 Date_Components :: struct {
-	year:   int,
-	month:  int,
-	day:    int,
-	hour:   int,
-	minute: int,
-	second: int,
+	year:           int,
+	month:          int,
+	day:            int,
+	hour:           int,
+	minute:         int,
+	second:         int,
+	offset_seconds: int,
+	has_offset:     bool,
+	tz_abbr:        string,
 }
 
 // TODO: Use some kind of scanner interface
@@ -38,6 +41,9 @@ parse_iso_date :: proc(iso: string) -> (c: Date_Components, ok: bool) {
 		c.second = parse_2_digits(iso, 17)
 	}
 
+	parse_offset(iso, &c)
+
+	c.tz_abbr = "UTC"
 	return c, true
 }
 
@@ -46,6 +52,54 @@ parse_2_digits :: proc(s: string, offset: int) -> int {
 		return 0
 	}
 	return (int(s[offset]) - 0x30) * 10 + (int(s[offset + 1]) - 0x30)
+}
+
+// parse_offset parses the timezone suffix of an ISO 8601 string (Z,
+// +HH:MM, +HHMM, -HH:MM, -HHMM). Skips fractional seconds if present.
+// Does nothing if no recognizable offset is found.
+parse_offset :: proc(iso: string, c: ^Date_Components) {
+	pos := 19
+	if pos >= len(iso) {
+		return
+	}
+
+	// Skip fractional seconds (e.g., .123)
+	if iso[pos] == '.' {
+		pos += 1
+		for pos < len(iso) && iso[pos] >= '0' && iso[pos] <= '9' {
+			pos += 1
+		}
+	}
+
+	if pos >= len(iso) {
+		return
+	}
+
+	switch iso[pos] {
+	case 'Z', 'z':
+		c.has_offset = true
+	case '+', '-':
+		sign := 1 if iso[pos] == '+' else -1
+		pos += 1
+		if pos + 1 >= len(iso) {
+			return
+		}
+		hours := parse_2_digits(iso, pos)
+		pos += 2
+
+		minutes := 0
+		if pos < len(iso) && iso[pos] == ':' {
+			pos += 1
+		}
+		if pos + 1 < len(iso) {
+			minutes = parse_2_digits(iso, pos)
+		}
+
+		c.offset_seconds = sign * (hours * 3600 + minutes * 60)
+		c.has_offset = true
+	case:
+		// no recognizable offset
+	}
 }
 
 format_date :: proc(
@@ -80,7 +134,12 @@ match_token :: proc(b: ^strings.Builder, dt: Date_Components, s: string) -> int 
 		s,
 		"2006",
 	) {strings.write_string(b, fmt.tprintf("%04d", dt.year)); return 4}
-	if strings.has_prefix(s, "MST") {strings.write_string(b, "UTC"); return 3}
+	if strings.has_prefix(s, "MST") {
+		abbr := dt.tz_abbr
+		if len(abbr) == 0 do abbr = "UTC"
+		strings.write_string(b, abbr)
+		return 3
+	}
 	if strings.has_prefix(s, "Jan") {emit_month_abbr(b, dt); return 3}
 	if strings.has_prefix(s, "Mon") {emit_weekday(b, dt, full = false); return 3}
 	if strings.has_prefix(

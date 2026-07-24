@@ -17,6 +17,9 @@ test_parse_iso_date_extracts_time :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.hour, 8)
 	testing.expect_value(t, c.minute, 49)
 	testing.expect_value(t, c.second, 54)
+	testing.expect_value(t, c.has_offset, true)
+	testing.expect_value(t, c.offset_seconds, -14400)
+	testing.expect_value(t, c.tz_abbr, "UTC")
 }
 
 @(test)
@@ -26,6 +29,8 @@ test_parse_iso_date_lowercase_t :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.hour, 8)
 	testing.expect_value(t, c.minute, 49)
 	testing.expect_value(t, c.second, 54)
+	testing.expect_value(t, c.has_offset, true)
+	testing.expect_value(t, c.offset_seconds, 0)
 }
 
 @(test)
@@ -35,6 +40,7 @@ test_parse_iso_date_date_only_zero_time :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.hour, 0)
 	testing.expect_value(t, c.minute, 0)
 	testing.expect_value(t, c.second, 0)
+	testing.expect_value(t, c.has_offset, false)
 }
 
 @(test)
@@ -47,6 +53,47 @@ test_parse_iso_date_invalid_day_errors :: proc(t: ^testing.T) {
 test_parse_iso_date_too_short_errors :: proc(t: ^testing.T) {
 	_, ok := parse_iso_date("2026-03")
 	testing.expect(t, !ok, "input shorter than 10 chars should fail")
+}
+
+@(test)
+test_parse_offset_positive_colon :: proc(t: ^testing.T) {
+	c, ok := parse_iso_date("2026-03-15T08:49:54+07:00")
+	testing.expect(t, ok, "should parse")
+	testing.expect_value(t, c.has_offset, true)
+	testing.expect_value(t, c.offset_seconds, 25200)
+}
+
+@(test)
+test_parse_offset_positive_no_colon :: proc(t: ^testing.T) {
+	c, ok := parse_iso_date("2026-03-15T08:49:54+0530")
+	testing.expect(t, ok, "should parse")
+	testing.expect_value(t, c.has_offset, true)
+	testing.expect_value(t, c.offset_seconds, 19800)
+}
+
+@(test)
+test_parse_offset_hours_only :: proc(t: ^testing.T) {
+	c, ok := parse_iso_date("2026-03-15T08:49:54+05")
+	testing.expect(t, ok, "should parse")
+	testing.expect_value(t, c.has_offset, true)
+	testing.expect_value(t, c.offset_seconds, 18000)
+}
+
+@(test)
+test_parse_offset_none_with_time :: proc(t: ^testing.T) {
+	c, ok := parse_iso_date("2026-03-15T08:49:54")
+	testing.expect(t, ok, "should parse")
+	testing.expect_value(t, c.has_offset, false)
+	testing.expect_value(t, c.offset_seconds, 0)
+}
+
+@(test)
+test_parse_offset_skips_fractional_seconds :: proc(t: ^testing.T) {
+	c, ok := parse_iso_date("2026-03-15T08:49:54.123Z")
+	testing.expect(t, ok, "should parse")
+	testing.expect_value(t, c.has_offset, true)
+	testing.expect_value(t, c.offset_seconds, 0)
+	testing.expect_value(t, c.second, 54)
 }
 
 // ---------------------------------------------------------------------------
@@ -140,9 +187,9 @@ test_format_date_month_day_numeric_padding :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_format_date_mst_always_utc :: proc(t: ^testing.T) {
-	// Date_Components carries no offset yet, so MST is a hardcoded
-	// placeholder until real timezone support lands.
+test_format_date_mst_defaults_utc :: proc(t: ^testing.T) {
+	// Date_Components constructed directly (not via parse_iso_date)
+	// defaults to UTC for the MST token.
 	dt := Date_Components{year = 2026, month = 1, day = 1, hour = 12}
 	result := format_date(dt, "MST")
 	testing.expect_value(t, result, "UTC")
