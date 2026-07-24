@@ -21,9 +21,9 @@ Point :: struct {
 }
 
 Node :: struct {
-	ctx:   [4]u32,
-	id:    rawptr,
-	tree:  rawptr,
+	ctx:  [4]u32,
+	id:   rawptr,
+	tree: rawptr,
 }
 
 Query_Capture :: struct {
@@ -40,7 +40,7 @@ Query_Match :: struct {
 }
 
 Query_Error :: enum c.int {
-	None     = 0,
+	None = 0,
 	Syntax,
 	NodeType,
 	Field,
@@ -56,71 +56,48 @@ foreign import libdl "system:dl"
 foreign import html_grammar "system:tree-sitter-html"
 foreign import css_grammar "system:tree-sitter-css"
 
-@(link_prefix="ts_")
+@(link_prefix = "ts_")
 foreign lib {
 	parser_new :: proc() -> Parser ---
 	parser_delete :: proc(self: Parser) ---
 	parser_set_language :: proc(self: Parser, language: Language) -> bool ---
-	parser_parse_string :: proc(
-		self: Parser,
-		old_tree: Tree,
-		string: cstring,
-		length: u32,
-	) -> Tree ---
+	parser_parse_string :: proc(self: Parser, old_tree: Tree, string: cstring, length: u32) -> Tree ---
 }
 
-@(link_prefix="ts_")
+@(link_prefix = "ts_")
 foreign lib {
-	 tree_root_node :: proc(self: Tree) -> Node ---
-	 tree_delete :: proc(self: Tree) ---
+	tree_root_node :: proc(self: Tree) -> Node ---
+	tree_delete :: proc(self: Tree) ---
 }
 
-@(link_prefix="ts_")
+@(link_prefix = "ts_")
 foreign lib {
-	 node_start_byte :: proc(self: Node) -> u32 ---
-	 node_end_byte :: proc(self: Node) -> u32 ---
-	 node_has_error :: proc(self: Node) -> bool ---
-	 node_is_error :: proc(self: Node) -> bool ---
-	 node_child_count :: proc(self: Node) -> u32 ---
-	 node_child :: proc(self: Node, child_index: u32) -> Node ---
-	 node_named_child_count :: proc(self: Node) -> u32 ---
-	 node_named_child :: proc(self: Node, child_index: u32) -> Node ---
-	 node_start_point :: proc(self: Node) -> Point ---
-	 node_type :: proc(self: Node) -> cstring ---
-	 node_parent :: proc(self: Node) -> Node ---
+	node_start_byte :: proc(self: Node) -> u32 ---
+	node_end_byte :: proc(self: Node) -> u32 ---
+	node_has_error :: proc(self: Node) -> bool ---
+	node_is_error :: proc(self: Node) -> bool ---
+	node_child_count :: proc(self: Node) -> u32 ---
+	node_child :: proc(self: Node, child_index: u32) -> Node ---
+	node_named_child_count :: proc(self: Node) -> u32 ---
+	node_named_child :: proc(self: Node, child_index: u32) -> Node ---
+	node_start_point :: proc(self: Node) -> Point ---
+	node_type :: proc(self: Node) -> cstring ---
+	node_parent :: proc(self: Node) -> Node ---
 }
 
-@(link_prefix="ts_")
+@(link_prefix = "ts_")
 foreign lib {
-	 query_new :: proc(
-		language: Language,
-		source: cstring,
-		source_len: u32,
-		error_offset: ^u32,
-		error_type: ^Query_Error,
-	) -> Query ---
+	query_new :: proc(language: Language, source: cstring, source_len: u32, error_offset: ^u32, error_type: ^Query_Error) -> Query ---
 	query_delete :: proc(self: Query) ---
-	query_capture_name_for_id :: proc(
-		self: Query,
-		index: u32,
-		length: ^u32,
-	) -> cstring ---
+	query_capture_name_for_id :: proc(self: Query, index: u32, length: ^u32) -> cstring ---
 }
 
-@(link_prefix="ts_")
+@(link_prefix = "ts_")
 foreign lib {
 	query_cursor_new :: proc() -> Query_Cursor ---
 	query_cursor_delete :: proc(self: Query_Cursor) ---
-	query_cursor_exec :: proc(
-		self: Query_Cursor,
-		query: Query,
-		node: Node,
-	) ---
-	query_cursor_next_capture :: proc(
-		self: Query_Cursor,
-		match: ^Query_Match,
-		capture_index: ^u32,
-	) -> bool ---
+	query_cursor_exec :: proc(self: Query_Cursor, query: Query, node: Node) ---
+	query_cursor_next_capture :: proc(self: Query_Cursor, match: ^Query_Match, capture_index: ^u32) -> bool ---
 }
 
 foreign libdl {
@@ -250,22 +227,25 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 
 	err_offset: u32
 	err_type: Query_Error
-	query := query_new(
-		gc.language,
-		query_c,
-		u32(len(query_src)),
-		&err_offset,
-		&err_type,
-	)
+	query := query_new(gc.language, query_c, u32(len(query_src)), &err_offset, &err_type)
 	if query == nil {
 		tok := extract_query_token(query_src, err_offset)
 		cause := fmt.tprintf("query error at byte %d (type %v)", err_offset, err_type)
 		#partial switch err_type {
 		case .NodeType:
 			if tok != "" {
-				cause = fmt.tprintf("query references unknown node type '%s' (byte %d); the grammar (.so) and query (.scm) are likely from different tree-sitter-%s versions", tok, err_offset, lang)
+				cause = fmt.tprintf(
+					"query references unknown node type '%s' (byte %d); the grammar (.so) and query (.scm) are likely from different tree-sitter-%s versions",
+					tok,
+					err_offset,
+					lang,
+				)
 			} else {
-				cause = fmt.tprintf("query references an unknown node type at byte %d; the grammar (.so) and query (.scm) are likely from different tree-sitter-%s versions", err_offset, lang)
+				cause = fmt.tprintf(
+					"query references an unknown node type at byte %d; the grammar (.so) and query (.scm) are likely from different tree-sitter-%s versions",
+					err_offset,
+					lang,
+				)
 			}
 		case .Field:
 			cause = fmt.tprintf("query references unknown field '%s' at byte %d", tok, err_offset)
@@ -308,8 +288,13 @@ extract_query_token :: proc(src: []byte, offset: u32) -> string {
 	end := offset
 	for int(end) < len(src) {
 		c := src[end]
-		is_ident := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-			(c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'
+		is_ident :=
+			(c >= 'A' && c <= 'Z') ||
+			(c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') ||
+			c == '_' ||
+			c == '-' ||
+			c == '.'
 		if !is_ident do break
 		end += 1
 	}
@@ -331,3 +316,4 @@ helix_version_from_path :: proc(path: string) -> string {
 	if end <= start do return ""
 	return path[start:end]
 }
+
