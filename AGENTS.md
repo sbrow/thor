@@ -40,7 +40,7 @@ thor/
 
 | File | Responsibility |
 |---|---|
-| `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `build_vfs`, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
+| `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `build_vfs`, wires `treesitter.grammar_dir`/`query_dir` from config, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
 | `site.odin` | `Flags` (CLI), `Config_File` (thor.json, includes `og: Open_Graph`), `Site` (runtime state + arena + VFS + pages + modules + `og`). `Feature` enum. 5-step `init_site`. Imports `md "markdown"` for `Extension` enum. |
 | `content.odin` | `Page` struct (includes `lastmod`, `og`), `scan_content` (section-aware walk that handles leaf bundles), `load_page`, `infer_layout`. Calls `md.process()` for the markdown pipeline. |
 | `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. Data structs (`Base_Data`, `Page_Data`, `Home_Data`, `Section_Data`). VFS-based template loading with fallback chain (`get_template`). |
@@ -139,6 +139,12 @@ Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
   "og": {
     "image": "https://example.com/og.png"
   },
+  "date": {
+    "format": "2 Jan 2006",
+    "timezone": "America/New_York"
+  },
+  "grammars": "~/.config/helix/runtime/grammars/",
+  "queries": "/path/to/tree-sitter/queries",
   "markdown_extensions": { "emoji": true, "highlight": false },
   "params": {
     "social": [
@@ -208,13 +214,13 @@ Templates use Mustache with template inheritance (`{{<base}}` / `{{$block}}`):
 
 ```html
 <!-- base.html -->
-<body>{{> nav}}{{$content}}{{/content}}{{> footer}}</body>
+<body>{{> nav}}{{$main}}{{/main}}{{> footer}}</body>
 
 <!-- page.html (content layout) -->
 {{<base}}
-{{$content}}
-<main><article><h1>{{page_title}}</h1>{{&body}}</article></main>
-{{/content}}
+{{$main}}
+<main><article><h1>{{page_title}}</h1>{{&content}}</article></main>
+{{/main}}
 {{/base}}
 ```
 
@@ -224,7 +230,7 @@ Data is passed as **typed structs** (not `map[string]any`). Mustache resolves st
 Base_Data :: struct {
     now:          string,        // UTC ISO 8601 build timestamp
     params:       json.Value,
-    body:         string,
+    content:      string,
     title:        string,
     description:  string,
     og:           Open_Graph,
@@ -273,9 +279,8 @@ Currently implemented: `group_by <field>` (list → list-of-groups) and `format`
 Build-time highlighting via Tree-sitter C FFI. No client-side JavaScript.
 
 - **HTML and CSS grammars** statically linked via Nix (`mkGrammarStaticLib` in `thor/flake.nix`). Always available, no `dlopen`.
-- **Other grammars** (bash, odin, nu, etc.) loaded via `dlopen` from Helix's compiled `.so` files.
-- Highlight queries (`.scm`) loaded from Helix's runtime directory.
-- Paths hardcoded in `treesitter/treesitter.odin` (`GRAPHS_PATH`, `QUERIES_PATH`) — Nix store paths, Helix-version-dependent. (See `TODOS.md`.)
+- **Other grammars** (bash, odin, nu, etc.) loaded via `dlopen` from `.so` files.
+- Grammar and query paths configured via `thor.json` (`grammars`, `queries`). Flow: `thor.json` → `Config_File` → `Site` → `main.odin` sets `treesitter.grammar_dir`/`treesitter.query_dir`. Tilde (`~/`) expanded by `expand_path` in `site.odin`. Paths logged at startup.
 - Grammar loading split: `ensure_parser` (parser only, used by minify) vs `load_grammar` (parser + query, used by highlight).
 - Capture names mapped to CSS classes: `keyword` → `.hl-keyword`, etc.
 - Atom-one-dark color theme in `main.css`.
@@ -431,7 +436,7 @@ See `mustache/EXTENSIONS.md`.
 
 - cmark allocates via C malloc, not the arena. HTML output leaks until process exit (problematic in watch mode — see `TODOS.md`).
 - CSS/JS cache busting uses manual `?v=N` query params instead of content hashing.
-- Tree-sitter grammar/query paths for dynamic grammars hardcoded in `treesitter/treesitter.odin` (Nix store hashes, Helix-version-dependent). HTML/CSS are statically linked.
+- Tree-sitter grammar/query paths must be configured manually via `thor.json` (`grammars`, `queries`) — no auto-discovery. HTML/CSS are statically linked.
 - `map[string]any` only works through `lookup_in`'s special-case handling; thor otherwise uses structs.
 - `format_f64` in mustache brute-forces shortest float representation.
 - Content directory not mounted in VFS (modules can ship templates/assets but not content packs yet).
