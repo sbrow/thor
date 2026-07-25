@@ -27,7 +27,7 @@ thor/
 ├── feed.odin           # RSS + sitemap generation
 ├── vfs.odin            # Union file system (defaults → modules → site)
 ├── assets.odin         # VFS-based asset copying
-├── html.odin           # HTML helpers: strip_html_tags, unescape_html, generate_summary
+├── html.odin           # HTML helpers: strip_html_tags, unescape_html, generate_summary (word-count truncation), generate_description (scrub to plain text)
 ├── opengraph.odin      # Open_Graph struct + og_for_site/og_for_page
 ├── frontmatter.odin    # JSON frontmatter parser (supports nested og + lastmod)
 ├── defaults.odin       # DEFAULTS_PATH constant (#directory)
@@ -48,7 +48,7 @@ thor/
 | `feed.odin` | RSS feed + sitemap XML. Uses `page.url` for canonical URLs. |
 | `vfs.odin` | Union file system: `VFS`, `build_vfs`, `mount_dir`, `mount_subdir`, `mount_recursive`, `vfs_get`, `vfs_get_entry`, `vfs_entry_data`. Layers defaults → modules → site. |
 | `assets.odin` | `copy_assets_dir` — iterates VFS entries with `assets/` prefix, minifies CSS, copies verbatim or via `os.copy_file`. |
-| `html.odin` | `strip_html_tags` (moved from render.odin), `unescape_html`, `generate_summary` (Hugo-style body summary for OG descriptions). |
+| `html.odin` | `strip_html_tags`, `unescape_html`, `generate_summary` (word-count truncation, zero-alloc), `generate_description` (HTML→plain text: strip tags, decode entities, collapse whitespace). |
 | `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec, `is_article: Maybe(bool)`). `og_for_site(site)` for site defaults (from config + derived), `og_for_page(site_og, page)` for page-specific (overlay page.og + derive from page data). |
 | `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, and nested `og` object (via `json_get_open_graph`). |
 | `defaults.odin` | `DEFAULTS_PATH` constant, resolved at compile time via `#directory` so bundled templates ship in the binary. |
@@ -187,7 +187,7 @@ Content is **not yet in the VFS** — `scan_content` still uses direct filesyste
 - `is_article ← !page._is_index`
 - `section ← page.section`
 - `published_time / modified_time ← page.date / page.lastmod`
-- `description ← page.description`, else body summary (via `generate_summary`)
+- `description ← page.description`, else `generate_description(generate_summary(body_html))` (scrubbed plain text)
 
 Paths through maps (e.g. `params.*`) are silently allowed — not validated. Templates access via `{{og.url}}`, `{{og.title}}`, `{{#og.is_article}}`, etc.
 

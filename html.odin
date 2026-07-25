@@ -29,7 +29,7 @@ strip_html_tags :: proc(s: string, allocator := context.allocator) -> string {
 }
 
 unescape_html :: proc(s: string) -> string {
-	sb := strings.builder_make_len(len(s))
+	sb := strings.builder_make_len_cap(0, len(s))
 	defer strings.builder_destroy(&sb)
 
 	start := 0
@@ -72,73 +72,146 @@ unescape_html :: proc(s: string) -> string {
 	return strings.to_string(sb)
 }
 
-// generate_summary produces a plain-text summary of an HTML fragment.
-// Blocks (paragraphs, headings, list items) are extracted, their tags
-// stripped, entities decoded, and accumulated word-by-word until the
-// max_words threshold is crossed — at which point the rest of the
-// current block is included before stopping. Mirrors Hugo's default
-// summary behavior.
+// generate_summary truncates an HTML string to the first max_words words.
+// Walks forward counting whitespace→text transitions, skipping tag interiors
+// so spaces inside attributes don't count. Returns a substring of the
+// original — zero allocation. Mirrors Hugo's default (70 words).
 generate_summary :: proc(html: string, max_words: int = 70) -> string {
-	separated, _ := strings.replace_all(html, "</p>", "\n\n", context.temp_allocator)
-	separated, _ = strings.replace_all(separated, "</h1>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</h2>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</h3>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</h4>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</h5>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</h6>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</li>", "\n\n")
-	separated, _ = strings.replace_all(separated, "</blockquote>", "\n\n")
-
-	stripped := strip_html_tags(separated, context.temp_allocator)
-	plain := unescape_html(stripped)
-
-	blocks := strings.split(plain, "\n\n", allocator = context.temp_allocator)
-	defer delete(blocks)
-
-	sb := strings.builder_make(context.temp_allocator)
-	defer strings.builder_destroy(&sb)
-
+	if max_words <= 0 {
+		return ""
+	}
 	word_count := 0
-	first := true
-	for raw_block in blocks {
-		block := strings.trim_space(raw_block)
-		if len(block) == 0 {
+	in_word := false
+	in_tag := false
+	for i in 0 ..< len(html) {
+		c := html[i]
+		if in_tag {
+			if c == '>' {
+				in_tag = false
+			}
 			continue
 		}
-
-		// Collapse internal whitespace to single spaces.
-		block_sb := strings.builder_make(context.temp_allocator)
-		has_content := false
-		in_space := true
-		for c in block {
-			if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-				in_space = true
-			} else {
-				if in_space && has_content {
-					strings.write_byte(&block_sb, ' ')
+		if c == '<' {
+			in_tag = true
+			if in_word {
+				word_count += 1
+				if word_count >= max_words {
+					return html[:i]
 				}
-				strings.write_rune(&block_sb, c)
-				in_space = false
-				has_content = true
+				in_word = false
 			}
+			continue
 		}
-		collapsed := strings.to_string(block_sb)
-		words := strings.split(collapsed, " ", allocator = context.temp_allocator)
-
-		if !first && word_count > 0 {
-			strings.write_byte(&sb, ' ')
-		}
-		strings.write_string(&sb, collapsed)
-		word_count += len(words)
-		first = false
-
-		delete(words)
-
-		if word_count >= max_words {
-			break
+		is_space := c == ' ' || c == '\n' || c == '\t' || c == '\r'
+		if is_space {
+			if in_word {
+				word_count += 1
+				if word_count >= max_words {
+					return html[:i]
+				}
+				in_word = false
+			}
+		} else {
+			in_word = true
 		}
 	}
-
-	return strings.to_string(sb)
+	return html
 }
 
+// generate_description converts an HTML fragment to plain text by stripping
+// tags, decoding entities, and collapsing whitespace. Emits a space when
+// exiting any tag so block-level boundaries aren't lost. Intended for OG
+// descriptions — operate on the output of generate_summary for bounded input.
+generate_description :: proc(html: string, allocator := context.temp_allocator) -> string {
+	sb := strings.builder_make_len_cap(0, len(html), allocator)
+	defer strings.builder_destroy(&sb)
+
+	in_tag := false
+	prev_was_space := true
+	run_start := 0
+	i := 0
+	for i < len(html) {
+		c := html[i]
+		if in_tag {
+			if c == '>' {
+				in_tag = false
+				if !prev_was_space {
+					strings.write_byte(&sb, ' ')
+					prev_was_space = true
+				}
+			}
+			i += 1
+			run_start = i
+			continue
+		}
+		if c == '<' {
+			if i > run_start {
+				strings.write_string(&sb, html[run_start:i])
+				prev_was_space = false
+			}
+			in_tag = true
+			i += 1
+			continue
+		}
+		if c == '&' {
+			if i > run_start {
+				strings.write_string(&sb, html[run_start:i])
+				prev_was_space = false
+			}
+			semi := strings.index(html[i:], ";")
+			if semi > 0 && semi <= 5 {
+				entity := html[i:i + semi + 1]
+				replacement := ""
+				switch entity {
+				case "&amp;":
+					replacement = "&"
+				case "&lt;":
+					replacement = "<"
+				case "&gt;":
+					replacement = ">"
+				case "&quot;":
+					replacement = "\""
+				case "&#39;", "&apos;":
+					replacement = "'"
+				case:
+					replacement = ""
+				}
+				if replacement != "" {
+					strings.write_string(&sb, replacement)
+					prev_was_space = false
+					i += semi + 1
+					run_start = i
+					continue
+				}
+			}
+			strings.write_byte(&sb, '&')
+			prev_was_space = false
+			i += 1
+			run_start = i
+			continue
+		}
+		if c == ' ' || c == '\n' || c == '\t' || c == '\r' {
+			if i > run_start {
+				strings.write_string(&sb, html[run_start:i])
+				prev_was_space = false
+			}
+			if !prev_was_space {
+				strings.write_byte(&sb, ' ')
+				prev_was_space = true
+			}
+			i += 1
+			run_start = i
+			continue
+		}
+		i += 1
+	}
+	if i > run_start && !in_tag {
+		strings.write_string(&sb, html[run_start:i])
+	}
+
+	result := strings.to_string(sb)
+	if len(result) > 0 && result[len(result) - 1] == ' ' {
+		result = result[:len(result) - 1]
+	}
+	return result
+}

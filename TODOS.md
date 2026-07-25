@@ -21,6 +21,8 @@
 - [ ] return `src: cstring` from `load_query`.
 - [ ] Improve `unescape_html` with simd.
 - [ ] generate summary before syntax highlighting.
+- [ ] generate summary before markdown to html conversion.
+- [ ] mount_recursive is pretty significant
 
 
 ## Memory Management
