@@ -16,7 +16,7 @@ import md "markdown"
 // Site is the primary workhorse.
 Site :: struct {
 	arena:               mem.Dynamic_Arena,
-	pages:               [dynamic]Page,
+	pages:               #soa[dynamic]Page,
 	modules:             [dynamic]string,
 	vfs:                 VFS,
 	title:               string,

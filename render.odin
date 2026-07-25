@@ -393,11 +393,11 @@ get_year :: proc(iso: string) -> string {
 	return iso[:4]
 }
 
-sort_pages_by_date :: proc(pages: []Page) {
+sort_pages_by_date :: proc(pages: #soa[]Page) {
 	for i in 1 ..< len(pages) {
 		key := pages[i]
 		j := i - 1
-		for j >= 0 && pages[j].date < key.date {
+		for j >= 0 && pages.date[j] < key.date {
 			pages[j + 1] = pages[j]
 			j -= 1
 		}

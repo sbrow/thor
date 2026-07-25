@@ -37,7 +37,7 @@ Pending_File :: struct {
 // site_load_content reads the content directory and populates site.pages.
 // Drafts are excluded unless .Drafts is enabled.
 site_load_content :: proc(site: ^Site) {
-	site.pages = make([dynamic]Page, 0, 8, site_allocator(site))
+	site.pages = make(#soa[dynamic]Page, 0, 8, site_allocator(site))
 
 	// Phase 0: Enumerate content files
 	pending := make([dynamic]Pending_File, 0, 16, context.temp_allocator)
