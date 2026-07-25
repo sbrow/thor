@@ -16,7 +16,6 @@
 - [ ] Only publish referenced assets.
 - [ ] Split `load_page` into frontmatter-parse + body-process phases so draft pages can skip the markdown pipeline entirely
 - [ ] Use spall to find ways to reduce run time.
-- [x] Consider using `#soa` for Page lists.
 - [ ] too many `write_string` calls in `highlight_block`
 - [ ] return `src: cstring` from `load_query`.
 - [ ] Improve `unescape_html` with simd.
@@ -54,11 +53,7 @@
 - [ ] Decide if lambdas actually provide any value.
 
 ## Dates
-- [x] Accept "strings"
-- [x] Accept keys
-- [x] handle timezones
 - [ ] display an error when no part of the date appears in the output.
-- [x] use `date.format` as the default format.
 - [ ] Handle 0 and whitespace padding i.e. "_2" -> " 2"
 - [ ] Do we *need* mustache.Date_Components, or can we use core:time/datetime.DateTime?
 - [ ] show a proper diagnostic for timezones
@@ -99,11 +94,7 @@ main :: proc () {
       (or whatever template is next in the chain)
 - [ ] Add `-production` flag
   - sets `-minify`
-- [x] Mustache diagnostics
-  - [x] Rust-style error messages: position tracking on Node/Template/Data_Error, `diagnostic.odin` with `format_error`, ANSI colors via `core:terminal/ansi` (Phase 1+2+3)
-  - [x] Unknown-key detection with Levenshtein suggestions (`core:strings/levenshtein_distance`); warning severity (Phase 4+5)
-  - [x] Strict-by-default posture: warn on missing keys in `{{k}}`/`{{{k}}}`/`{{#k}}`/`{{^k}}`, missing partials, missing parents, unmatched block overrides
-  - [x] Block-override source-template tracking: warnings inside overrides point at the override's source file, not the parent template
+- [ ] Mustache diagnostics
   - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
   - [ ] Could be better error message when missing a closing (or opening) brace
   - [ ] Error message doesn't show position of faulty pipe name correctly.
@@ -126,7 +117,6 @@ main :: proc () {
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] follow symlinks in `scan_content`?
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
-- [x] We need to be able to do `Year_Section` in a non-magical, unprivileged way. Implemented via the pipes extension to mustache — see [mustache/EXTENSIONS.md](mustache/EXTENSIONS.md).
 - [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
 - [ ] Theme selector for syntax highlighting.
