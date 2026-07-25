@@ -3,8 +3,11 @@ package treesitter
 import "core:c"
 import "core:fmt"
 import "core:log"
+import "core:mem"
 import "core:os"
 import "core:strings"
+import "core:sync"
+import "core:thread"
 
 grammar_dir: string
 query_dir: string
@@ -127,7 +130,30 @@ Grammar_Cache :: struct {
 
 Get_Language_Proc :: #type proc() -> Language
 
-grammar_cache: map[string]^Grammar_Cache
+SPALL :: #config(SPALL, false)
+
+grammar_store: Grammar_Store
+cache_mutex: sync.Mutex
+
+Grammar_Store :: struct {
+	cache:     map[string]^Grammar_Cache,
+	allocator: mem.Allocator,
+}
+
+init_persistent :: proc() {
+	grammar_store.allocator = context.allocator
+	grammar_store.cache = make(map[string]^Grammar_Cache, grammar_store.allocator)
+}
+
+when SPALL {
+	_thread_init:    proc() = nil
+	_thread_cleanup: proc() = nil
+
+	set_thread_callbacks :: proc(init: proc() = nil, cleanup: proc() = nil) {
+		_thread_init = init
+		_thread_cleanup = cleanup
+	}
+}
 
 builtin_language :: proc(lang: string) -> (language: Language, ok: bool) {
 	switch lang {
@@ -165,41 +191,44 @@ load_query :: proc(lang: string) -> (src: string, path: string, ok: bool) {
 	return string(raw), path, true
 }
 
-ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
-	if grammar_cache == nil {
-		grammar_cache = make(map[string]^Grammar_Cache)
+load_language :: proc(lang: string) -> (language: Language, ok: bool) {
+	if builtin, bok := builtin_language(lang); bok {
+		language = builtin
+		ok = true
+		return
 	}
-	if cached, ok := grammar_cache[lang]; ok {
+	if grammar_dir == "" {
+		log.warnf("treesitter: no grammar path set, skipping %s", lang)
+		return
+	}
+	so_path := fmt.caprintf("%s/%s.so", grammar_dir, lang, allocator = context.temp_allocator)
+	handle := dlopen(so_path, RTLD_LAZY)
+	if handle == nil {
+		log.warnf("treesitter: cannot load grammar %s (%s)", lang, so_path)
+		return
+	}
+	sym_name := fmt.caprintf("tree_sitter_%s", lang, allocator = context.temp_allocator)
+	sym := dlsym(handle, sym_name)
+	if sym == nil {
+		log.errorf("treesitter: cannot find symbol %s in %s", sym_name, so_path)
+		return
+	}
+	get_language := transmute(Get_Language_Proc)(sym)
+	language = get_language()
+	ok = true
+	return
+}
+
+ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
+	if cached, ok := grammar_store.cache[lang]; ok {
 		return cached
 	}
 
-	grammar_cache[lang] = nil
+	grammar_store.cache[lang] = nil
 
-	language: Language
-
-	if builtin, ok := builtin_language(lang); ok {
-		language = builtin
-	} else {
-		if grammar_dir == "" {
-			log.warnf("treesitter: no grammar path set, skipping %s", lang)
-			return nil
-		}
-
-		so_path := fmt.caprintf("%s/%s.so", grammar_dir, lang, allocator = context.temp_allocator)
-		handle := dlopen(so_path, RTLD_LAZY)
-		if handle == nil {
-			log.warnf("treesitter: cannot load grammar %s (%s)", lang, so_path)
-			return nil
-		}
-
-		sym_name := fmt.caprintf("tree_sitter_%s", lang, allocator = context.temp_allocator)
-		sym := dlsym(handle, sym_name)
-		if sym == nil {
-			log.errorf("treesitter: cannot find symbol %s in %s", sym_name, so_path)
-			return nil
-		}
-		get_language := transmute(Get_Language_Proc)(sym)
-		language = get_language()
+	language, ok := load_language(lang)
+	if !ok {
+		return nil
 	}
 
 	parser := parser_new()
@@ -213,35 +242,23 @@ ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 		return nil
 	}
 
-	gc := new(Grammar_Cache)
+	gc := new(Grammar_Cache, grammar_store.allocator)
 	gc.language = language
 	gc.parser = parser
-	grammar_cache[lang] = gc
+	grammar_store.cache[lang] = gc
 	return gc
 }
 
-load_grammar :: proc(lang: string) -> ^Grammar_Cache {
-	gc := ensure_parser(lang)
-	if gc == nil {
-		return nil
-	}
-	if gc.query != nil {
-		return gc
-	}
-	if gc.query_failed {
-		return nil
-	}
-
-	query_src, query_path, ok := load_query(lang)
-	if !ok {
-		gc.query_failed = true
-		return nil
+compile_query :: proc(lang: string, language: Language) -> (query: Query, cursor: Query_Cursor, ok: bool) {
+	query_src, query_path, qok := load_query(lang)
+	if !qok {
+		return
 	}
 	query_c := strings.clone_to_cstring(query_src, context.temp_allocator)
 
 	err_offset: u32
 	err_type: Query_Error
-	query := query_new(gc.language, query_c, u32(len(query_src)), &err_offset, &err_type)
+	query = query_new(language, query_c, u32(len(query_src)), &err_offset, &err_type)
 	if query == nil {
 		tok := extract_query_token(transmute([]byte)query_src, err_offset)
 		cause := fmt.tprintf("query error at byte %d (type %v)", err_offset, err_type)
@@ -290,13 +307,116 @@ load_grammar :: proc(lang: string) -> ^Grammar_Cache {
 			}
 		}
 
+		return
+	}
+
+	cursor = query_cursor_new()
+	ok = true
+	return
+}
+
+load_grammar :: proc(lang: string) -> ^Grammar_Cache {
+	gc := ensure_parser(lang)
+	if gc == nil {
+		return nil
+	}
+	if gc.query != nil {
+		return gc
+	}
+	if gc.query_failed {
+		return nil
+	}
+
+	query, cursor, ok := compile_query(lang, gc.language)
+	if !ok {
 		gc.query_failed = true
 		return nil
 	}
 
 	gc.query = query
-	gc.cursor = query_cursor_new()
+	gc.cursor = cursor
 	return gc
+}
+
+preload_grammar :: proc(lang: string) -> ^Grammar_Cache {
+	language, ok := load_language(lang)
+	if !ok {
+		return nil
+	}
+
+	parser := parser_new()
+	if parser == nil {
+		log.errorf("treesitter: cannot create parser for %s", lang)
+		return nil
+	}
+	if !parser_set_language(parser, language) {
+		log.errorf("treesitter: ABI mismatch for %s grammar", lang)
+		parser_delete(parser)
+		return nil
+	}
+
+	gc := new(Grammar_Cache, grammar_store.allocator)
+	gc.language = language
+	gc.parser = parser
+
+	query, cursor, qok := compile_query(lang, language)
+	if !qok {
+		gc.query_failed = true
+		return gc
+	}
+
+	gc.query = query
+	gc.cursor = cursor
+	return gc
+}
+
+preload_grammars :: proc(languages: []string) {
+	if len(languages) == 0 {
+		return
+	}
+
+	// Filter out already-loaded languages (watch mode reuse)
+	to_load := make([dynamic]string, 0, len(languages), context.temp_allocator)
+	for lang in languages {
+		if cached, ok := grammar_store.cache[lang]; ok && cached != nil {
+			continue
+		}
+		if _, bok := builtin_language(lang); bok {
+			continue
+		}
+		append(&to_load, lang)
+	}
+
+	if len(to_load) == 0 {
+		return
+	}
+
+	threads := make([]^thread.Thread, len(to_load), context.temp_allocator)
+	for i in 0 ..< len(to_load) {
+		threads[i] = thread.create_and_start_with_poly_data(to_load[i], grammar_worker)
+	}
+	for t in threads {
+		thread.join(t)
+		thread.destroy(t)
+	}
+}
+
+grammar_worker :: proc(lang: string) {
+	when SPALL {
+		if _thread_init != nil {
+			_thread_init()
+		}
+		defer if _thread_cleanup != nil {
+			_thread_cleanup()
+		}
+	}
+
+	gc := preload_grammar(lang)
+	if gc != nil {
+		sync.mutex_lock(&cache_mutex)
+		grammar_store.cache[lang] = gc
+		sync.mutex_unlock(&cache_mutex)
+	}
 }
 
 extract_query_token :: proc(src: []byte, offset: u32) -> string {

@@ -15,6 +15,15 @@ when SPALL {
 	spall_ctx: spall.Context
 	@(thread_local)
 	spall_buffer: spall.Buffer
+
+	init_spall_for_thread :: proc() {
+		backing := make([]u8, spall.BUFFER_DEFAULT_SIZE, context.temp_allocator)
+		spall_buffer = spall.buffer_create(backing, u32(sync.current_thread_id()))
+	}
+
+	cleanup_spall_for_thread :: proc() {
+		spall.buffer_destroy(&spall_ctx, &spall_buffer)
+	}
 }
 
 main :: proc() {
@@ -39,6 +48,12 @@ main :: proc() {
 	console_logger := log.create_console_logger(.Info, logger_opts)
 	context.logger = console_logger
 	defer log.destroy_console_logger(console_logger)
+
+	treesitter.init_persistent()
+
+	when SPALL {
+		treesitter.set_thread_callbacks(init_spall_for_thread, cleanup_spall_for_thread)
+	}
 
 	for {
 		defer free_all(context.temp_allocator)

@@ -20,7 +20,7 @@ thor/
 ├── treesitter/         # FFI types + grammar management (standalone package)
 ├── markdown/           # Content transformation pipeline (imports ../treesitter)
 ├── mustache/           # Template engine with lambdas + pipe filters + diagnostics
-├── content.odin        # Page struct, scan_content, load_page
+├── content.odin        # Page struct, Pending_File, scan_content_files, collect_languages, load_page
 ├── render.odin         # Template rendering, data structs, RSS, sitemap
 ├── site.odin           # Config (Flags, Config_File, Site), init_site
 ├── minify.odin         # HTML/CSS minification (imports treesitter)
@@ -42,7 +42,7 @@ thor/
 |---|---|
 | `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `build_vfs`, wires `treesitter.grammar_dir`/`query_dir` from config, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
 | `site.odin` | `Flags` (CLI), `Config_File` (thor.json, includes `og: Open_Graph`), `Site` (runtime state + arena + VFS + pages + modules + `og`). `Feature` enum. 5-step `init_site`. Imports `md "markdown"` for `Extension` enum. |
-| `content.odin` | `Page` struct (includes `lastmod`, `og`), `scan_content` (section-aware walk that handles leaf bundles), `load_page`, `infer_layout`. Calls `md.process()` for the markdown pipeline. |
+| `content.odin` | `Page` struct (includes `lastmod`, `og`), `Pending_File` struct, `scan_content_files` (section-aware walk that handles leaf bundles), `collect_languages` (pre-scan for code fence languages), `load_page`, `infer_layout`. Calls `md.process()` for the markdown pipeline. |
 | `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. Data structs (`Base_Data`, `Page_Data`, `Home_Data`, `Section_Data`). VFS-based template loading with fallback chain (`get_template`). |
 | `minify.odin` | HTML/CSS minification via tree-sitter. Imports `ts "treesitter"`. |
 | `feed.odin` | RSS feed + sitemap XML. Uses `page.url` for canonical URLs. |
@@ -57,7 +57,7 @@ thor/
 
 | Package | Files | Responsibility |
 |---|---|---|
-| `treesitter/` | `treesitter.odin` | FFI types (`Parser`, `Node`, `Query`, etc.), `@(link_prefix="ts_")` foreign bindings, grammar management (`ensure_parser`, `load_grammar`, `grammar_cache`), statically-linked HTML/CSS grammars |
+| `treesitter/` | `treesitter.odin` | FFI types (`Parser`, `Node`, `Query`, etc.), `@(link_prefix="ts_")` foreign bindings, grammar management (`Grammar_Store` with persistent allocator, `load_language`/`compile_query` building blocks, `ensure_parser`/`load_grammar` lazy loading, `preload_grammar`/`preload_grammars` for parallel loading with `sync.Mutex` cache protection), statically-linked HTML/CSS grammars |
 | `markdown/` | `markdown.odin` | `Extension` enum, `DEFAULT_EXTENSIONS`, `process(body, ext, file_path)` — full pipeline, `parse_extension_list`, `apply_extension_config` |
 | | `footnotes.odin` | `strip_definitions` (pre-cmark), `inject_notes` (post-cmark) |
 | | `alerts.odin` | `inject_alerts` — GitHub alert blocks (`> [!NOTE]`) → styled blockquotes with semantic class names (`alert-note` etc.) |
@@ -74,7 +74,7 @@ Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss,
 ```
 thor.json → find_config → init_site (5-step)
   → build_vfs (defaults/layouts → modules → site/layouts, site/assets)
-  → site_load_content (scan_content + url computation)
+  → site_load_content (scan_content_files + collect_languages + preload_grammars + load_page + url computation)
   → render_site
     → load_partials + get_template (VFS + fallback chain)
     → render_page_html / render_home_html / render_section
@@ -170,7 +170,7 @@ Three access patterns:
 - `vfs_get_entry(vfs, path) -> (VFS_Entry, []byte, bool)` — entry + data (for callers that need `fs_path` for diagnostics)
 - `vfs_entry_data(entry) -> ([]byte, bool)` — data from an entry already in hand (avoids redundant map lookup when iterating `vfs.files`)
 
-Content is **not yet in the VFS** — `scan_content` still uses direct filesystem reads. (See `TODOS.md`.)
+Content is **not yet in the VFS** — `scan_content_files` still uses direct filesystem reads. (See `TODOS.md`.)
 
 ## Open Graph
 
@@ -279,7 +279,7 @@ Currently implemented: `group_by <field>` (list → list-of-groups) and `format`
 Build-time highlighting via Tree-sitter C FFI. No client-side JavaScript.
 
 - **HTML and CSS grammars** statically linked via Nix (`mkGrammarStaticLib` in `thor/flake.nix`). Always available, no `dlopen`.
-- **Other grammars** (bash, odin, nu, etc.) loaded via `dlopen` from `.so` files.
+- **Other grammars** (bash, odin, nu, etc.) loaded via `dlopen` from `.so` files. Pre-scanned from content code fences and loaded in parallel via `preload_grammars` (one thread per language, `sync.Mutex` on `Grammar_Store.cache`). `Grammar_Store.allocator` is the OS heap (set by `init_persistent` before arena override) so grammars persist across watch-mode rebuilds.
 - Grammar and query paths configured via `thor.json` (`grammars`, `queries`). Flow: `thor.json` → `Config_File` → `Site` → `main.odin` sets `treesitter.grammar_dir`/`treesitter.query_dir`. Tilde (`~/`) expanded by `expand_path` in `site.odin`. Paths logged at startup.
 - Grammar loading split: `ensure_parser` (parser only, used by minify) vs `load_grammar` (parser + query, used by highlight).
 - Capture names mapped to CSS classes: `keyword` → `.hl-keyword`, etc.

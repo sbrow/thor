@@ -1,6 +1,7 @@
 package main
 
 import md "markdown"
+import ts "treesitter"
 
 import "core:fmt"
 import "core:log"
@@ -26,21 +27,46 @@ Page :: struct {
 	_is_index:   bool `private`,
 }
 
+Pending_File :: struct {
+	path:     string,
+	section:  string,
+	slug:     string,
+	is_index: bool,
+}
+
 // site_load_content reads the content directory and populates site.pages.
 // Drafts are excluded unless .Drafts is enabled.
 site_load_content :: proc(site: ^Site) {
 	site.pages = make([dynamic]Page, 0, 8, site_allocator(site))
-	scan_content(site, site.content_dir, "")
+
+	// Phase 0: Enumerate content files
+	pending := make([dynamic]Pending_File, 0, 16, context.temp_allocator)
+	scan_content_files(site.content_dir, "", &pending)
+
+	// Phase 1: Pre-scan for code fence languages
+	// Phase 2: Parallel grammar preload
+	if .Highlight in site.markdown_extensions {
+		languages := collect_languages(pending[:])
+		ts.preload_grammars(languages)
+	}
+
+	// Phase 3: Load pages (grammars already cached)
+	for file in pending {
+		page, ok := load_page(file.path, file.section, file.slug, file.is_index, site.markdown_extensions)
+		if ok && (!page.draft || .Drafts in site.features) {
+			append(&site.pages, page)
+		}
+	}
 
 	for &page in site.pages {
 		page.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
 	}
 }
 
-// scan_content walks the content directory. At the root level (section=""),
-// directories are treated as sections. Within a section, directories are
-// treated as leaf bundles (directory with an index file).
-scan_content :: proc(site: ^Site, dir: string, section: string) {
+// scan_content_files walks the content directory and collects Pending_File
+// entries. At the root level (section=""), directories are treated as
+// sections. Within a section, directories are treated as leaf bundles.
+scan_content_files :: proc(dir: string, section: string, pending: ^[dynamic]Pending_File) {
 	entries, err := os.read_all_directory_by_path(dir, context.allocator)
 	if err != nil {
 		log.warnf("cannot read %s: %v", dir, err)
@@ -59,35 +85,93 @@ scan_content :: proc(site: ^Site, dir: string, section: string) {
 			is_idx := filename == "index"
 			slug := is_idx ? "" : filename
 
-			page, ok := load_page(entry.fullpath, section, slug, is_idx, site.markdown_extensions)
-			if ok && (!page.draft || .Drafts in site.features) {
-				append(&site.pages, page)
-			}
+			append(pending, Pending_File {
+				path = strings.clone(entry.fullpath, context.temp_allocator),
+				section = section,
+				slug = slug,
+				is_index = is_idx,
+			})
 
 		case .Directory:
 			if section == "" {
-				scan_content(site, entry.fullpath, entry.name)
+				scan_content_files(entry.fullpath, entry.name, pending)
 			} else {
 				index_path := fmt.tprintf("%s/index.html", entry.fullpath)
 				if !os.exists(index_path) {
 					index_path = fmt.tprintf("%s/index.md", entry.fullpath)
 				}
 				if os.exists(index_path) {
-					page, ok := load_page(
-						index_path,
-						section,
-						entry.name,
-						false,
-						site.markdown_extensions,
-					)
-					if ok && (!page.draft || .Drafts in site.features) {
-						append(&site.pages, page)
-					}
+					append(pending, Pending_File {
+						path = strings.clone(index_path, context.temp_allocator),
+						section = section,
+						slug = entry.name,
+						is_index = false,
+					})
 				}
 			}
 		case .Undetermined, .Symlink, .Named_Pipe, .Socket, .Block_Device, .Character_Device:
 		}
 	}
+}
+
+// collect_languages scans .md files for code fence language identifiers
+// (```lang or ~~~lang) and returns the unique set.
+collect_languages :: proc(files: []Pending_File) -> []string {
+	set := make(map[string]bool, context.temp_allocator)
+
+	for file in files {
+		if !strings.has_suffix(file.path, ".md") {
+			continue
+		}
+		data, err := os.read_entire_file_from_path(file.path, context.temp_allocator)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+
+		pos := 0
+		for pos < len(content) {
+			newline := strings.index_byte(content[pos:], '\n')
+			line_end := pos + newline if newline >= 0 else len(content)
+			line := content[pos:line_end]
+
+			i := 0
+			for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+				i += 1
+			}
+
+			if i + 3 <= len(line) && (line[i] == '`' && line[i+1] == '`' && line[i+2] == '`') ||
+			   (i + 3 <= len(line) && line[i] == '~' && line[i+1] == '~' && line[i+2] == '~') {
+				fence_char := line[i]
+				j := i + 3
+				for j < len(line) && line[j] == fence_char {
+					j += 1
+				}
+				for j < len(line) && (line[j] == ' ' || line[j] == '\t') {
+					j += 1
+				}
+				lang_start := j
+				for j < len(line) {
+					c := line[j]
+					if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+						break
+					}
+					j += 1
+				}
+				if j > lang_start {
+					set[line[lang_start:j]] = true
+				}
+			}
+
+			pos = line_end + 1
+		}
+	}
+
+	result := make([dynamic]string, 0, len(set), context.temp_allocator)
+	for lang in set {
+		append(&result, lang)
+	}
+	return result[:]
 }
 
 infer_layout :: proc(section: string, is_index: bool) -> string {
@@ -172,4 +256,3 @@ strip_extension :: proc(name: string) -> string {
 	}
 	return name[:dot]
 }
-

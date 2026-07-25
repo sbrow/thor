@@ -23,6 +23,12 @@
 - [ ] generate summary before syntax highlighting.
 - [ ] generate summary before markdown to html conversion.
 - [ ] mount_recursive is pretty significant
+- [ ] thread pool for grammar loading is unbounded.
+- [ ] load grammars async.
+- [ ] during `load_page`:
+  - pass each code block to the treesitter queue
+  - continue working on the page,
+  - `await` the highlighted code.
 
 
 ## Memory Management
