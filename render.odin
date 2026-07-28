@@ -10,40 +10,34 @@ import "core:strings"
 import "core:time"
 import "core:time/datetime"
 
+Template_Context :: struct {
+	params:      json.Value,
+	now:         string,
+	content:     string,
+	title:       string,
+	description: string,
+	og:          Open_Graph,
+	date_format: string,
+	timezone:    ^datetime.TZ_Region,
+
+	// Page Data
+	page_title:  string,
+	date:        string,
+
+	// Home data
+	pages:       [dynamic]Page_Context,
+
+	// Section Data
+	// TODO: Remove "posts" from the Odin code
+	posts:       [dynamic]Page_Context,
+}
+
 Page_Context :: struct {
 	permalink: string,
 	title:     string,
 	starred:   bool,
 	date:      string,
 	year:      string,
-}
-
-Base_Data :: struct {
-	now:          string,
-	params:       json.Value,
-	content:      string,
-	title:        string,
-	description:  string,
-	og:           Open_Graph,
-	date_format:  string,
-	timezone:     ^datetime.TZ_Region,
-}
-
-Page_Data :: struct {
-	using base: Base_Data,
-	page_title: string,
-	date:       string,
-}
-
-Home_Data :: struct {
-	using base: Base_Data,
-	pages:      [dynamic]Page_Context,
-}
-
-Section_Data :: struct {
-	using base: Base_Data,
-	page_title: string,
-	posts:      [dynamic]Page_Context,
 }
 
 build_page_context :: proc(page: Page) -> Page_Context {
@@ -131,7 +125,7 @@ capitalize :: proc(s: string) -> string {
 
 render_template :: proc(
 	content_tpl: mustache.Template,
-	data: any,
+	data: Template_Context,
 	partials: map[string]mustache.Template,
 ) -> string {
 	result, err := mustache.render(content_tpl, data, partials)
@@ -162,14 +156,13 @@ render_site :: proc(site: ^Site) {
 	now, ok2 := time.time_to_rfc3339(time.now(), offset, false, allocator)
 	assert(ok2)
 
-	// Build base data once
-	base := Base_Data {
-		now          = now,
-		params       = site.params,
-		description  = site.description,
-		og           = site.og,
-		date_format  = site.date.format,
-		timezone     = site.tz,
+	ctx := Template_Context {
+		now         = now,
+		params      = site.params,
+		description = site.description,
+		og          = site.og,
+		date_format = site.date.format,
+		timezone    = site.tz,
 	}
 
 	// Find home page
@@ -198,7 +191,7 @@ render_site :: proc(site: ^Site) {
 			continue
 		}
 		tpl := get_template(&site.vfs, page.layout, &template_cache)
-		html := render_page_html(page, site, tpl, partials, base)
+		html := render_page_html(page, site, tpl, partials, ctx)
 		if .Minify in site.features {
 			html = minify_html(html)
 		}
@@ -226,7 +219,7 @@ render_site :: proc(site: ^Site) {
 			has_section_index,
 			section_tpl,
 			partials,
-			base,
+			ctx,
 		)
 		if .Minify in site.features {
 			html = minify_html(html)
@@ -237,7 +230,7 @@ render_site :: proc(site: ^Site) {
 	// Render home page
 	if has_home {
 		home_tpl := get_template(&site.vfs, "home", &template_cache)
-		home_html := render_home_html(home, site, home_tpl, partials, base)
+		home_html := render_home_html(home, site, home_tpl, partials, ctx)
 		if .Minify in site.features {
 			home_html = minify_html(home_html)
 		}
@@ -271,18 +264,15 @@ render_page_html :: proc(
 	site: ^Site,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
-	base: Base_Data,
+	ctx: Template_Context,
 ) -> string {
-	is_article := page.section != ""
-	data := Page_Data {
-		base = base,
-	}
-	data.title = fmt.tprintf("%s | %s", page.title, site.title)
-	data.page_title = page.title
-	data.content = page.body_html
-	data.date = page.date
-	data.og = og_for_page(site.og, page)
-	return render_template(content_tpl, data, partials)
+	ctx := ctx
+	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
+	ctx.page_title = page.title
+	ctx.content = page.body_html
+	ctx.date = page.date
+	ctx.og = og_for_page(site.og, page)
+	return render_template(content_tpl, ctx, partials)
 }
 
 render_home_html :: proc(
@@ -290,7 +280,7 @@ render_home_html :: proc(
 	site: ^Site,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
-	base: Base_Data,
+	ctx: Template_Context,
 ) -> string {
 	list_pages := make([dynamic]Page_Context)
 	defer delete(list_pages)
@@ -301,14 +291,13 @@ render_home_html :: proc(
 		append(&list_pages, build_page_context(page))
 	}
 
-	data := Home_Data {
-		base = base,
-	}
-	data.title = site.title
-	data.content = home.body_html
-	data.pages = list_pages
-	data.og = og_for_page(site.og, home)
-	return render_template(content_tpl, data, partials)
+	ctx := ctx
+	ctx.title = site.title
+	ctx.content = home.body_html
+	ctx.pages = list_pages
+	ctx.og = og_for_page(site.og, home)
+
+	return render_template(content_tpl, ctx, partials)
 }
 
 render_section :: proc(
@@ -318,7 +307,7 @@ render_section :: proc(
 	has_index: bool,
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
-	base: Base_Data,
+	ctx: Template_Context,
 ) -> string {
 	posts := make([dynamic]Page_Context)
 	defer delete(posts)
@@ -329,25 +318,23 @@ render_section :: proc(
 		append(&posts, build_page_context(page))
 	}
 
-	data := Section_Data {
-		base = base,
-	}
+	ctx := ctx
 	if has_index {
-		data.content = section_index.body_html
-		data.page_title = section_index.title
-		data.title = fmt.tprintf("%s | %s", section_index.title, site.title)
-		data.og = og_for_page(site.og, section_index)
+		ctx.content = section_index.body_html
+		ctx.page_title = section_index.title
+		ctx.title = fmt.tprintf("%s | %s", section_index.title, site.title)
+		ctx.og = og_for_page(site.og, section_index)
 	} else {
-		data.page_title = capitalize(section)
-		data.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
-		data.og.title = capitalize(section)
-		data.og.description = ""
-		data.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
-		data.og.type = "website"
-		data.og.is_article = false
+		ctx.page_title = capitalize(section)
+		ctx.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
+		ctx.og.title = capitalize(section)
+		ctx.og.description = ""
+		ctx.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
+		ctx.og.type = "website"
+		ctx.og.is_article = false
 	}
-	data.posts = posts
-	return render_template(content_tpl, data, partials)
+	ctx.posts = posts
+	return render_template(content_tpl, ctx, partials)
 }
 
 load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {

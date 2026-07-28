@@ -81,6 +81,7 @@ main :: proc () {
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
+- [ ] merge `render_{section,home_html,page_html}` procs.
 - [ ] try to combine render_page_html and render_home_html?
 - [ ] Avoid `json.Value` / `json.Object` where possible.
 - [ ] Create a json schema file for `thor.json`.
