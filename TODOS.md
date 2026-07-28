@@ -8,6 +8,8 @@
 - [ ] consider adding a limit to the context stack in mustache.
 - [ ] better diagnostics for syntax errors in treesitter.
 - [x] Add heading ids as a default on extension.
+- [ ] show "stack traces" in template error diagnostics
+- [ ] starred must be a param.
 
 ## Performance
 
@@ -31,6 +33,11 @@
   - `await` the highlighted code.
 - [ ] can markdown extensions run in parallel?
 - [ ] enforce MAX_SLUG_LENGTH
+
+## Remove Privileged content
+
+- [ ] `group_by` currently requires a computed `year` field on the page.
+  - We should replace this with `{{ pages | group_by (date | "2006") }}` or similar
 
 
 ## Memory Management
@@ -145,6 +152,7 @@ main :: proc () {
   - [ ] `new site` set up new project
 - [ ] warn/error when unknown key used in mustache.
 - [ ] Import/export packages. Hugo, jekyll, WordPress, etc.
+- [ ] opt-in "strict_keys" mode. in this mode, key lookups may not view parent objects.
 
 ## Notes
 

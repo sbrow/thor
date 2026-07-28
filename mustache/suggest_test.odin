@@ -12,7 +12,7 @@ Inner :: struct {
 
 Outer :: struct {
 	title:      string,
-	page_title: string,
+	page.title: string,
 	inner:      Inner,
 	numbers:    [3]int,
 }
@@ -150,8 +150,8 @@ test_validate_map_path_silent :: proc(t: ^testing.T) {
 
 @(test)
 test_suggest_correction_exact :: proc(t: ^testing.T) {
-	available := []string{"title", "page_title", "body"}
-	testing.expect_value(t, suggest_correction(available, "page_titel"), "page_title")
+	available := []string{"title", "page.title", "body"}
+	testing.expect_value(t, suggest_correction(available, "page_titel"), "page.title")
 }
 
 @(test)

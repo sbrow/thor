@@ -220,7 +220,7 @@ Templates use Mustache with template inheritance (`{{<base}}` / `{{$block}}`):
 <!-- page.html (content layout) -->
 {{<base}}
 {{$main}}
-<main><article><h1>{{page_title}}</h1>{{&content}}</article></main>
+<main><article><h1>{{page.title}}</h1>{{&content}}</article></main>
 {{/main}}
 {{/base}}
 ```
@@ -240,7 +240,7 @@ Base_Data :: struct {
 }
 Page_Data :: struct {
     using base: Base_Data,  // fields promoted via reflection fallback
-    page_title: string,
+    page.title: string,
     date:       string,     // raw ISO 8601; formatted via `| format` in templates
 }
 Home_Data :: struct {
@@ -249,7 +249,7 @@ Home_Data :: struct {
 }
 Section_Data :: struct {
     using base: Base_Data,
-    page_title: string,
+    page.title: string,
     posts:      [dynamic]Page_Context,  // flat list; year grouping done in template via pipe
 }
 ```

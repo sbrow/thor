@@ -19,35 +19,14 @@ Template_Context :: struct {
 	og:          Open_Graph,
 	date_format: string,
 	timezone:    ^datetime.TZ_Region,
-
-	// Page Data
-	page_title:  string,
-	date:        string,
+	page:        Page,
 
 	// Home data
-	pages:       [dynamic]Page_Context,
+	pages:       [dynamic]Page,
 
 	// Section Data
 	// TODO: Remove "posts" from the Odin code
-	posts:       [dynamic]Page_Context,
-}
-
-Page_Context :: struct {
-	permalink: string,
-	title:     string,
-	starred:   bool,
-	date:      string,
-	year:      string,
-}
-
-build_page_context :: proc(page: Page) -> Page_Context {
-	return Page_Context {
-		permalink = page.permalink,
-		title = page.title,
-		starred = page.is_starred,
-		date = page.date,
-		year = get_year(page.date),
-	}
+	posts:       [dynamic]Page,
 }
 
 load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
@@ -268,9 +247,8 @@ render_page_html :: proc(
 ) -> string {
 	ctx := ctx
 	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
-	ctx.page_title = page.title
+	ctx.page = page
 	ctx.content = page.content
-	ctx.date = page.date
 	ctx.og = og_for_page(site.og, page)
 	return render_template(content_tpl, ctx, partials)
 }
@@ -282,13 +260,12 @@ render_home_html :: proc(
 	partials: map[string]mustache.Template,
 	ctx: Template_Context,
 ) -> string {
-	list_pages := make([dynamic]Page_Context)
-	defer delete(list_pages)
+	list_pages := make([dynamic]Page, 0, 8, context.temp_allocator)
 	for page in site.pages {
 		if page._is_index {
 			continue
 		}
-		append(&list_pages, build_page_context(page))
+		append(&list_pages, page)
 	}
 
 	ctx := ctx
@@ -309,24 +286,25 @@ render_section :: proc(
 	partials: map[string]mustache.Template,
 	ctx: Template_Context,
 ) -> string {
-	posts := make([dynamic]Page_Context)
-	defer delete(posts)
+	posts := make([dynamic]Page, 0, len(site.pages) / 2, context.temp_allocator)
 	for page in site.pages {
 		if page.section != section || page._is_index {
 			continue
 		}
-		append(&posts, build_page_context(page))
+		append(&posts, page)
 	}
 
 	ctx := ctx
 	if has_index {
 		ctx.content = section_index.content
-		ctx.page_title = section_index.title
+		ctx.page = section_index
 		ctx.title = fmt.tprintf("%s | %s", section_index.title, site.title)
 		ctx.og = og_for_page(site.og, section_index)
 	} else {
-		ctx.page_title = capitalize(section)
-		ctx.title = fmt.tprintf("%s | %s", capitalize(section), site.title)
+		ctx.page = Page {
+			title = capitalize(section),
+		}
+		ctx.title = fmt.tprintf("%s | %s", ctx.page.title, site.title)
 		ctx.og.title = capitalize(section)
 		ctx.og.description = ""
 		ctx.og.url = fmt.tprintf("%s/%s/", site.base_url, section)

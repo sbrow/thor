@@ -7,6 +7,7 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:strings"
+import "core:time"
 
 // Fields with underscores should never be set by the user.
 Page :: struct {
@@ -18,12 +19,13 @@ Page :: struct {
 	title:       string,
 	description: string,
 	date:        string,
+	year:        string,
 	lastmod:     string,
 	menu:        string,
 	content:     string,
 	og:          Open_Graph,
 	draft:       bool,
-	is_starred:  bool,
+	starred:     bool,
 	_is_index:   bool `private`,
 }
 
@@ -231,9 +233,18 @@ load_page :: proc(
 	page.title = fm.title
 	page.description = fm.description
 	page.date = fm.date
+	if page.date == "" {
+		info, stat_err := os.stat(file_path, context.allocator)
+		if stat_err == nil {
+			page.date, _ = time.time_to_rfc3339(info.modification_time, 0, false, context.allocator)
+			os.file_info_delete(info, context.allocator)
+			log.warnf("no date in frontmatter for %s, using file modification time: %s", file_path, page.date)
+		}
+	}
+	page.year = get_year(page.date)
 	page.lastmod = fm.lastmod
 	page.draft = fm.draft
-	page.is_starred = fm.isStarred
+	page.starred = fm.isStarred
 	page.menu = fm.menu
 	page.layout = fm.layout if fm.layout != "" else infer_layout(section, is_index)
 	page.og = fm.og

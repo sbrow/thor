@@ -1,7 +1,7 @@
 {{<base}}
 {{$main}}
 <main>
-  <h1>{{page_title}}</h1>
+  <h1>{{page.title}}</h1>
   {{&content}}
   {{#posts | group_by year}}
   <section>
