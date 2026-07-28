@@ -123,7 +123,7 @@ Config is split into three structs with a clear 5-step initialization flow:
 
 **`Feature` enum** — `Drafts`, `Minify`, `Watch`. Checked with `.Minify in site.features`.
 
-**`markdown.Extension` enum** (in the `markdown` package, not main) — `Emoji`, `Sidenotes`, `Alerts`, `Highlight`, `Sections`. Default is `md.DEFAULT_EXTENSIONS` (currently `.Emoji, .Sidenotes, .Alerts`). Configurable via:
+**`markdown.Extension` enum** (in the `markdown` package, not main) — `Emoji`, `Sidenotes`, `Alerts`, `Highlight`, `Sections`, `HeadingIDs`. Default is `md.DEFAULT_EXTENSIONS` (currently `.Emoji, .Sidenotes, .Alerts, .HeadingIDs`). Configurable via:
 - `thor.json`: `"markdown_extensions": { "emoji": true, "highlight": false, ... }`
 - CLI: `-ext:highlight,sections` (enable) / `-no-ext:emoji` (disable). Comma-separated, case-insensitive.
 
@@ -203,6 +203,7 @@ raw markdown
   → md.inject_notes          (if .Sidenotes — post-cmark)
   → md.inject_alerts         (if .Alerts — post-cmark)
   → md.highlight_code        (if .Highlight — post-cmark)
+  → md.inject_heading_ids    (if .HeadingIDs — post-cmark, pre-sections)
   → md.wrap_sections         (if .Sections — post-cmark)
 ```
 

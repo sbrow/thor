@@ -11,9 +11,10 @@ Extension :: enum {
 	Alerts,
 	Highlight,
 	Sections,
+	HeadingIDs,
 }
 
-DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts}
+DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts, .HeadingIDs}
 
 process :: proc(body: string, ext: bit_set[Extension], file_path: string) -> string {
 	side_notes := make(map[string]string)
@@ -34,6 +35,9 @@ process :: proc(body: string, ext: bit_set[Extension], file_path: string) -> str
 	}
 	if .Highlight in ext {
 		html = highlight_code(html, file_path)
+	}
+	if .HeadingIDs in ext {
+		html = inject_heading_ids(html)
 	}
 	if .Sections in ext {
 		html = wrap_sections(html)
@@ -56,6 +60,8 @@ parse_extension_list :: proc(s: string) -> (result: bit_set[Extension]) {
 			result += {.Highlight}
 		case "sections":
 			result += {.Sections}
+		case "heading_ids":
+			result += {.HeadingIDs}
 		}
 	}
 	return result
@@ -77,6 +83,8 @@ apply_extension_config :: proc(ext: ^bit_set[Extension], config: json.Object) {
 			if enabled {ext^ += {.Highlight}} else {ext^ -= {.Highlight}}
 		case "sections":
 			if enabled {ext^ += {.Sections}} else {ext^ -= {.Sections}}
+		case "heading_ids":
+			if enabled {ext^ += {.HeadingIDs}} else {ext^ -= {.HeadingIDs}}
 		}
 	}
 }
