@@ -1,7 +1,10 @@
 <header>
   <nav>
     <ul>
-      <li><a href="/">{{title}}</a></li>
+      <li><a href="/">{{> home-link}}</a></li>
+      {{#menus.main}}
+      <li><a href="{{url}}">{{name}}</a></li>
+      {{/menus.main}}
     </ul>
   </nav>
 </header>

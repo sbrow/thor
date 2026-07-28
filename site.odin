@@ -20,6 +20,7 @@ Site_Context :: struct {
 	base_url:    string,
 	params:      json.Object,
 	og:          Open_Graph,
+	menus:       map[string][]Menu_Entry,
 }
 
 // Site is the primary workhorse, containing everything needed to build the site,
@@ -68,6 +69,7 @@ Config_File :: struct {
 	markdown_extensions: json.Value,
 	params:              json.Value,
 	modules:             json.Value,
+	menus:               json.Value,
 	og:                  Open_Graph,
 	date:                Date_Preferences,
 	grammars:            string,
@@ -199,6 +201,15 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 
 	site.og = config.og
 	site.date = config.date
+
+	// Parse config menus if present (nil = absent, non-nil = present)
+	if config.menus != nil {
+		site.menus = parse_config_menus(config.menus, site_allocator(site))
+		if site.menus == nil {
+			// Present but empty ({}) — explicit opt-out
+			site.menus = make(map[string][]Menu_Entry, site_allocator(site))
+		}
+	}
 
 	site.grammars = expand_path(config.grammars, site_allocator(site))
 	site.queries = expand_path(config.queries, site_allocator(site))

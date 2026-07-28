@@ -89,14 +89,31 @@ get_template :: proc(
 	return mustache.Template{}
 }
 
-capitalize :: proc(s: string) -> string {
+to_title_case :: proc(s: string, allocator := context.allocator) -> string {
 	if len(s) == 0 {
 		return s
 	}
-	if s[0] >= 'a' && s[0] <= 'z' {
-		return fmt.aprintf("%c%s", s[0] - 32, s[1:])
+
+	out := transmute([]byte)strings.clone(s, allocator)
+
+	capitalize_next := true
+	for char, i in s {
+		switch char {
+		case '-', '_':
+			out[i] = ' '
+			fallthrough
+		case ' ':
+			capitalize_next = true
+		case 'a' ..= 'z':
+			if capitalize_next {
+				out[i] = u8(char) - 32
+			}
+			fallthrough
+		case:
+			capitalize_next = false
+		}
 	}
-	return s
+	return string(out)
 }
 
 render_template :: proc(
@@ -281,6 +298,7 @@ render_section :: proc(
 	partials: map[string]mustache.Template,
 	ctx: Template_Context,
 ) -> string {
+	alloc := site_allocator(site)
 	posts := make([dynamic]Page, 0, len(site.pages) / 2, context.temp_allocator)
 	for page in site.pages {
 		if page.section != section || page._is_index {
@@ -295,11 +313,12 @@ render_section :: proc(
 		ctx.title = fmt.tprintf("%s | %s", section_index.title, site.title)
 		ctx.og = og_for_page(site.og, section_index)
 	} else {
+		title := to_title_case(section, alloc)
 		ctx.page = Page {
-			title = capitalize(section),
+			title = title,
 		}
 		ctx.title = fmt.tprintf("%s | %s", ctx.page.title, site.title)
-		ctx.og.title = capitalize(section)
+		ctx.og.title = title
 		ctx.og.description = ""
 		ctx.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
 		ctx.og.type = "website"

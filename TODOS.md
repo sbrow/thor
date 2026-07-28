@@ -8,6 +8,7 @@
   - [ ] show a proper diagnostic for timezones
     - currently "unable to load timezone 'America/New_Yorkskie'"
     - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
+  - [ ] Test menu diagnostics
 - [x] Simplify / unify template context stack. Come up with a name for it.
   - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
@@ -17,10 +18,13 @@
 - [x] Add a `#config(MAX_CONTEXT_DEPTH, 16?)` to `mustache`.
 - [ ] Documentation
   - [ ] talk about the context stack (and its limit).
+  - [ ] highlight the differences in the way menus are handled.
+- [ ] consider sites with data based urls.
 - [ ] menu system
   - [ ] like Hugo's, but warn(/fail?) if menus are defined in the config *and* pages.
     - i.e. force the user to choose one or the other.
 - [ ] Don't show annoying log output in tests.
+- [ ] improve home link customization.
 
 ## Performance
 
@@ -44,6 +48,8 @@
   - `await` the highlighted code.
 - [ ] can markdown extensions run in parallel?
 - [ ] enforce MAX_SLUG_LENGTH
+- [ ] enforce MAX_CONTEXT_DEPTH
+- [ ] ensure struct fields are ordered correctly
 
 ## Remove Privileged content
 
@@ -78,6 +84,7 @@
 - [ ] Do we *need* mustache.Date_Components, or can we use core:time/datetime.DateTime?
 
 ## General 
+- [ ] configure opt-out of automatic sections being added to menu.
 - [ ] get rid of the global variables in the `treesitter` package.
 - [ ] Consider using `or_else` when applying default values to structs. i.e.
 ```odin
@@ -96,6 +103,8 @@ main :: proc () {
 - [ ] Integrity hash
   - Allows users to verify their output didn't change after upgrading to a new version
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
+- [ ] come up with scrapers / scrape sources to harvest site data
+  - we'll use this to help us sculpt defaults.
 - [ ] merge `render_{section,home_html,page_html}` procs.
 - [ ] try to combine render_page_html and render_home_html?
 - [ ] Debug log stats. (analytics)
@@ -116,6 +125,10 @@ main :: proc () {
 - [ ] running ./thor/thor still logs the debug message: using config /home/spencer/github.com/sbrow.github.io/thor.json
   - wrong cwd?
 - [ ] Clean up the default layouts
+- [ ] Menus
+  - [ ] Detailed frontmatter menu form ("menu": {"main": {"weight": 5}})
+  - [ ] Menu active state (pre-compute is_active based on page.permalink prefix match)
+  - [ ] Page.weight field for general-purpose page ordering (menus, lists, related posts)
 - [ ] if no `html` tag detected in output, re-render output with base template
       (or whatever template is next in the chain)
 - [ ] Add `-production` flag

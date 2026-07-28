@@ -69,6 +69,8 @@ site_load_content :: proc(site: ^Site) {
 	for &page in site.pages {
 		page.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
 	}
+
+	build_menus(site)
 }
 
 // scan_content_files walks the content directory and collects Pending_File
