@@ -20,7 +20,7 @@ Page :: struct {
 	date:        string,
 	lastmod:     string,
 	menu:        string,
-	body_html:   string,
+	content:     string,
 	og:          Open_Graph,
 	draft:       bool,
 	is_starred:  bool,
@@ -52,7 +52,13 @@ site_load_content :: proc(site: ^Site) {
 
 	// Phase 3: Load pages (grammars already cached)
 	for file in pending {
-		page, ok := load_page(file.path, file.section, file.slug, file.is_index, site.markdown_extensions)
+		page, ok := load_page(
+			file.path,
+			file.section,
+			file.slug,
+			file.is_index,
+			site.markdown_extensions,
+		)
 		if ok && (!page.draft || .Drafts in site.features) {
 			append(&site.pages, page)
 		}
@@ -85,12 +91,15 @@ scan_content_files :: proc(dir: string, section: string, pending: ^[dynamic]Pend
 			is_idx := filename == "index"
 			slug := is_idx ? "" : filename
 
-			append(pending, Pending_File {
-				path = strings.clone(entry.fullpath, context.temp_allocator),
-				section = section,
-				slug = slug,
-				is_index = is_idx,
-			})
+			append(
+				pending,
+				Pending_File {
+					path = strings.clone(entry.fullpath, context.temp_allocator),
+					section = section,
+					slug = slug,
+					is_index = is_idx,
+				},
+			)
 
 		case .Directory:
 			if section == "" {
@@ -101,12 +110,15 @@ scan_content_files :: proc(dir: string, section: string, pending: ^[dynamic]Pend
 					index_path = fmt.tprintf("%s/index.md", entry.fullpath)
 				}
 				if os.exists(index_path) {
-					append(pending, Pending_File {
-						path = strings.clone(index_path, context.temp_allocator),
-						section = section,
-						slug = entry.name,
-						is_index = false,
-					})
+					append(
+						pending,
+						Pending_File {
+							path = strings.clone(index_path, context.temp_allocator),
+							section = section,
+							slug = entry.name,
+							is_index = false,
+						},
+					)
 				}
 			}
 		case .Undetermined, .Symlink, .Named_Pipe, .Socket, .Block_Device, .Character_Device:
@@ -140,8 +152,9 @@ collect_languages :: proc(files: []Pending_File) -> []string {
 				i += 1
 			}
 
-			if i + 3 <= len(line) && (line[i] == '`' && line[i+1] == '`' && line[i+2] == '`') ||
-			   (i + 3 <= len(line) && line[i] == '~' && line[i+1] == '~' && line[i+2] == '~') {
+			if i + 3 <= len(line) &&
+				   (line[i] == '`' && line[i + 1] == '`' && line[i + 2] == '`') ||
+			   (i + 3 <= len(line) && line[i] == '~' && line[i + 1] == '~' && line[i + 2] == '~') {
 				fence_char := line[i]
 				j := i + 3
 				for j < len(line) && line[j] == fence_char {
@@ -226,9 +239,9 @@ load_page :: proc(
 	page.og = fm.og
 
 	if strings.has_suffix(file_path, ".html") {
-		page.body_html = strings.clone(body)
+		page.content = strings.clone(body)
 	} else {
-		page.body_html = md.process(body, ext, file_path)
+		page.content = md.process(body, ext, file_path)
 	}
 
 	if section == "" && is_index {
@@ -256,3 +269,4 @@ strip_extension :: proc(name: string) -> string {
 	}
 	return name[:dot]
 }
+

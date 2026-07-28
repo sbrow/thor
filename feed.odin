@@ -50,7 +50,7 @@ generate_rss :: proc(site: ^Site) -> string {
 				page.url,
 				pub_date,
 				page.url,
-				xml_escape(page.body_html),
+				xml_escape(page.content),
 			),
 		)
 	}
@@ -74,10 +74,7 @@ generate_sitemap :: proc(site: ^Site) -> string {
 		if page.date != "" {
 			lastmod = fmt.aprintf("<lastmod>%s</lastmod>", page.date)
 		}
-		strings.write_string(
-			&sb,
-			fmt.aprintf("<url><loc>%s</loc>%s</url>\n", page.url, lastmod),
-		)
+		strings.write_string(&sb, fmt.aprintf("<url><loc>%s</loc>%s</url>\n", page.url, lastmod))
 	}
 
 	// Section index pages (for sections without an index in content)

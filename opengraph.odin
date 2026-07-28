@@ -70,8 +70,8 @@ og_for_page :: proc(site_og: Open_Graph, page: Page) -> Open_Graph {
 		og.description = page.description
 		description_set = true
 	}
-	if !description_set && is_article && page.body_html != "" {
-		og.description = generate_description(generate_summary(page.body_html))
+	if !description_set && is_article && page.content != "" {
+		og.description = generate_description(generate_summary(page.content))
 		description_set = true
 	}
 	if !description_set {
@@ -115,3 +115,4 @@ og_for_page :: proc(site_og: Open_Graph, page: Page) -> Open_Graph {
 
 	return og
 }
+

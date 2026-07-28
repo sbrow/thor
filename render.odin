@@ -269,7 +269,7 @@ render_page_html :: proc(
 	ctx := ctx
 	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
 	ctx.page_title = page.title
-	ctx.content = page.body_html
+	ctx.content = page.content
 	ctx.date = page.date
 	ctx.og = og_for_page(site.og, page)
 	return render_template(content_tpl, ctx, partials)
@@ -293,7 +293,7 @@ render_home_html :: proc(
 
 	ctx := ctx
 	ctx.title = site.title
-	ctx.content = home.body_html
+	ctx.content = home.content
 	ctx.pages = list_pages
 	ctx.og = og_for_page(site.og, home)
 
@@ -320,7 +320,7 @@ render_section :: proc(
 
 	ctx := ctx
 	if has_index {
-		ctx.content = section_index.body_html
+		ctx.content = section_index.content
 		ctx.page_title = section_index.title
 		ctx.title = fmt.tprintf("%s | %s", section_index.title, site.title)
 		ctx.og = og_for_page(site.og, section_index)
