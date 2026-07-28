@@ -13,7 +13,6 @@ import "core:time/datetime"
 Template_Context :: struct {
 	params:      json.Value,
 	now:         string,
-	content:     string,
 	title:       string,
 	description: string,
 	og:          Open_Graph,
@@ -154,6 +153,7 @@ render_site :: proc(site: ^Site) {
 			break
 		}
 	}
+	ctx.page = home
 
 	// Collect sections
 	sections := make(map[string]bool)
@@ -248,7 +248,6 @@ render_page_html :: proc(
 	ctx := ctx
 	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
 	ctx.page = page
-	ctx.content = page.content
 	ctx.og = og_for_page(site.og, page)
 	return render_template(content_tpl, ctx, partials)
 }
@@ -270,7 +269,6 @@ render_home_html :: proc(
 
 	ctx := ctx
 	ctx.title = site.title
-	ctx.content = home.content
 	ctx.pages = list_pages
 	ctx.og = og_for_page(site.og, home)
 
@@ -296,7 +294,6 @@ render_section :: proc(
 
 	ctx := ctx
 	if has_index {
-		ctx.content = section_index.content
 		ctx.page = section_index
 		ctx.title = fmt.tprintf("%s | %s", section_index.title, site.title)
 		ctx.og = og_for_page(site.og, section_index)
