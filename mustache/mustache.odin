@@ -1,5 +1,6 @@
 package mustache
 
+import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:reflect"
@@ -147,7 +148,21 @@ render :: proc(
 
 	ctx := make([dynamic]any, 0, 4, allocator)
 	defer delete(ctx)
-	append(&ctx, data)
+
+	// If data is a []any, expand into individual context frames.
+	// Otherwise, push as a single frame.
+	elem_info, count, slice_data := list_info(data)
+	if elem_info != nil {
+		if _, is_any := elem_info.variant.(runtime.Type_Info_Any); is_any {
+			for j in 0 ..< count {
+				append(&ctx, extract_list_element(elem_info, slice_data, j))
+			}
+		} else {
+			append(&ctx, data)
+		}
+	} else {
+		append(&ctx, data)
+	}
 
 	all_nodes := tmpl.nodes[:]
 	err = render_nodes(tmpl, all_nodes, &ctx, partials, &builder)

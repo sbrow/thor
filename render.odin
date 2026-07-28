@@ -103,10 +103,17 @@ capitalize :: proc(s: string) -> string {
 
 render_template :: proc(
 	content_tpl: mustache.Template,
-	data: Template_Context,
+	ctx: Template_Context,
 	partials: map[string]mustache.Template,
 ) -> string {
-	result, err := mustache.render(content_tpl, data, partials)
+	result, err := mustache.render(
+		content_tpl,
+		[]any { /*ctx.site,*/
+			ctx.page,
+			ctx,
+		},
+		partials,
+	)
 	if err != nil {
 		log.errorf(
 			"%s",
