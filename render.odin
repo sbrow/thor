@@ -2,7 +2,6 @@ package main
 
 import "mustache"
 
-import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:os"
@@ -11,13 +10,12 @@ import "core:time"
 import "core:time/datetime"
 
 Template_Context :: struct {
-	params:      json.Value,
 	now:         string,
 	title:       string,
-	description: string,
-	og:          Open_Graph,
 	date_format: string,
 	timezone:    ^datetime.TZ_Region,
+	og:          Open_Graph,
+	site:        Site_Context,
 	page:        Page,
 
 	// Home data
@@ -106,14 +104,7 @@ render_template :: proc(
 	ctx: Template_Context,
 	partials: map[string]mustache.Template,
 ) -> string {
-	result, err := mustache.render(
-		content_tpl,
-		[]any { /*ctx.site,*/
-			ctx.page,
-			ctx,
-		},
-		partials,
-	)
+	result, err := mustache.render(content_tpl, []any{ctx.site, ctx.page, ctx}, partials)
 	if err != nil {
 		log.errorf(
 			"%s",
@@ -142,9 +133,8 @@ render_site :: proc(site: ^Site) {
 	assert(ok2)
 
 	ctx := Template_Context {
+		site        = site.site_context,
 		now         = now,
-		params      = site.params,
-		description = site.description,
 		og          = site.og,
 		date_format = site.date.format,
 		timezone    = site.tz,

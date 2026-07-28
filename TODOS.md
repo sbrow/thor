@@ -2,14 +2,18 @@
 
 - Polish existing features before moving on to new ones.
 - [ ] Improve diagnostics
-- [ ] Simplify / unify template context stack. Come up with a name for it.
-  - [ ] `render_template` should accept `Template_Context`, not `any`
+- [x] Simplify / unify template context stack. Come up with a name for it.
+  - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
 - [ ] consider adding a limit to the context stack in mustache.
 - [ ] better diagnostics for syntax errors in treesitter.
 - [x] Add heading ids as a default on extension.
 - [ ] show "stack traces" in template error diagnostics
 - [ ] starred must be a param.
+- [ ] Add a `#config(MAX_CONTEXT_DEPTH, 16?)` to `mustache`.
+- [ ] menu system
+  - [ ] like Hugo's, but warn(/fail?) if menus are defined in the config *and* pages.
+    - i.e. force the user to choose one or the other.
 
 ## Performance
 

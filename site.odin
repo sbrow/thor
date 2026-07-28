@@ -13,24 +13,31 @@ import "core:time/timezone"
 import md "markdown"
 
 
-// Site is the primary workhorse.
+// Site_Context holds the site date that is accessible in templates.
+Site_Context :: struct {
+	title:       string,
+	description: string,
+	base_url:    string,
+	params:      json.Object,
+	og:          Open_Graph,
+}
+
+// Site is the primary workhorse, containing everything needed to build the site,
+// including an arena allocator, the pages, and all the various directories and
+// enabled features.
 Site :: struct {
+	using site_context:  Site_Context,
 	arena:               mem.Dynamic_Arena,
 	pages:               #soa[dynamic]Page,
 	modules:             [dynamic]string,
 	vfs:                 VFS,
-	title:               string,
-	description:         string,
-	base_url:            string,
 	config_path:         string,
 	content_dir:         string,
 	assets_dir:          string,
 	output_dir:          string,
 	layouts_dir:         string,
-	params:              json.Object,
 	features:            bit_set[Feature],
 	markdown_extensions: bit_set[md.Extension],
-	og:                  Open_Graph,
 	date:                Date_Preferences,
 	tz:                  ^datetime.TZ_Region,
 	grammars:            string,
