@@ -10,11 +10,15 @@ Inner :: struct {
 	bar: int,
 }
 
+Page :: struct {
+	title: string,
+}
+
 Outer :: struct {
-	title:      string,
-	page.title: string,
-	inner:      Inner,
-	numbers:    [3]int,
+	title:   string,
+	page:    Page,
+	inner:   Inner,
+	numbers: [3]int,
 }
 
 @(test)

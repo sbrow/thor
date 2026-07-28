@@ -153,10 +153,7 @@ suggest_correction :: proc(available: []string, missing: string) -> string {
 	if len(available) == 0 || len(missing) == 0 {
 		return ""
 	}
-	threshold := 2
-	if len(missing) > 8 {
-		threshold = len(missing) / 4
-	}
+	threshold := max(2, len(missing) / 3)
 
 	best: string
 	best_dist := threshold + 1

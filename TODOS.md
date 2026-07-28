@@ -2,18 +2,25 @@
 
 - Polish existing features before moving on to new ones.
 - [ ] Improve diagnostics
+  - [ ] show "stack traces" in template error diagnostics
+  - [ ] better diagnostics for syntax errors in treesitter.
+  - [ ] Ensure diagnostics for MAX_CONTEXT_DEPTH are good.
+  - [ ] show a proper diagnostic for timezones
+    - currently "unable to load timezone 'America/New_Yorkskie'"
+    - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
 - [x] Simplify / unify template context stack. Come up with a name for it.
   - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
-- [ ] consider adding a limit to the context stack in mustache.
-- [ ] better diagnostics for syntax errors in treesitter.
+- [x] consider adding a limit to the context stack in mustache.
 - [x] Add heading ids as a default on extension.
-- [ ] show "stack traces" in template error diagnostics
 - [ ] starred must be a param.
-- [ ] Add a `#config(MAX_CONTEXT_DEPTH, 16?)` to `mustache`.
+- [x] Add a `#config(MAX_CONTEXT_DEPTH, 16?)` to `mustache`.
+- [ ] Documentation
+  - [ ] talk about the context stack (and its limit).
 - [ ] menu system
   - [ ] like Hugo's, but warn(/fail?) if menus are defined in the config *and* pages.
     - i.e. force the user to choose one or the other.
+- [ ] Don't show annoying log output in tests.
 
 ## Performance
 
@@ -69,9 +76,6 @@
 - [ ] display an error when no part of the date appears in the output.
 - [ ] Handle 0 and whitespace padding i.e. "_2" -> " 2"
 - [ ] Do we *need* mustache.Date_Components, or can we use core:time/datetime.DateTime?
-- [ ] show a proper diagnostic for timezones
-  - currently "unable to load timezone 'America/New_Yorkskie'"
-  - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
 
 ## General 
 - [ ] get rid of the global variables in the `treesitter` package.

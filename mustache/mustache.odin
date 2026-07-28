@@ -3,8 +3,18 @@ package mustache
 import "base:runtime"
 import "core:fmt"
 import "core:log"
-import "core:reflect"
 import "core:strings"
+
+// A hypothetical maximum context depth. Trying to pass more than this many items
+// to render(tpl, data), or nesting templates further than this depth would be
+// an error.
+// May be enforced in a later version (for performance)
+MAX_CONTEXT_DEPTH :: #config(MAX_CONTEXT_DEPTH, 16)
+
+// Context_Stack is the growable stack of data frames walked top-to-bottom by
+// resolve_name. Frames are pushed on section descent and popped on exit; the
+// root data (or each element of a root []any) forms the base frames.
+Context_Stack :: [dynamic]any
 
 // ---------------------------------------------------------------------------
 // Error types
@@ -12,7 +22,7 @@ import "core:strings"
 
 Error_Kind :: enum {
 	Syntax, // parse-time: malformed template
-	Data,   // render-time: template fine, data wrong (e.g. filter misuse)
+	Data, // render-time: template fine, data wrong (e.g. filter misuse)
 }
 
 Error_Body :: struct {
@@ -22,14 +32,18 @@ Error_Body :: struct {
 }
 
 // Error is nil when no error occurred.
-Error :: union { Error_Body }
+Error :: union {
+	Error_Body,
+}
 
 // body unwraps the Error_Body from a non-nil Error.
 // Precondition: err != nil.
 body :: proc(err: Error) -> Error_Body {
 	switch e in err {
-	case Error_Body: return e
-	case: return {}
+	case Error_Body:
+		return e
+	case:
+		return {}
 	}
 }
 
@@ -143,11 +157,9 @@ render :: proc(
 	err: Error,
 ) {
 	builder: strings.Builder
-	strings.builder_init(&builder, allocator)
-	defer strings.builder_destroy(&builder)
+	strings.builder_init(&builder, context.temp_allocator)
 
-	ctx := make([dynamic]any, 0, 4, allocator)
-	defer delete(ctx)
+	ctx := make(Context_Stack, 0, 4, context.temp_allocator)
 
 	// If data is a []any, expand into individual context frames.
 	// Otherwise, push as a single frame.
@@ -287,14 +299,14 @@ parse_section :: proc(
 
 		case .Section_Close:
 			if strings.contains(tok.value, "|") {
-			return Error_Body {
-				msg = fmt.tprintf(
-					"pipe expression not allowed in close tag '{{{{/%s}}}}' — use the bare key",
-					tok.value,
-				),
-				pos = tok.pos,
-				kind = .Syntax,
-			}
+				return Error_Body {
+					msg = fmt.tprintf(
+						"pipe expression not allowed in close tag '{{{{/%s}}}}' — use the bare key",
+						tok.value,
+					),
+					pos = tok.pos,
+					kind = .Syntax,
+				}
 			}
 			if end_tag != "" && tok.value == end_tag {
 				pos^ += 1
@@ -331,12 +343,7 @@ parse_section :: proc(
 			idx := len(nodes)
 			append(
 				nodes,
-				Node {
-					kind = .Parent,
-					key = tok.value,
-					indent = tok.indent,
-					pos = tok.pos,
-				},
+				Node{kind = .Parent, key = tok.value, indent = tok.indent, pos = tok.pos},
 			)
 			parse_section(tokens, pos, nodes, tok.value, source, allocator, tok.pos) or_return
 			nodes[idx].children = nodes[idx + 1:len(nodes)]
@@ -344,15 +351,7 @@ parse_section :: proc(
 		case .Block_Open:
 			pos^ += 1
 			idx := len(nodes)
-			append(
-				nodes,
-				Node {
-					kind = .Block,
-					key = tok.value,
-					indent = tok.indent,
-					pos = tok.pos,
-				},
-			)
+			append(nodes, Node{kind = .Block, key = tok.value, indent = tok.indent, pos = tok.pos})
 			parse_section(tokens, pos, nodes, tok.value, source, allocator, tok.pos) or_return
 			nodes[idx].children = nodes[idx + 1:len(nodes)]
 		}
@@ -499,21 +498,29 @@ remove_line_indent :: proc(s: string, indent: string, allocator := context.alloc
 
 render_template :: proc(
 	pt: Template,
-	ctx: ^[dynamic]any,
+	ctx: ^Context_Stack,
 	partials: map[string]Template,
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override,
 	indent: string,
 ) -> Error {
 	if len(indent) > 0 {
-		state := Indent_State{indent = indent, at_line_start = false}
+		state := Indent_State {
+			indent        = indent,
+			at_line_start = false,
+		}
 		strings.write_string(b, indent) // first line always gets indent
 		return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, &state)
 	}
 	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, nil)
 }
 
-write_indented :: proc(b: ^strings.Builder, indent: string, content: string, at_line_start: ^bool) {
+write_indented :: proc(
+	b: ^strings.Builder,
+	indent: string,
+	content: string,
+	at_line_start: ^bool,
+) {
 	if len(indent) == 0 || len(content) == 0 {
 		strings.write_string(b, content)
 		return
@@ -544,7 +551,7 @@ write_indented :: proc(b: ^strings.Builder, indent: string, content: string, at_
 render_nodes :: proc(
 	current: Template,
 	nodes: []Node,
-	ctx: ^[dynamic]any,
+	ctx: ^Context_Stack,
 	partials: map[string]Template,
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override = nil,
@@ -588,16 +595,16 @@ render_nodes :: proc(
 				if perr == nil {
 					temp: strings.Builder
 					strings.builder_init(&temp, context.temp_allocator)
-				render_nodes(
-					sub_tpl,
-					sub_tpl.nodes[:],
-					ctx,
-					partials,
-					&temp,
-					blocks,
-					nil,
-				) or_return
-				write_value(b, strings.to_string(temp), escape = true)
+					render_nodes(
+						sub_tpl,
+						sub_tpl.nodes[:],
+						ctx,
+						partials,
+						&temp,
+						blocks,
+						nil,
+					) or_return
+					write_value(b, strings.to_string(temp), escape = true)
 				}
 			} else {
 				write_value(b, val, escape = true)
@@ -630,16 +637,16 @@ render_nodes :: proc(
 				if perr == nil {
 					temp: strings.Builder
 					strings.builder_init(&temp, context.temp_allocator)
-				render_nodes(
-					sub_tpl,
-					sub_tpl.nodes[:],
-					ctx,
-					partials,
-					&temp,
-					blocks,
-					nil,
-				) or_return
-				write_value(b, strings.to_string(temp), escape = false)
+					render_nodes(
+						sub_tpl,
+						sub_tpl.nodes[:],
+						ctx,
+						partials,
+						&temp,
+						blocks,
+						nil,
+					) or_return
+					write_value(b, strings.to_string(temp), escape = false)
 				}
 			} else {
 				write_value(b, val, escape = false)
@@ -666,23 +673,36 @@ render_nodes :: proc(
 					context.temp_allocator,
 				)
 				if perr == nil {
-				render_nodes(
-					sub_tpl,
-					sub_tpl.nodes[:],
-					ctx,
-					partials,
-					b,
-					blocks,
-					nil,
-				) or_return
+					render_nodes(
+						sub_tpl,
+						sub_tpl.nodes[:],
+						ctx,
+						partials,
+						b,
+						blocks,
+						nil,
+					) or_return
 				}
-		} else if is_truthy(val) {
-			children := node.children
-			elem_info, count, data := list_info(val)
-			if elem_info != nil {
-				for j in 0 ..< count {
-					elem := extract_list_element(elem_info, data, j)
-					append(ctx, elem)
+			} else if is_truthy(val) {
+				children := node.children
+				elem_info, count, data := list_info(val)
+				if elem_info != nil {
+					for j in 0 ..< count {
+						elem := extract_list_element(elem_info, data, j)
+						context_push(ctx, elem, current, node)
+						defer pop(ctx)
+						render_nodes(
+							current,
+							children,
+							ctx,
+							partials,
+							b,
+							blocks,
+							indent_state,
+						) or_return
+					}
+				} else {
+					context_push(ctx, val, current, node)
 					defer pop(ctx)
 					render_nodes(
 						current,
@@ -694,13 +714,8 @@ render_nodes :: proc(
 						indent_state,
 					) or_return
 				}
-			} else {
-				append(ctx, val)
-				defer pop(ctx)
-				render_nodes(current, children, ctx, partials, b, blocks, indent_state) or_return
 			}
-		}
-		i += 1 + len(node.children)
+			i += 1 + len(node.children)
 
 		case .Inverted:
 			val := resolve_name(node.key, ctx[:])
@@ -714,10 +729,18 @@ render_nodes :: proc(
 				}
 				val = transformed
 			}
-		if !is_truthy(val) {
-			render_nodes(current, node.children, ctx, partials, b, blocks, indent_state) or_return
-		}
-		i += 1 + len(node.children)
+			if !is_truthy(val) {
+				render_nodes(
+					current,
+					node.children,
+					ctx,
+					partials,
+					b,
+					blocks,
+					indent_state,
+				) or_return
+			}
+			i += 1 + len(node.children)
 
 		case .Partial:
 			name := node.key
@@ -736,64 +759,64 @@ render_nodes :: proc(
 			}
 			i += 1
 
-	case .Block:
-		content_nodes: []Node
-		content_blocks := blocks
-		render_current := current
+		case .Block:
+			content_nodes: []Node
+			content_blocks := blocks
+			render_current := current
 
-		found_override := false
-		if blocks != nil {
-			if o, ok := blocks[node.key]; ok {
-				content_nodes = o.nodes
-				found_override = true
-				render_current = o.source
+			found_override := false
+			if blocks != nil {
+				if o, ok := blocks[node.key]; ok {
+					content_nodes = o.nodes
+					found_override = true
+					render_current = o.source
+				}
 			}
-		}
-		if !found_override {
-			content_nodes = node.children
-		}
-
-		if len(node.indent) > 0 {
-			temp: strings.Builder
-			strings.builder_init(&temp, context.temp_allocator)
-			render_nodes(
-				render_current,
-				content_nodes,
-				ctx,
-				partials,
-				&temp,
-				content_blocks,
-				nil,
-			) or_return
-			at_ls := true
-			write_indented(b, node.indent, strings.to_string(temp), &at_ls)
-		} else {
-			render_nodes(
-				render_current,
-				content_nodes,
-				ctx,
-				partials,
-				b,
-				content_blocks,
-				indent_state,
-			) or_return
-		}
-		i += 1 + len(node.children)
-
-	case .Parent:
-		parent_children := node.children
-		merged := merge_block_overrides(parent_children, blocks, current)
-		pt, found := partials[node.key]
-		if !found {
-			warn_missing_partial(current, partials, node, node.key)
-		} else {
-			warn_unmatched_block_overrides(current, pt, parent_children)
-			render_template(pt, ctx, partials, b, merged, node.indent) or_return
-			if indent_state != nil {
-				indent_state.at_line_start = false
+			if !found_override {
+				content_nodes = node.children
 			}
-		}
-		i += 1 + len(node.children)
+
+			if len(node.indent) > 0 {
+				temp: strings.Builder
+				strings.builder_init(&temp, context.temp_allocator)
+				render_nodes(
+					render_current,
+					content_nodes,
+					ctx,
+					partials,
+					&temp,
+					content_blocks,
+					nil,
+				) or_return
+				at_ls := true
+				write_indented(b, node.indent, strings.to_string(temp), &at_ls)
+			} else {
+				render_nodes(
+					render_current,
+					content_nodes,
+					ctx,
+					partials,
+					b,
+					content_blocks,
+					indent_state,
+				) or_return
+			}
+			i += 1 + len(node.children)
+
+		case .Parent:
+			parent_children := node.children
+			merged := merge_block_overrides(parent_children, blocks, current)
+			pt, found := partials[node.key]
+			if !found {
+				warn_missing_partial(current, partials, node, node.key)
+			} else {
+				warn_unmatched_block_overrides(current, pt, parent_children)
+				render_template(pt, ctx, partials, b, merged, node.indent) or_return
+				if indent_state != nil {
+					indent_state.at_line_start = false
+				}
+			}
+			i += 1 + len(node.children)
 		}
 	}
 	return nil
@@ -935,5 +958,27 @@ warn_unmatched_block_overrides :: proc(
 		)
 		log.warnf("%s", diag)
 	}
+}
+
+context_push :: proc(ctx: ^Context_Stack, val: any, current: Template, node: Node) {
+	append(ctx, val)
+	if len(ctx^) == MAX_CONTEXT_DEPTH + 1 {
+		warn_context_depth(current, node)
+	}
+}
+
+// warn_context_depth emits a diagnostic warning pointing at the section tag
+// whose push carried the context stack past MAX_CONTEXT_DEPTH.
+warn_context_depth :: proc(current: Template, node: Node) {
+	msg := fmt.tprintf(
+		"context stack depth exceeded %d (possible recursive section/partial)",
+		MAX_CONTEXT_DEPTH,
+	)
+	path := current.path
+	if path == "" {
+		path = "<input>"
+	}
+	diag := format_error(path, current.source, node.pos, msg, "", colorize = should_colorize())
+	log.warnf("%s", diag)
 }
 

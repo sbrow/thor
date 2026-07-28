@@ -1,7 +1,9 @@
 #+test
 package mustache
 
+import "core:log"
 import "core:mem"
+import "core:strings"
 import "core:testing"
 
 @(test)
@@ -122,5 +124,41 @@ leak_repeated_render :: proc(t: ^testing.T) {
 		testing.expect(t, rerr == nil)
 		defer delete(result)
 	}
+}
+
+// A deeply nested map pushes the context stack past MAX_CONTEXT_DEPTH (16).
+// The depth warning must be non-fatal: rendering still succeeds.
+@(test)
+test_context_depth_warns :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
+	AMT :: MAX_CONTEXT_DEPTH + 2
+
+	// Build AMT nested {x: {...}} levels; the innermost holds `leaf`.
+	data := make(map[string]any, context.temp_allocator)
+	data["leaf"] = "found"
+	for _ in 0 ..< AMT {
+		outer := make(map[string]any, context.temp_allocator)
+		outer["x"] = data
+		data = outer
+	}
+
+	// Template: AMT nested {{#x}} sections around {{leaf}}.
+	src: strings.Builder
+	strings.builder_init(&src, context.temp_allocator)
+	for _ in 0 ..< AMT do strings.write_string(&src, "{{#x}}")
+	strings.write_string(&src, "{{leaf}}")
+	for _ in 0 ..< AMT do strings.write_string(&src, "{{/x}}")
+	template := strings.to_string(src)
+
+	tmpl, perr := parse(template, "<depth-test>", context.temp_allocator)
+	testing.expect(t, perr == nil, "should parse")
+	if perr != nil {
+		return
+	}
+
+	result, rerr := render(tmpl, data, allocator = context.temp_allocator)
+	testing.expect(t, rerr == nil, "depth warning must be non-fatal")
+	testing.expect_value(t, result, "found")
 }
 
