@@ -98,6 +98,14 @@ main :: proc () {
 - [ ] Content-hash fingerprinting for CSS and JS cache busting
 - [ ] merge `render_{section,home_html,page_html}` procs.
 - [ ] try to combine render_page_html and render_home_html?
+- [ ] Debug log stats. (analytics)
+  - [ ] final Context_Stack cap
+  - [ ] highest PIPE args used 
+  - [ ] longest slug length + name that generated it
+  - [ ] number of pages
+  - [ ] number of blocks
+  - [ ] enabled features / extensions
+  - [ ] etc
 - [ ] Avoid `json.Value` / `json.Object` where possible.
 - [ ] Create a json schema file for `thor.json`.
 - [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.
