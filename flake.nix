@@ -114,6 +114,7 @@
               pkgs.git
               pkgs.cmark
               pkgs.tree-sitter
+              pkgs.tzdata
               html-grammar
               css-grammar
             ];
