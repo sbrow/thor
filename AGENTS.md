@@ -449,6 +449,14 @@ See `HUGO.md` for analysis of why thor doesn't need Hugo's shortcode context iso
 See `mustache/SPEC.md` for the original implementation specification.
 See `mustache/EXTENSIONS.md` for non-standard extensions (pipes).
 
+## Odin language facts
+
+These are things that are easy to get wrong:
+
+- **Proc arguments are immutable.** You cannot assign to a parameter directly. To get a mutable copy, shadow it: `x := x`. If you need to modify the source, pass a pointer `^x`.
+- **`for` each loops use `item, idx` order**, not `idx, item`. Correct: `for item, idx in arr`. Wrong: `for idx, item in arr`.
+- **`make([dynamic]T, n, allocator)` sets capacity, not length.** To get length=0 with capacity=n, use `make([dynamic]T, 0, n, allocator)`. Using `make([dynamic]T, n, allocator)` creates `len=n` with `n` zero-initialized elements.
+
 ## TODO
 
 See `TODOS.md` for the full list.
