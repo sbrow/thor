@@ -21,6 +21,8 @@
     - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
   - [ ] Test menu diagnostics
   - [ ] Honestly, Test **all** diagnostics
+  - [ ] Need to be careful about diagnostics across module boundaries.
+    - we don't necessarilly want to warn users about theme designers mistakes. (though perhaps we do)
 - [x] Simplify / unify template context stack. Come up with a name for it.
   - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
@@ -37,6 +39,10 @@
     - i.e. force the user to choose one or the other.
 - [ ] Don't show annoying log output in tests.
 - [ ] improve home link customization.
+  - [ ] currently an accessability issue.
+- [ ] support JSON5 in in frontmatter
+- [ ] Create a json schema file for `thor.json`.
+- [ ] cleanup `#partial switch`es.
 
 ## Performance
 
@@ -128,7 +134,6 @@ main :: proc () {
   - [ ] enabled features / extensions
   - [ ] etc
 - [ ] Avoid `json.Value` / `json.Object` where possible.
-- [ ] Create a json schema file for `thor.json`.
 - [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.
 - [ ] Add page params
 - [ ] We must remove all mention of `posts` from the odin code.

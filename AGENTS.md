@@ -21,15 +21,16 @@ thor/
 ├── markdown/           # Content transformation pipeline (imports ../treesitter)
 ├── mustache/           # Template engine with lambdas + pipe filters + diagnostics
 ├── content.odin        # Page struct, Pending_File, scan_content_files, collect_languages, load_page
-├── render.odin         # Template rendering, data structs, RSS, sitemap
-├── site.odin           # Config (Flags, Config_File, Site), init_site
+├── render.odin         # Template rendering, Template_Context, sort_pages, RSS, sitemap
+├── menus.odin          # Menu_Entry, DEFAULT_WEIGHT, build_menus, collect_auto_menus, merge_page_menus, parse_page_menus, parse_config_menus
+├── site.odin           # Config (Flags, Config_File, Site, Site_Context), init_site
 ├── minify.odin         # HTML/CSS minification (imports treesitter)
 ├── feed.odin           # RSS + sitemap generation
 ├── vfs.odin            # Union file system (defaults → modules → site)
 ├── assets.odin         # VFS-based asset copying
-├── html.odin           # HTML helpers: strip_html_tags, unescape_html, generate_summary (word-count truncation), generate_description (scrub to plain text)
+├── html.odin           # HTML helpers: strip_html_tags, unescape_html, generate_summary, generate_description
 ├── opengraph.odin      # Open_Graph struct + og_for_site/og_for_page
-├── frontmatter.odin    # JSON frontmatter parser (supports nested og + lastmod)
+├── frontmatter.odin    # JSON frontmatter parser (supports nested og + lastmod + weight + menus)
 ├── defaults.odin       # DEFAULTS_PATH constant (#directory)
 ├── main.odin           # Entry point
 ├── bench/              # Template rendering benchmark
@@ -41,16 +42,17 @@ thor/
 | File | Responsibility |
 |---|---|
 | `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `build_vfs`, wires `treesitter.grammar_dir`/`query_dir` from config, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
-| `site.odin` | `Flags` (CLI), `Config_File` (thor.json, includes `og: Open_Graph`), `Site` (runtime state + arena + VFS + pages + modules + `og`). `Feature` enum. 5-step `init_site`. Imports `md "markdown"` for `Extension` enum. |
-| `content.odin` | `Page` struct (includes `lastmod`, `og`), `Pending_File` struct, `scan_content_files` (section-aware walk that handles leaf bundles), `collect_languages` (pre-scan for code fence languages), `load_page`, `infer_layout`. Calls `md.process()` for the markdown pipeline. |
-| `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. Data structs (`Base_Data`, `Page_Data`, `Home_Data`, `Section_Data`). VFS-based template loading with fallback chain (`get_template`). |
+| `site.odin` | `Flags` (CLI), `Config_File` (thor.json), `Site_Context` (template-facing: `title`, `description`, `base_url`, `params`, `og`, `menus`), `Site` (runtime state + arena + VFS + pages + `og`). `Feature` enum. 5-step `init_site`. Config menu parsing in `site_apply_config`. |
+| `content.odin` | `Page` struct (includes `weight`, `menus: map[string]Menu_Entry`, `og`), `Pending_File` struct, `scan_content_files` (section-aware walk that handles leaf bundles), `collect_languages` (pre-scan for code fence languages), `load_page` (falls back to file mtime when no frontmatter date), `infer_layout`. Calls `md.process()` for the markdown pipeline. |
+| `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. `Template_Context` (unified render struct with `site: Site_Context`, `page: Page`, `menus`, `posts`, `pages`). 3-frame context stack via `[]any{ctx.site, ctx.page, ctx}`. `sort_pages` (weight primary, date secondary). `to_title_case` for section display names. VFS-based template loading with fallback chain (`get_template`). |
+| `menus.odin` | Menu system: `Menu_Entry {name, url, weight}`, `DEFAULT_WEIGHT = 10`. `build_menus` (priority chain: config → auto + page frontmatter). `collect_auto_menus` (sections + root-level pages). `merge_page_menus` (frontmatter entries with effective weight fallback). `parse_page_menus` (string/array/object forms). `parse_config_menus` (from thor.json). `sort_menu_entries` / `compare_menu_entries` (weight primary, name secondary). |
 | `minify.odin` | HTML/CSS minification via tree-sitter. Imports `ts "treesitter"`. |
 | `feed.odin` | RSS feed + sitemap XML. Uses `page.url` for canonical URLs. |
 | `vfs.odin` | Union file system: `VFS`, `build_vfs`, `mount_dir`, `mount_subdir`, `mount_recursive`, `vfs_get`, `vfs_get_entry`, `vfs_entry_data`. Layers defaults → modules → site. |
 | `assets.odin` | `copy_assets_dir` — iterates VFS entries with `assets/` prefix, minifies CSS, copies verbatim or via `os.copy_file`. |
 | `html.odin` | `strip_html_tags`, `unescape_html`, `generate_summary` (word-count truncation, zero-alloc), `generate_description` (HTML→plain text: strip tags, decode entities, collapse whitespace). |
-| `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec, `is_article: Maybe(bool)`). `og_for_site(site)` for site defaults (from config + derived), `og_for_page(site_og, page)` for page-specific (overlay page.og + derive from page data). |
-| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, and nested `og` object (via `json_get_open_graph`). |
+| `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec, `is_article: Maybe(bool)`). `og_for_site(site)` for site defaults (from config + derived), `og_for_page(site_og, page)` for page-specific (overlay page.og + derive from page data). Description falls back to `generate_description(generate_summary(body_html))`. |
+| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, `weight`, `menus`, and nested `og` object (via `json_get_open_graph`). Helpers: `json_get_string`, `json_get_bool`, `json_get_int`. |
 | `defaults.odin` | `DEFAULTS_PATH` constant, resolved at compile time via `#directory` so bundled templates ship in the binary. |
 
 ### Subpackages
@@ -64,6 +66,7 @@ thor/
 | | `emoji.odin` | `expand_emoji` — `:shortcode:` → unicode emoji |
 | | `sectionate.odin` | `wrap_sections` — splits HTML at `<h2>` into `<section>` wrappers |
 | | `highlight.odin` | Syntax highlighting via tree-sitter. Imports `../treesitter`. |
+| | `heading_ids.odin` | `inject_heading_ids` — adds `id` attributes to `<h1>`-`<h6>` from heading text. Slug-based, deduplicated. |
 | `mustache/` | See [Mustache engine](#mustache-engine) below | Template engine |
 | `bench/` | `bench.odin` + `templates/` | Standalone template rendering benchmark. Generates 500 posts + 100 comments, renders with indented partials + inheritance + pipes. `--dump <path>` for output validation, positional arg for iteration count (default 250). |
 
@@ -74,10 +77,10 @@ Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss,
 ```
 thor.json → find_config → init_site (5-step)
   → build_vfs (defaults/layouts → modules → site/layouts, site/assets)
-  → site_load_content (scan_content_files + collect_languages + preload_grammars + load_page + url computation)
+  → site_load_content (scan_content_files + collect_languages + preload_grammars + load_page + url computation + build_menus)
   → render_site
     → load_partials + get_template (VFS + fallback chain)
-    → render_page_html / render_home_html / render_section
+    → render_page_html / render_home_html / render_section (3-frame context stack: site, page, ctx)
     → optional minify_html
     → public/
 ```
@@ -94,12 +97,14 @@ Page :: struct {
     title:       string,
     description: string,
     date:        string,
+    year:        string,
+    weight:      int,         // page ordering (default DEFAULT_WEIGHT = 10)
     lastmod:     string,
-    menu:        string,
-    body_html:   string,
+    menus:       map[string]Menu_Entry,  // frontmatter menu assignments
+    content:     string,      // rendered HTML body
+    og:          Open_Graph,
     draft:       bool,
-    is_starred:  bool,
-    og:          Open_Graph,  // per-page OG overrides from frontmatter
+    starred:     bool,
     _is_index:   bool `private`,
 }
 ```
@@ -112,6 +117,33 @@ No `Page_Type` enum — page type is inferred from section + `_is_index`. Layout
 - Root page: `"page"`
 
 **Template fallback chain** (in `get_template`): for content pages, `post → page → base`; for section indexes, `posts_index → section_index → page → base`. Fallbacks logged at debug level. Frontmatter `layout` field overrides the inferred value.
+
+## Menus
+
+Menu system in `menus.odin`. `Menu_Entry :: struct {name: string, url: string, weight: int}`. `DEFAULT_WEIGHT = 10`.
+
+### Sources (priority chain, no mixing)
+
+1. **Config menus** (`"menus"` key in `thor.json`) — exclusive. `"menus": {}` = explicit opt-out (no menus). Config entries sorted by weight.
+2. **Auto-menus + page frontmatter** — always run together when no config menus:
+   - Auto: one entry per section directory + one per root-level non-index page. Alphabetical.
+   - Page frontmatter: `"menus": "main"` (string), `["main", "footer"]` (array), or `{"main": {"weight": 30}}` (object with per-menu weight). Merged with auto entries, sorted by weight.
+
+### Weight
+
+- `Page.weight` — general page ordering (default `DEFAULT_WEIGHT`). Affects `sort_pages` (weight primary, date secondary).
+- Per-menu weight — from object frontmatter form. Falls back to `Page.weight` when `DEFAULT_WEIGHT`.
+- `Menu_Entry.weight` — effective weight after fallback. Sorted ascending, name alphabetical for ties.
+
+### Templates
+
+```html
+{{#menus.main}}
+  <li><a href="{{url}}">{{name}}</a></li>
+{{/menus.main}}
+```
+
+`Template_Context.menus` resolves above `Page.menus` (frontmatter assignments) on the 3-frame context stack. Accessible as `{{#menus.main}}` or `{{#site.menus.main}}`.
 
 ## Config system
 
@@ -146,6 +178,12 @@ Config precedence: `CLI flags > thor.json values > hardcoded defaults`.
   "grammars": "~/.config/helix/runtime/grammars/",
   "queries": "/path/to/tree-sitter/queries",
   "markdown_extensions": { "emoji": true, "highlight": false },
+  "menus": {
+    "main": [
+      {"name": "Home", "url": "/", "weight": 1},
+      {"name": "About", "url": "/about/"}
+    ]
+  },
   "params": {
     "social": [
       { "name": "github", "url": "...", "icon": "icons/github" }
@@ -225,36 +263,26 @@ Templates use Mustache with template inheritance (`{{<base}}` / `{{$block}}`):
 {{/base}}
 ```
 
-Data is passed as **typed structs** (not `map[string]any`). Mustache resolves struct fields via Odin reflection, including `using`-embedded fields. Date presence is checked via string truthiness (`{{#date}}`) — no separate `has_date` bool needed. Dates are stored as raw ISO strings; presentation formatting happens in the template via the `format` pipe (see Pipes extension below).
+Data is passed as a single `Template_Context` struct. `render_template` passes a 3-frame context stack `[]any{ctx.site, ctx.page, ctx}` to `mustache.render`, which auto-detects `[]any` and expands each element into a stack frame. Name resolution walks top-to-bottom: `Template_Context` → `Page` → `Site_Context`. Fields not found on the top frame fall through to lower frames.
 
 ```odin
-Base_Data :: struct {
-    now:          string,        // UTC ISO 8601 build timestamp
-    params:       json.Value,
-    content:      string,
-    title:        string,
-    description:  string,
-    og:           Open_Graph,
-    date_format:  string,        // from site.date.format (thor.json)
-    timezone:     ^datetime.TZ_Region,  // loaded from site.date.timezone or local, owned by Site
-}
-Page_Data :: struct {
-    using base: Base_Data,  // fields promoted via reflection fallback
-    page.title: string,
-    date:       string,     // raw ISO 8601; formatted via `| format` in templates
-}
-Home_Data :: struct {
-    using base: Base_Data,
-    pages:      [dynamic]Page_Context,
-}
-Section_Data :: struct {
-    using base: Base_Data,
-    page.title: string,
-    posts:      [dynamic]Page_Context,  // flat list; year grouping done in template via pipe
+Template_Context :: struct {
+    site:        Site_Context,   // site-level data (title, description, base_url, params, og)
+    menus:       map[string][]Menu_Entry,  // generated menu data (copied from site, resolves above Page.menus)
+    now:         string,          // UTC ISO 8601 build timestamp
+    title:       string,          // computed browser title ("Page | Site")
+    date_format: string,          // from site.date.format (thor.json)
+    timezone:    ^datetime.TZ_Region,  // for format pipe
+    og:          Open_Graph,      // computed per-page OG
+    page:        Page,            // current page
+    pages:       [dynamic]Page,   // home page list
+    posts:       [dynamic]Page,   // section post list
 }
 ```
 
-`render_site` pre-parses all partials and the base layout once (via `mustache.parse`), then per-layout templates are cached in `get_template`. Year-based grouping on section index pages is done in the template via `{{#posts | group_by year}}` (see Pipes extension below) — there is no `Year_Section` Go-side struct.
+`Site_Context` is embedded in `Site` via `using site_context`. Fields like `site.title`, `site.menus`, `site.params` are accessed directly on `Site` through promotion. `Template_Context.menus` is copied from `site.menus` to resolve above `Page.menus` (frontmatter assignments) on the context stack.
+
+`render_site` pre-parses all partials and the base layout once (via `mustache.parse`), then per-layout templates are cached in `get_template`. Year-based grouping on section index pages is done in the template via `{{#posts | group_by year}}` (see Pipes extension below).
 
 ### Pipes extension
 
@@ -456,6 +484,7 @@ These are things that are easy to get wrong:
 - **Proc arguments are immutable.** You cannot assign to a parameter directly. To get a mutable copy, shadow it: `x := x`. If you need to modify the source, pass a pointer `^x`.
 - **`for` each loops use `item, idx` order**, not `idx, item`. Correct: `for item, idx in arr`. Wrong: `for idx, item in arr`.
 - **`make([dynamic]T, n, allocator)` sets capacity, not length.** To get length=0 with capacity=n, use `make([dynamic]T, 0, n, allocator)`. Using `make([dynamic]T, n, allocator)` creates `len=n` with `n` zero-initialized elements.
+- `#partial switch` is usually a code smell. prefer a `case all, extra, types:` branch.
 
 ## TODO
 

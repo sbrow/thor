@@ -16,6 +16,7 @@ Template_Context :: struct {
 	timezone:    ^datetime.TZ_Region,
 	og:          Open_Graph,
 	site:        Site_Context,
+	menus:       map[string][]Menu_Entry,
 	page:        Page,
 
 	// Home data
@@ -151,6 +152,7 @@ render_site :: proc(site: ^Site) {
 
 	ctx := Template_Context {
 		site        = site.site_context,
+		menus       = site.menus,
 		now         = now,
 		og          = site.og,
 		date_format = site.date.format,

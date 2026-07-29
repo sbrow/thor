@@ -21,7 +21,7 @@ Page :: struct {
 	date:        string,
 	year:        string,
 	lastmod:     string,
-	menu:        string,
+	menus:       map[string]Menu_Entry,
 	content:     string,
 	og:          Open_Graph,
 	draft:       bool,
@@ -256,15 +256,6 @@ load_page :: proc(
 	page.lastmod = fm.lastmod
 	page.draft = fm.draft
 	page.starred = fm.isStarred
-	page.menu = fm.menu
-	page.layout = fm.layout if fm.layout != "" else infer_layout(section, is_index)
-	page.og = fm.og
-
-	if strings.has_suffix(file_path, ".html") {
-		page.content = strings.clone(body)
-	} else {
-		page.content = md.process(body, ext, file_path)
-	}
 
 	if section == "" && is_index {
 		page.permalink = "/"
@@ -274,6 +265,16 @@ load_page :: proc(
 		page.permalink = fmt.aprintf("/%s/", slug)
 	} else {
 		page.permalink = fmt.aprintf("/%s/%s/", section, slug)
+	}
+
+	page.menus = parse_page_menus(fm.menus, page, context.allocator)
+	page.layout = fm.layout if fm.layout != "" else infer_layout(section, is_index)
+	page.og = fm.og
+
+	if strings.has_suffix(file_path, ".html") {
+		page.content = strings.clone(body)
+	} else {
+		page.content = md.process(body, ext, file_path)
 	}
 
 	ok = true

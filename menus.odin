@@ -3,12 +3,111 @@ package main
 import "core:encoding/json"
 import "core:fmt"
 import "core:log"
+import "core:mem"
 import "core:os"
 import "core:strings"
 
 Menu_Entry :: struct {
-	name: string,
-	url:  string,
+	name:   string,
+	url:    string,
+	weight: int,
+}
+
+// parse_page_menus converts raw frontmatter JSON into map[string]Menu_Entry.
+// Supports three forms:
+//   "menus": "main"                              → {main: {name=title, url=permalink, weight=0}}
+//   "menus": ["main", "footer"]                  → {main: {...}, footer: {...}}
+//   "menus": {"main": {"weight": 30}}            → {main: {name=title, url=permalink, weight=30}}
+parse_page_menus :: proc(
+	raw: json.Value,
+	page: Page,
+	allocator: mem.Allocator,
+) -> map[string]Menu_Entry {
+	result: map[string]Menu_Entry
+
+	if raw == nil {
+		return nil
+	}
+
+	switch v in raw {
+	case json.String:
+		result = make(map[string]Menu_Entry, allocator)
+		result[string(v)] = Menu_Entry {
+			name = page.title,
+			url  = page.permalink,
+		}
+
+	case json.Array:
+		result = make(map[string]Menu_Entry, allocator)
+		for item in v {
+			if s, ok := item.(json.String); ok {
+				result[string(s)] = Menu_Entry {
+					name = page.title,
+					url  = page.permalink,
+				}
+			} else {
+				log.warnf("menus: ignoring non-string item in menus array: %v", item)
+			}
+		}
+
+	case json.Object:
+		result = make(map[string]Menu_Entry, allocator)
+		for menu_name, entry_val in v {
+			weight := 0
+			if entry_obj, ok := entry_val.(json.Object); ok {
+				if w, ok := entry_obj["weight"]; ok {
+					#partial switch wval in w {
+					case json.Integer:
+						weight = int(wval)
+					case json.Float:
+						weight = int(wval)
+					case:
+						log.warnf(
+							"menus: '%s' entry 'weight' must be a number, got %v",
+							menu_name,
+							w,
+						)
+					}
+				}
+				if _, has_name := entry_obj["name"]; has_name {
+					log.warnf(
+						"menus: '%s' entry 'name' override not yet supported, ignoring",
+						menu_name,
+					)
+				}
+				if _, has_url := entry_obj["url"]; has_url {
+					log.warnf(
+						"menus: '%s' entry 'url' override not yet supported, ignoring",
+						menu_name,
+					)
+				}
+			} else {
+				log.warnf(
+					"menus: '%s' entry must be an object, got %v, using defaults",
+					menu_name,
+					entry_val,
+				)
+			}
+			result[menu_name] = Menu_Entry {
+				name   = page.title,
+				url    = page.permalink,
+				weight = weight,
+			}
+		}
+
+	case json.Null:
+		return nil
+
+	case json.Integer, json.Float, json.Boolean:
+		log.warnf("menus: expected string, array, or object, got %v", raw)
+		return nil
+	}
+
+	if page.title == "" {
+		log.warnf("menus: page '%s' has no title, menu entry will be blank", page.permalink)
+	}
+
+	return result
 }
 
 // build_menus populates site.menus:
@@ -21,7 +120,7 @@ build_menus :: proc(site: ^Site) {
 	if site.menus != nil {
 		has_menus := false
 		for page in site.pages {
-			if page.menu != "" {
+			if len(page.menus) > 0 {
 				has_menus = true
 				break
 			}
@@ -50,22 +149,21 @@ build_menus :: proc(site: ^Site) {
 	merge_page_menus(site)
 }
 
-// merge_page_menus collects frontmatter "menu" entries from pages and merges
+// merge_page_menus collects frontmatter menu entries from pages and merges
 // them into site.menus (which may already contain auto-generated entries).
-// If no pages have "menu" set, this is a no-op.
+// If no pages have menus set, this is a no-op.
 merge_page_menus :: proc(site: ^Site) {
 	alloc := site_allocator(site)
 
 	// Collect page entries by menu name
 	page_entries := make(map[string][dynamic]Menu_Entry, 16, alloc)
 	for page in site.pages {
-		if page.menu == "" {
-			continue
+		for menu_name, entry in page.menus {
+			if _, ok := page_entries[menu_name]; !ok {
+				page_entries[menu_name] = make([dynamic]Menu_Entry, 0, 4, alloc)
+			}
+			append(&page_entries[menu_name], entry)
 		}
-		if _, ok := page_entries[page.menu]; !ok {
-			page_entries[page.menu] = make([dynamic]Menu_Entry, 0, 4, alloc)
-		}
-		append(&page_entries[page.menu], Menu_Entry{name = page.title, url = page.permalink})
 	}
 
 	if len(page_entries) == 0 {
@@ -221,3 +319,4 @@ parse_config_menus :: proc(
 
 	return result
 }
+

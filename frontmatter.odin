@@ -10,7 +10,7 @@ Frontmatter :: struct {
 	date:        string,
 	lastmod:     string,
 	publishDate: string,
-	menu:        string,
+	menus:       json.Value,
 	layout:      string,
 	og:          Open_Graph,
 	draft:       bool,
@@ -55,7 +55,9 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	fm.publishDate = json_get_string(obj, "publishDate")
 	fm.draft = json_get_bool(obj, "draft")
 	fm.isStarred = json_get_bool(obj, "isStarred")
-	fm.menu = json_get_string(obj, "menu")
+	if v, ok := obj["menus"]; ok {
+		fm.menus = v
+	}
 	fm.layout = json_get_string(obj, "layout")
 	fm.og = json_get_open_graph(obj, "og")
 
@@ -81,6 +83,20 @@ json_get_bool :: proc(obj: json.Object, key: string) -> bool {
 	return false
 }
 
+json_get_int :: proc(obj: json.Object, key: string) -> int {
+	if v, ok := obj[key]; ok {
+		switch val in v {
+		case json.Integer:
+			return int(val)
+		case json.Float:
+			return int(val)
+		case json.Boolean, json.String, json.Array, json.Object, json.Null:
+			return 0
+		}
+	}
+	return 0
+}
+
 json_get_open_graph :: proc(obj: json.Object, key: string) -> Open_Graph {
 	og: Open_Graph
 	if v, ok := obj[key]; ok {
@@ -99,3 +115,4 @@ json_get_open_graph :: proc(obj: json.Object, key: string) -> Open_Graph {
 	}
 	return og
 }
+
