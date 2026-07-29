@@ -10,6 +10,7 @@ Frontmatter :: struct {
 	date:        string,
 	lastmod:     string,
 	publishDate: string,
+	weight:      int,
 	menus:       json.Value,
 	layout:      string,
 	og:          Open_Graph,
@@ -53,6 +54,7 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	fm.date = json_get_string(obj, "date")
 	fm.lastmod = json_get_string(obj, "lastmod")
 	fm.publishDate = json_get_string(obj, "publishDate")
+	fm.weight = json_get_int(obj, "weight")
 	fm.draft = json_get_bool(obj, "draft")
 	fm.isStarred = json_get_bool(obj, "isStarred")
 	if v, ok := obj["menus"]; ok {

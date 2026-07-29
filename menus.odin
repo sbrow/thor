@@ -166,7 +166,16 @@ merge_page_menus :: proc(site: ^Site) {
 			if _, ok := page_entries[menu_name]; !ok {
 				page_entries[menu_name] = make([dynamic]Menu_Entry, 0, 4, alloc)
 			}
-			append(&page_entries[menu_name], entry)
+			// Effective weight: per-menu weight if explicit, else page.weight
+			effective := entry.weight
+			if effective == DEFAULT_WEIGHT {
+				effective = page.weight
+			}
+			append(&page_entries[menu_name], Menu_Entry{
+				name = entry.name,
+				url = entry.url,
+				weight = effective,
+			})
 		}
 	}
 
@@ -212,16 +221,22 @@ collect_auto_menus :: proc(site: ^Site) {
 	for section in sections {
 		name := to_title_case(section, alloc)
 		url := fmt.aprintf("/%s/", section, allocator = alloc)
+		skip := false
 		for page in site.pages {
 			if page.section == section && page._is_index {
 				url = page.permalink
 				if page.title != "" {
 					name = page.title
 				}
+				if _, has_main := page.menus["main"]; has_main {
+					skip = true
+				}
 				break
 			}
 		}
-		append(&entries, Menu_Entry{name = name, url = url, weight = DEFAULT_WEIGHT})
+		if !skip {
+			append(&entries, Menu_Entry{name = name, url = url, weight = DEFAULT_WEIGHT})
+		}
 	}
 
 	// Root-level page entries (section = "", not index)
@@ -229,9 +244,12 @@ collect_auto_menus :: proc(site: ^Site) {
 		if page._is_index || page.section != "" || page.title == "" {
 			continue
 		}
+		if _, has_main := page.menus["main"]; has_main {
+			continue
+		}
 		append(
 			&entries,
-			Menu_Entry{name = page.title, url = page.permalink, weight = DEFAULT_WEIGHT},
+			Menu_Entry{name = page.title, url = page.permalink, weight = page.weight},
 		)
 	}
 

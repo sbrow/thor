@@ -20,6 +20,7 @@ Page :: struct {
 	description: string,
 	date:        string,
 	year:        string,
+	weight:      int,
 	lastmod:     string,
 	menus:       map[string]Menu_Entry,
 	content:     string,
@@ -253,6 +254,7 @@ load_page :: proc(
 		}
 	}
 	page.year = get_year(page.date)
+	page.weight = fm.weight if fm.weight != 0 else DEFAULT_WEIGHT
 	page.lastmod = fm.lastmod
 	page.draft = fm.draft
 	page.starred = fm.isStarred

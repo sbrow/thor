@@ -136,7 +136,7 @@ render_template :: proc(
 render_site :: proc(site: ^Site) {
 	allocator := site_allocator(site)
 	pages := site.pages[:]
-	sort_pages_by_date(pages)
+	sort_pages(pages)
 
 	// Load shared resources
 	partials := load_partials(&site.vfs)
@@ -373,16 +373,27 @@ get_year :: proc(iso: string) -> string {
 	return iso[:4]
 }
 
-sort_pages_by_date :: proc(pages: #soa[]Page) {
+// Weight primary (ascending). Date secondary (descending) for equal weights.
+sort_pages :: proc(pages: #soa[]Page) {
 	for i in 1 ..< len(pages) {
 		key := pages[i]
 		j := i - 1
-		for j >= 0 && pages.date[j] < key.date {
+		for j >= 0 && compare_pages(pages, j, key) > 0 {
 			pages[j + 1] = pages[j]
 			j -= 1
 		}
 		pages[j + 1] = key
 	}
+}
+
+compare_pages :: proc(pages: #soa[]Page, j: int, key: Page) -> int {
+	wj := pages.weight[j]
+	wk := key.weight
+	if wj != wk do return wj - wk
+	// Equal weight → date descending
+	if pages.date[j] < key.date do return 1
+	if pages.date[j] > key.date do return -1
+	return 0
 }
 
 write_page :: proc(output_dir: string, permalink: string, html: string) {

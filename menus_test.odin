@@ -272,3 +272,138 @@ test_config_weight_parsing_and_sort :: proc(t: ^testing.T) {
 	testing.expect_value(t, main[2].name, "Heavy")
 	testing.expect_value(t, main[2].weight, 20)
 }
+
+// --- json_get_int tests ---
+
+@(test)
+test_json_get_int_integer :: proc(t: ^testing.T) {
+	obj, _ := json.parse_string(`{"weight": 5}`, spec = .JSON)
+	defer json.destroy_value(obj)
+	o, _ := obj.(json.Object)
+	testing.expect_value(t, json_get_int(o, "weight"), 5)
+}
+
+@(test)
+test_json_get_int_float :: proc(t: ^testing.T) {
+	obj, _ := json.parse_string(`{"weight": 5.0}`, spec = .JSON)
+	defer json.destroy_value(obj)
+	o, _ := obj.(json.Object)
+	testing.expect_value(t, json_get_int(o, "weight"), 5)
+}
+
+@(test)
+test_json_get_int_missing :: proc(t: ^testing.T) {
+	obj, _ := json.parse_string(`{}`, spec = .JSON)
+	defer json.destroy_value(obj)
+	o, _ := obj.(json.Object)
+	testing.expect_value(t, json_get_int(o, "weight"), 0)
+}
+
+@(test)
+test_json_get_int_non_numeric :: proc(t: ^testing.T) {
+	obj, _ := json.parse_string(`{"weight": "5"}`, spec = .JSON)
+	defer json.destroy_value(obj)
+	o, _ := obj.(json.Object)
+	testing.expect_value(t, json_get_int(o, "weight"), 0)
+}
+
+// --- sort_pages tests ---
+
+@(test)
+test_sort_pages_weight_primary :: proc(t: ^testing.T) {
+	pages := make(#soa[dynamic]Page, 0, 3)
+	defer delete(pages)
+	append(&pages, Page{title = "Gamma", date = "2025-01-03", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "Alpha", date = "2025-01-01", weight = 5})
+	append(&pages, Page{title = "Beta", date = "2025-01-02", weight = 1})
+
+	sort_pages(pages[:])
+
+	// weight 1, weight 5, then default weight 10
+	testing.expect_value(t, pages.title[0], "Beta")
+	testing.expect_value(t, pages.title[1], "Alpha")
+	testing.expect_value(t, pages.title[2], "Gamma")
+}
+
+@(test)
+test_sort_pages_equal_weights_by_date :: proc(t: ^testing.T) {
+	pages := make(#soa[dynamic]Page, 0, 3)
+	defer delete(pages)
+	append(&pages, Page{title = "Old", date = "2025-01-01", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "New", date = "2025-06-01", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "Mid", date = "2025-03-01", weight = DEFAULT_WEIGHT})
+
+	sort_pages(pages[:])
+
+	// All same weight → date descending
+	testing.expect_value(t, pages.title[0], "New")
+	testing.expect_value(t, pages.title[1], "Mid")
+	testing.expect_value(t, pages.title[2], "Old")
+}
+
+@(test)
+test_sort_pages_mixed :: proc(t: ^testing.T) {
+	pages := make(#soa[dynamic]Page, 0, 4)
+	defer delete(pages)
+	append(&pages, Page{title = "DefaultOld", date = "2025-01-01", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "DefaultNew", date = "2025-06-01", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "Heavy", date = "2025-03-01", weight = 20})
+	append(&pages, Page{title = "Light", date = "2025-02-01", weight = 1})
+
+	sort_pages(pages[:])
+
+	// weight 1, weight 10 (DefaultNew by date), weight 10 (DefaultOld by date), weight 20
+	testing.expect_value(t, pages.title[0], "Light")
+	testing.expect_value(t, pages.title[1], "DefaultNew")
+	testing.expect_value(t, pages.title[2], "DefaultOld")
+	testing.expect_value(t, pages.title[3], "Heavy")
+}
+
+// --- merge_page_menus effective weight tests ---
+
+@(test)
+test_merge_page_menus_weight_fallback :: proc(t: ^testing.T) {
+	site: Site
+	mem.dynamic_arena_init(&site.arena)
+	defer mem.dynamic_arena_destroy(&site.arena)
+	context.allocator = site_allocator(&site)
+
+	page := make_page("Test", "/test/")
+	page.weight = 3
+	page.menus = parse_page_menus(parse_raw(`"main"`), page, site_allocator(&site))
+
+	site.pages = make(#soa[dynamic]Page, 0, 1, site_allocator(&site))
+	append(&site.pages, page)
+
+	// Don't call collect_auto_menus — test merge_page_menus in isolation
+	merge_page_menus(&site)
+
+	main, ok := site.menus["main"]
+	testing.expect(t, ok)
+	testing.expect(t, len(main) == 1, "expected exactly 1 entry")
+	testing.expect_value(t, main[0].name, "Test")
+	testing.expect_value(t, main[0].weight, 3)
+}
+
+@(test)
+test_auto_menus_no_duplicate_with_frontmatter :: proc(t: ^testing.T) {
+	site: Site
+	mem.dynamic_arena_init(&site.arena)
+	defer mem.dynamic_arena_destroy(&site.arena)
+	context.allocator = site_allocator(&site)
+
+	// Root-level page with explicit "menus": "main"
+	page := make_page("Ideas", "/ideas/")
+	page.menus = parse_page_menus(parse_raw(`"main"`), page, site_allocator(&site))
+
+	site.pages = make(#soa[dynamic]Page, 0, 1, site_allocator(&site))
+	append(&site.pages, page)
+
+	collect_auto_menus(&site)
+	merge_page_menus(&site)
+
+	main, ok := site.menus["main"]
+	testing.expect(t, ok)
+	testing.expect(t, len(main) == 1, "expected exactly 1 entry (no duplicate)")
+	testing.expect_value(t, main[0].name, "Ideas")
+}

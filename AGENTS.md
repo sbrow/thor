@@ -485,6 +485,8 @@ These are things that are easy to get wrong:
 - **`for` each loops use `item, idx` order**, not `idx, item`. Correct: `for item, idx in arr`. Wrong: `for idx, item in arr`.
 - **`make([dynamic]T, n, allocator)` sets capacity, not length.** To get length=0 with capacity=n, use `make([dynamic]T, 0, n, allocator)`. Using `make([dynamic]T, n, allocator)` creates `len=n` with `n` zero-initialized elements.
 - `#partial switch` is usually a code smell. prefer a `case all, extra, types:` branch.
+- you don't usually need to create arena allocators in tests, instead use context.temp_allocator if you want to simplify cleanup.
+- you don't need to manually set up a tracking allocator in tests. the context.allocator will warn you about leaks.
 
 ## TODO
 
