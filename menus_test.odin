@@ -4,6 +4,8 @@ package main
 import "core:encoding/json"
 import "core:log"
 import "core:mem"
+import "core:os"
+import "core:strings"
 import "core:testing"
 
 make_page :: proc(title: string, permalink: string) -> Page {
@@ -422,4 +424,97 @@ test_auto_menus_no_duplicate_with_frontmatter :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	testing.expect(t, len(main) == 1, "expected exactly 1 entry (no duplicate)")
 	testing.expect_value(t, main[0].name, "Ideas")
+}
+
+// --- warn_duplicate_weights tests ---
+
+@(test)
+test_warn_duplicate_weights_explicit :: proc(t: ^testing.T) {
+	path := "/tmp/thor_test_warn_explicit.log"
+	os.remove(path)
+	f, err := os.open(path, os.O_RDWR | os.O_CREATE | os.O_TRUNC)
+	if err != nil {
+		testing.expect(t, false, "failed to open temp log file")
+		return
+	}
+
+	logger := log.create_file_logger(f)
+	context.logger = logger
+
+	entries := []Menu_Entry {
+		{name = "Alpha", url = "/a/", weight = 5},
+		{name = "Beta", url = "/b/", weight = 5},
+	}
+	warn_duplicate_weights("main", entries)
+
+	log.destroy_file_logger(logger)
+
+	data, _ := os.read_entire_file_from_path(path, context.temp_allocator)
+	output := string(data)
+	os.remove(path)
+
+	testing.expect(t, strings.contains(output, "duplicate weight 5"), "expected weight in warning")
+	testing.expect(t, strings.contains(output, "Alpha"), "expected first entry name")
+	testing.expect(t, strings.contains(output, "Beta"), "expected second entry name")
+	testing.expect(t, strings.contains(output, "'main'"), "expected menu name in warning")
+}
+
+@(test)
+test_warn_duplicate_weights_nil_not_flagged :: proc(t: ^testing.T) {
+	path := "/tmp/thor_test_warn_nil.log"
+	os.remove(path)
+	f, err := os.open(path, os.O_RDWR | os.O_CREATE | os.O_TRUNC)
+	if err != nil {
+		testing.expect(t, false, "failed to open temp log file")
+		return
+	}
+
+	logger := log.create_file_logger(f)
+	context.logger = logger
+
+	entries := []Menu_Entry {
+		{name = "Alpha", url = "/a/"},
+		{name = "Beta", url = "/b/"},
+	}
+	warn_duplicate_weights("main", entries)
+
+	log.destroy_file_logger(logger)
+
+	data, _ := os.read_entire_file_from_path(path, context.temp_allocator)
+	output := string(data)
+	os.remove(path)
+
+	testing.expect(t, output == "", "nil-weight entries should not produce warnings")
+}
+
+@(test)
+test_warn_duplicate_weights_explicit_default :: proc(t: ^testing.T) {
+	path := "/tmp/thor_test_warn_default.log"
+	os.remove(path)
+	f, err := os.open(path, os.O_RDWR | os.O_CREATE | os.O_TRUNC)
+	if err != nil {
+		testing.expect(t, false, "failed to open temp log file")
+		return
+	}
+
+	logger := log.create_file_logger(f)
+	context.logger = logger
+
+	entries := []Menu_Entry {
+		{name = "Alpha", url = "/a/", weight = 10},
+		{name = "Beta", url = "/b/", weight = 10},
+	}
+	warn_duplicate_weights("main", entries)
+
+	log.destroy_file_logger(logger)
+
+	data, _ := os.read_entire_file_from_path(path, context.temp_allocator)
+	output := string(data)
+	os.remove(path)
+
+	testing.expect(
+		t,
+		strings.contains(output, "duplicate weight 10"),
+		"explicit weight 10 (== DEFAULT_WEIGHT) should warn — this is the Maybe(int) win",
+	)
 }

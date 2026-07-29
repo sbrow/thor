@@ -45,14 +45,14 @@ thor/
 | `site.odin` | `Flags` (CLI), `Config_File` (thor.json), `Site_Context` (template-facing: `title`, `description`, `base_url`, `params`, `og`, `menus`), `Site` (runtime state + arena + VFS + pages + `og`). `Feature` enum. 5-step `init_site`. Config menu parsing in `site_apply_config`. |
 | `content.odin` | `Page` struct (includes `weight`, `menus: map[string]Menu_Entry`, `og`), `Pending_File` struct, `scan_content_files` (section-aware walk that handles leaf bundles), `collect_languages` (pre-scan for code fence languages), `load_page` (falls back to file mtime when no frontmatter date), `infer_layout`. Calls `md.process()` for the markdown pipeline. |
 | `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. `Template_Context` (unified render struct with `site: Site_Context`, `page: Page`, `menus`, `posts`, `pages`). 3-frame context stack via `[]any{ctx.site, ctx.page, ctx}`. `sort_pages` (weight primary, date secondary). `to_title_case` for section display names. VFS-based template loading with fallback chain (`get_template`). |
-| `menus.odin` | Menu system: `Menu_Entry {name, url, weight}`, `DEFAULT_WEIGHT = 10`. `build_menus` (priority chain: config → auto + page frontmatter). `collect_auto_menus` (sections + root-level pages). `merge_page_menus` (frontmatter entries with effective weight fallback). `parse_page_menus` (string/array/object forms). `parse_config_menus` (from thor.json). `sort_menu_entries` / `compare_menu_entries` (weight primary, name secondary). |
+| `menus.odin` | Menu system: `Menu_Entry {name, url, weight: Maybe(int)}`, `DEFAULT_WEIGHT = 10`. `build_menus` (priority chain: config → auto + page frontmatter, then `warn_all_duplicate_weights`). `collect_auto_menus` (sections + root-level pages, skips pages with explicit `"menus": "main"` frontmatter). `merge_page_menus` (frontmatter entries with effective weight fallback via nil check). `parse_page_menus` (string/array/object forms). `parse_config_menus` (from thor.json). `sort_menu_entries` / `compare_menu_entries` (weight primary via `.? or_else DEFAULT_WEIGHT`, name secondary). `warn_duplicate_weights` / `warn_all_duplicate_weights` (log when two entries in same menu have same explicitly-set weight). |
 | `minify.odin` | HTML/CSS minification via tree-sitter. Imports `ts "treesitter"`. |
 | `feed.odin` | RSS feed + sitemap XML. Uses `page.url` for canonical URLs. |
 | `vfs.odin` | Union file system: `VFS`, `build_vfs`, `mount_dir`, `mount_subdir`, `mount_recursive`, `vfs_get`, `vfs_get_entry`, `vfs_entry_data`. Layers defaults → modules → site. |
 | `assets.odin` | `copy_assets_dir` — iterates VFS entries with `assets/` prefix, minifies CSS, copies verbatim or via `os.copy_file`. |
 | `html.odin` | `strip_html_tags`, `unescape_html`, `generate_summary` (word-count truncation, zero-alloc), `generate_description` (HTML→plain text: strip tags, decode entities, collapse whitespace). |
 | `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec, `is_article: Maybe(bool)`). `og_for_site(site)` for site defaults (from config + derived), `og_for_page(site_og, page)` for page-specific (overlay page.og + derive from page data). Description falls back to `generate_description(generate_summary(body_html))`. |
-| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, `weight`, `menus`, and nested `og` object (via `json_get_open_graph`). Helpers: `json_get_string`, `json_get_bool`, `json_get_int`. |
+| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, `weight: Maybe(int)`, `menus`, and nested `og` object (via `json_get_open_graph`). Helpers: `json_get_string`, `json_get_bool`, `json_get_int` (returns `Maybe(int)`, nil for absent/invalid). |
 | `defaults.odin` | `DEFAULTS_PATH` constant, resolved at compile time via `#directory` so bundled templates ship in the binary. |
 
 ### Subpackages
@@ -77,7 +77,7 @@ Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss,
 ```
 thor.json → find_config → init_site (5-step)
   → build_vfs (defaults/layouts → modules → site/layouts, site/assets)
-  → site_load_content (scan_content_files + collect_languages + preload_grammars + load_page + url computation + build_menus)
+  → site_load_content (scan_content_files + collect_languages + preload_grammars + load_page + url computation + build_menus + warn_all_duplicate_weights)
   → render_site
     → load_partials + get_template (VFS + fallback chain)
     → render_page_html / render_home_html / render_section (3-frame context stack: site, page, ctx)
@@ -98,7 +98,7 @@ Page :: struct {
     description: string,
     date:        string,
     year:        string,
-    weight:      int,         // page ordering (default DEFAULT_WEIGHT = 10)
+    weight:      Maybe(int),  // page ordering (nil = unset, defaults to DEFAULT_WEIGHT at comparison time)
     lastmod:     string,
     menus:       map[string]Menu_Entry,  // frontmatter menu assignments
     content:     string,      // rendered HTML body
@@ -131,9 +131,12 @@ Menu system in `menus.odin`. `Menu_Entry :: struct {name: string, url: string, w
 
 ### Weight
 
-- `Page.weight` — general page ordering (default `DEFAULT_WEIGHT`). Affects `sort_pages` (weight primary, date secondary).
-- Per-menu weight — from object frontmatter form. Falls back to `Page.weight` when `DEFAULT_WEIGHT`.
-- `Menu_Entry.weight` — effective weight after fallback. Sorted ascending, name alphabetical for ties.
+All weight fields use `Maybe(int)` — nil means "unset," `some(v)` means explicitly set. This distinguishes `"weight": 10` (explicit) from no weight key (defaults to `DEFAULT_WEIGHT` at comparison time via `.? or_else DEFAULT_WEIGHT`). Eliminates the old `0`-as-sentinel pattern from `json_get_int`.
+
+- `Page.weight: Maybe(int)` — page-level ordering. nil = unset. Affects `sort_pages` (weight primary, date secondary).
+- `Menu_Entry.weight: Maybe(int)` — per-menu ordering. nil for auto-generated entries and string/array frontmatter forms. Explicit value from object frontmatter form `{"weight": N}`.
+- Effective weight in `merge_page_menus`: per-menu weight if set, else falls back to `page.weight`. Both `Maybe(int)`, so nil propagates naturally — no value-based sentinel check.
+- Sorted ascending via `.? or_else DEFAULT_WEIGHT`, name alphabetical for ties.
 
 ### Templates
 
@@ -144,6 +147,10 @@ Menu system in `menus.odin`. `Menu_Entry :: struct {name: string, url: string, w
 ```
 
 `Template_Context.menus` resolves above `Page.menus` (frontmatter assignments) on the 3-frame context stack. Accessible as `{{#menus.main}}` or `{{#site.menus.main}}`.
+
+### Duplicate weight warnings
+
+`warn_duplicate_weights` (called from `build_menus` after all menus are sorted) logs a warning when two entries in the same menu have the same explicitly-set weight. Only non-nil weights are checked — nil (unset/default) entries are never flagged, so auto-generated entries don't produce noise. The warning includes the menu name, weight value, and both entry names.
 
 ## Config system
 
@@ -487,6 +494,9 @@ These are things that are easy to get wrong:
 - `#partial switch` is usually a code smell. prefer a `case all, extra, types:` branch.
 - you don't usually need to create arena allocators in tests, instead use context.temp_allocator if you want to simplify cleanup.
 - you don't need to manually set up a tracking allocator in tests. the context.allocator will warn you about leaks.
+- **`Maybe(T)` unwrap syntax:** `value.? or_else default`. Not `value or_else default` — `or_else` works on the `?T` returned by `.?`, not on `Maybe(T)` directly.
+- **`Maybe(T)` equality:** `a == b` works directly between two `Maybe(T)` values (nil == nil → true, some(5) == some(5) → true, nil == some(5) → false). Also `a == 5` works (int coerces to `Maybe(int)`).
+- **File logger in tests:** `log.create_file_logger(&f)` + `context.logger = logger` captures log output. Must be set inline in the test proc (not via a helper proc) for context propagation. Clean up with `log.destroy_file_logger(logger)` then `os.read_entire_file_from_path` to verify output.
 
 ## TODO
 

@@ -35,8 +35,8 @@ parse_page_menus :: proc(
 	case json.String:
 		result = make(map[string]Menu_Entry, allocator)
 		result[string(v)] = Menu_Entry {
-			name   = page.title,
-			url    = page.permalink,
+			name = page.title,
+			url  = page.permalink,
 		}
 
 	case json.Array:
@@ -143,12 +143,14 @@ build_menus :: proc(site: ^Site) {
 			log.fatalf("menus: cannot mix config menus with frontmatter menus")
 			os.exit(1)
 		}
+		warn_all_duplicate_weights(site)
 		return
 	}
 
 	// No config menus — auto-generate, then merge page menus on top
 	collect_auto_menus(site)
 	merge_page_menus(site)
+	warn_all_duplicate_weights(site)
 }
 
 // merge_page_menus collects frontmatter menu entries from pages and merges
@@ -169,11 +171,10 @@ merge_page_menus :: proc(site: ^Site) {
 			if effective == nil {
 				effective = page.weight
 			}
-			append(&page_entries[menu_name], Menu_Entry{
-				name = entry.name,
-				url = entry.url,
-				weight = effective,
-			})
+			append(
+				&page_entries[menu_name],
+				Menu_Entry{name = entry.name, url = entry.url, weight = effective},
+			)
 		}
 	}
 
@@ -245,10 +246,7 @@ collect_auto_menus :: proc(site: ^Site) {
 		if _, has_main := page.menus["main"]; has_main {
 			continue
 		}
-		append(
-			&entries,
-			Menu_Entry{name = page.title, url = page.permalink, weight = page.weight},
-		)
+		append(&entries, Menu_Entry{name = page.title, url = page.permalink, weight = page.weight})
 	}
 
 	if len(entries) == 0 {
@@ -276,6 +274,29 @@ sort_menu_entries :: proc(entries: []Menu_Entry) {
 			j -= 1
 		}
 		entries[j + 1] = key
+	}
+}
+
+// warn_duplicate_weights logs a warning for each pair of adjacent entries
+// (pre-sorted) that have the same explicitly-set weight. Entries with nil
+// weight (unset/default) are never flagged.
+warn_duplicate_weights :: proc(menu_name: string, entries: []Menu_Entry) {
+	for i in 0 ..< len(entries) - 1 {
+		if entries[i].weight != nil && entries[i].weight == entries[i + 1].weight {
+			log.warnf(
+				"menus('%s'):'%s' and '%s' share the same weight (%d).",
+				menu_name,
+				entries[i].name,
+				entries[i + 1].name,
+				entries[i].weight,
+			)
+		}
+	}
+}
+
+warn_all_duplicate_weights :: proc(site: ^Site) {
+	for menu_name, entries in site.menus {
+		warn_duplicate_weights(menu_name, entries)
 	}
 }
 
@@ -367,3 +388,4 @@ parse_config_menus :: proc(
 
 	return result
 }
+

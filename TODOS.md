@@ -1,10 +1,10 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
-- [ ] Add Weights
-  - [ ] sort by `page.weight` when loading
-  - [ ] re-sort by `page.menu.weight` when building menus.
-	- [ ] warn user when 2 pages with explicit weights match. 
+- [x] Add Weights
+  - [x] sort by `page.weight` when loading
+  - [x] re-sort by `page.menu.weight` when building menus.
+	- [x] warn user when 2 pages with explicit weights match. 
 - [ ] Improve diagnostics
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
@@ -16,6 +16,7 @@
   - [ ] show "stack traces" in template error diagnostics
   - [ ] better diagnostics for syntax errors in treesitter.
   - [ ] Ensure diagnostics for MAX_CONTEXT_DEPTH are good.
+  - [ ] improve matching weights message.
   - [ ] show a proper diagnostic for timezones
     - currently "unable to load timezone 'America/New_Yorkskie'"
     - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
