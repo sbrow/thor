@@ -193,7 +193,7 @@ resolve_format_string :: proc(name: string, ctx: []any, pos: int) -> (string, Er
 	return str, nil
 }
 
-// TODO: diagnostics don't  show anything relevent
+// TODO: diagnostics don't  show anything relevant
 apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> (any, Error) {
 	switch filter.op {
 	case "group_by":

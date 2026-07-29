@@ -58,7 +58,7 @@ Errors (returned as `Data_Error` at render time):
 
 #### `format`
 
-Formats an ISO 8601 date string as a display string. Takes a string, returns a string (e.g. `"2026-03-15T08:49:54-04:00"` → `"15 Mar 2026"`). Invalid input (empty, too-short, non-string, or unparseable) returns a `Data_Error`. Templates that need to skip dateless pages should gate with a section — `{{#date}}<time datetime="{{.}}">{{. | format}}</time>{{/date}}` — so the section's truthiness check catches empty before the filter runs. Commonly used inline as `{{date | format}}` to render a display string while keeping the raw ISO available via `{{date}}` for the `datetime=` attribute.
+Formats an ISO 8601 date string as a display string. Takes a string, returns a string (e.g. `"2026-03-15T08:49:54-04:00"` → `"15 Mar 2026"`). Invalid input (empty, too-short, non-string, or unparsable) returns a `Data_Error`. Templates that need to skip dateless pages should gate with a section — `{{#date}}<time datetime="{{.}}">{{. | format}}</time>{{/date}}` — so the section's truthiness check catches empty before the filter runs. Commonly used inline as `{{date | format}}` to render a display string while keeping the raw ISO available via `{{date}}` for the `datetime=` attribute.
 
 Internally: parses the invariant `YYYY-MM-DD` prefix by char offset, stringifies `time.Month(month_num)` and slices `[:3]` for the abbreviation. Accepts any of these ISO 8601 forms (the date prefix is what matters): `2023-10-15T13:18:50-07:00`, `2023-10-15T13:18:50-0700`, `2023-10-15T13:18:50Z`, `2023-10-15T13:18:50`, `2023-10-15`.
 
