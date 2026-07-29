@@ -1,7 +1,18 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
+- [ ] Add Weights
+  - [ ] sort by `page.weight` when loading
+  - [ ] re-sort by `page.menu.weight` when building menus.
+	- [ ] warn user when 2 pages with explicit weights match. 
 - [ ] Improve diagnostics
+  - [ ] All Diagnostics should show:
+    - [ ] *What* went wrong
+    - [ ] *where* (in the file)
+    - [ ] *where* (in the stack trace)
+    - [ ] *how* you can fix it (if applicable)
+  - [ ] Create a Location struct that somewhat matches Odin's [Source_Code_Location](https://pkg.odin-lang.org/base/runtime/#Source_Code_Location)?
+    - Note that odin's version doesn't contain the stack trace.
   - [ ] show "stack traces" in template error diagnostics
   - [ ] better diagnostics for syntax errors in treesitter.
   - [ ] Ensure diagnostics for MAX_CONTEXT_DEPTH are good.
@@ -9,6 +20,7 @@
     - currently "unable to load timezone 'America/New_Yorkskie'"
     - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
   - [ ] Test menu diagnostics
+  - [ ] Honestly, Test **all** diagnostics
 - [x] Simplify / unify template context stack. Come up with a name for it.
   - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
