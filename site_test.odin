@@ -181,12 +181,15 @@ test_init_site_md_enable_disable :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_config_paths :: proc(t: ^testing.T) {
-	path := write_temp_config("paths", `{
+	path := write_temp_config(
+		"paths",
+		`{
 		"content_dir": "/custom/content",
 		"assets_dir": "/custom/assets",
 		"output_dir": "/custom/output",
 		"layouts_dir": "/custom/layouts"
-	}`)
+	}`,
+	)
 	defer os.remove(path)
 
 	site: Site
@@ -199,4 +202,3 @@ test_init_site_config_paths :: proc(t: ^testing.T) {
 	testing.expect_value(t, site.output_dir, "/custom/output")
 	testing.expect_value(t, site.layouts_dir, "/custom/layouts")
 }
-

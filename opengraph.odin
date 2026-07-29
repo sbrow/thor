@@ -115,4 +115,3 @@ og_for_page :: proc(site_og: Open_Graph, page: Page) -> Open_Graph {
 
 	return og
 }
-

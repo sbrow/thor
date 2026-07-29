@@ -146,7 +146,7 @@ init_persistent :: proc() {
 }
 
 when SPALL {
-	_thread_init:    proc() = nil
+	_thread_init: proc() = nil
 	_thread_cleanup: proc() = nil
 
 	set_thread_callbacks :: proc(init: proc() = nil, cleanup: proc() = nil) {
@@ -249,7 +249,14 @@ ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 	return gc
 }
 
-compile_query :: proc(lang: string, language: Language) -> (query: Query, cursor: Query_Cursor, ok: bool) {
+compile_query :: proc(
+	lang: string,
+	language: Language,
+) -> (
+	query: Query,
+	cursor: Query_Cursor,
+	ok: bool,
+) {
 	query_src, query_path, qok := load_query(lang)
 	if !qok {
 		return
@@ -451,4 +458,3 @@ helix_version_from_path :: proc(path: string) -> string {
 	if end <= start do return ""
 	return path[start:end]
 }
-

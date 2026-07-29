@@ -41,4 +41,3 @@ parse_2_digits :: proc(s: string, offset: int) -> int {
 	}
 	return (int(s[offset]) - 0x30) * 10 + (int(s[offset + 1]) - 0x30)
 }
-

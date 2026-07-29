@@ -161,4 +161,3 @@ test_context_depth_warns :: proc(t: ^testing.T) {
 	testing.expect(t, rerr == nil, "depth warning must be non-fatal")
 	testing.expect_value(t, result, "found")
 }
-

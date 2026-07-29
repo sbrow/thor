@@ -25,4 +25,3 @@ main :: proc() {
 	fmt.printfln("%+v", site)
 	fmt.printf("%+v", site)
 }
-

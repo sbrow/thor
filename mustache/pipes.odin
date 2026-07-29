@@ -53,8 +53,8 @@ tokenize_fields :: proc(seg: string, pos: int) -> (tokens: [dynamic]string, err:
 			}
 			if j >= len(seg) {
 				return tokens, Error_Body {
-					msg  = fmt.tprintf("unterminated string literal: %s", seg),
-					pos  = pos,
+					msg = fmt.tprintf("unterminated string literal: %s", seg),
+					pos = pos,
 					kind = .Syntax,
 				}
 			}
@@ -177,16 +177,16 @@ resolve_format_string :: proc(name: string, ctx: []any, pos: int) -> (string, Er
 	raw := resolve_name(name, ctx)
 	if raw == nil {
 		return "", Error_Body {
-			msg  = fmt.tprintf("unable to resolve date format key '%s'", name),
-			pos  = pos,
+			msg = fmt.tprintf("unable to resolve date format key '%s'", name),
+			pos = pos,
 			kind = .Data,
 		}
 	}
 	str, ok := reflect.as_string(raw)
 	if !ok {
 		return "", Error_Body {
-			msg  = fmt.tprintf("date format key '%s' is not a string", name),
-			pos  = pos,
+			msg = fmt.tprintf("date format key '%s' is not a string", name),
+			pos = pos,
 			kind = .Data,
 		}
 	}
@@ -337,4 +337,3 @@ apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, er
 
 	return groups, nil
 }
-

@@ -125,4 +125,3 @@ emit_am_pm :: proc(b: ^strings.Builder, dt: common.Date_Components) {
 emit_am_pm_lower :: proc(b: ^strings.Builder, dt: common.Date_Components) {
 	strings.write_string(b, "pm" if dt.hour >= 12 else "am")
 }
-

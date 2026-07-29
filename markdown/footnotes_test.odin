@@ -119,4 +119,3 @@ test_inject_notes_missing_ref :: proc(t: ^testing.T) {
 	testing.expect(t, strings.contains(out, "[^missing]"))
 	testing.expect(t, strings.contains(out, "[*missing]"))
 }
-

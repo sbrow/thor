@@ -101,4 +101,3 @@ test_multiple_alerts_render_together :: proc(t: ^testing.T) {
 </blockquote>`,
 	)
 }
-

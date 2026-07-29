@@ -104,11 +104,7 @@ tokenize :: proc(
 
 			close_idx := strings.index(src[key_start:], "}}")
 			if close_idx < 0 {
-				return tokens, Error_Body {
-					msg = "unclosed tag '{{'",
-					pos = tag_pos,
-					kind = .Syntax,
-				}
+				return tokens, Error_Body{msg = "unclosed tag '{{'", pos = tag_pos, kind = .Syntax}
 			}
 			close := key_start + close_idx
 
@@ -125,12 +121,7 @@ tokenize :: proc(
 				}
 				append(
 					&tokens,
-					Token {
-						kind = .Partial,
-						value = trimmed,
-						is_dynamic = is_dyn,
-						pos = tag_pos,
-					},
+					Token{kind = .Partial, value = trimmed, is_dynamic = is_dyn, pos = tag_pos},
 				)
 			} else {
 				append(
@@ -299,4 +290,3 @@ should_trim_whitespace :: proc(kind: Token_Kind) -> bool {
 	}
 	return false
 }
-

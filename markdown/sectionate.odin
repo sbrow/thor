@@ -43,4 +43,3 @@ wrap_sections :: proc(html: string) -> string {
 		return html
 	}
 }
-

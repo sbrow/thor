@@ -557,4 +557,3 @@ test_parse_error_pipe_parse_in_inverted_keeps_double_braces :: proc(t: ^testing.
 		fmt.tprintf("msg should contain literal '{{^', got %q", b.msg),
 	)
 }
-

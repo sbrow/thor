@@ -273,4 +273,3 @@ find_config :: proc(filename: string) -> (path: string, ok: bool) {
 		dir = dir[:idx]
 	}
 }
-

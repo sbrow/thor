@@ -127,4 +127,3 @@ to_benchmark :: proc($f: formatter) -> benchmark {
 		} \
 	)
 }
-

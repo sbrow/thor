@@ -82,9 +82,7 @@ test_description_plain_text :: proc(t: ^testing.T) {
 
 @(test)
 test_description_highlighted_code :: proc(t: ^testing.T) {
-	result := generate_description(
-		`<pre><code><span class="hl-keyword">if</span> x</code></pre>`,
-	)
+	result := generate_description(`<pre><code><span class="hl-keyword">if</span> x</code></pre>`)
 	testing.expect_value(t, result, "if x")
 }
 

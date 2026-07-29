@@ -54,7 +54,7 @@ minify_html :: proc(source: string) -> string {
 			segment := source[i:p.end]
 			strings.write_string(&sb, segment)
 			if len(segment) > 0 {
-				last_written = segment[len(segment)-1]
+				last_written = segment[len(segment) - 1]
 			}
 			i = int(p.end)
 			pi += 1
@@ -103,27 +103,27 @@ collect_html_ranges :: proc(
 	preserves: ^[dynamic]Range,
 ) {
 	child_count := ts.node_named_child_count(node)
-	for i in 0..<child_count {
+	for i in 0 ..< child_count {
 		child := ts.node_named_child(node, u32(i))
 		type_str := string(ts.node_type(child))
 
 		if type_str == "comment" {
-			append(comments, Range{
-				start = ts.node_start_byte(child),
-				end = ts.node_end_byte(child),
-			})
+			append(
+				comments,
+				Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
+			)
 		} else if type_str == "script_element" || type_str == "style_element" {
-			append(preserves, Range{
-				start = ts.node_start_byte(child),
-				end = ts.node_end_byte(child),
-			})
+			append(
+				preserves,
+				Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
+			)
 		} else if type_str == "element" {
 			tag := html_tag_name(child, source)
 			if is_preserve_tag(tag) {
-				append(preserves, Range{
-					start = ts.node_start_byte(child),
-					end = ts.node_end_byte(child),
-				})
+				append(
+					preserves,
+					Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
+				)
 			} else {
 				collect_html_ranges(child, source, comments, preserves)
 			}
@@ -135,11 +135,11 @@ collect_html_ranges :: proc(
 
 html_tag_name :: proc(element: ts.Node, source: string) -> string {
 	child_count := ts.node_named_child_count(element)
-	for i in 0..<child_count {
+	for i in 0 ..< child_count {
 		child := ts.node_named_child(element, u32(i))
 		if string(ts.node_type(child)) == "start_tag" {
 			tag_child_count := ts.node_named_child_count(child)
-			for j in 0..<tag_child_count {
+			for j in 0 ..< tag_child_count {
 				tag_child := ts.node_named_child(child, u32(j))
 				if string(ts.node_type(tag_child)) == "tag_name" {
 					start := ts.node_start_byte(tag_child)
@@ -241,13 +241,13 @@ minify_css :: proc(source: string) -> string {
 
 collect_css_comments :: proc(node: ts.Node, comments: ^[dynamic]Range) {
 	child_count := ts.node_named_child_count(node)
-	for i in 0..<child_count {
+	for i in 0 ..< child_count {
 		child := ts.node_named_child(node, u32(i))
 		if string(ts.node_type(child)) == "comment" {
-			append(comments, Range{
-				start = ts.node_start_byte(child),
-				end = ts.node_end_byte(child),
-			})
+			append(
+				comments,
+				Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
+			)
 		} else {
 			collect_css_comments(child, comments)
 		}

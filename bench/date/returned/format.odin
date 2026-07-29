@@ -124,4 +124,3 @@ emit_hour_12 :: proc(b: ^strings.Builder, dt: common.Date_Components, pad: bool)
 
 	fmt.sbprintf(b, format, h12)
 }
-

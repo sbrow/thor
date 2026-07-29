@@ -1,11 +1,11 @@
 package bench
 
+import "../mustache"
 import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:strconv"
 import "core:time"
-import "../mustache"
 
 Tag :: struct {
 	name: string,
@@ -101,13 +101,13 @@ main :: proc() {
 		return
 	}
 
-	for _ in 0..<3 {
+	for _ in 0 ..< 3 {
 		_, _ = mustache.render(page, data, partials, allocator = context.temp_allocator)
 		mem.dynamic_arena_free_all(&temp_arena)
 	}
 
 	start := time.now()
-	for _ in 0..<iterations {
+	for _ in 0 ..< iterations {
 		_, _ = mustache.render(page, data, partials, allocator = context.temp_allocator)
 		mem.dynamic_arena_free_all(&temp_arena)
 	}
@@ -116,8 +116,12 @@ main :: proc() {
 	seconds := time.duration_seconds(elapsed)
 	per_render_ms := seconds * 1000 / f64(iterations)
 
-	fmt.printfln("iterations=%d  total=%.3fs  per_render=%.3fms",
-		iterations, seconds, per_render_ms)
+	fmt.printfln(
+		"iterations=%d  total=%.3fs  per_render=%.3fms",
+		iterations,
+		seconds,
+		per_render_ms,
+	)
 }
 
 parse_file :: proc(name: string) -> mustache.Template {
@@ -138,16 +142,27 @@ parse_file :: proc(name: string) -> mustache.Template {
 }
 
 generate_data :: proc() -> Page_Data {
-	years := []string{
-		"2025", "2024", "2023", "2022", "2021",
-		"2020", "2019", "2018", "2017", "2016",
+	years := []string {
+		"2025",
+		"2024",
+		"2023",
+		"2022",
+		"2021",
+		"2020",
+		"2019",
+		"2018",
+		"2017",
+		"2016",
 	}
 
 	posts := make([dynamic]Post, 0, 500)
 	for year in years {
-		for i in 0..<50 {
+		for i in 0 ..< 50 {
 			tags := make([dynamic]Tag, 0, 3)
-			append(&tags, Tag{name = fmt.aprintf("%s-notes", year), slug = fmt.aprintf("%s-notes", year)})
+			append(
+				&tags,
+				Tag{name = fmt.aprintf("%s-notes", year), slug = fmt.aprintf("%s-notes", year)},
+			)
 			append(&tags, Tag{name = "writing", slug = "writing"})
 			append(&tags, Tag{name = "archive", slug = "archive"})
 
@@ -159,28 +174,34 @@ generate_data :: proc() -> Page_Data {
 				author = fmt.aprintf("Author %d", i % 5)
 			}
 
-			append(&posts, Post{
-				title = fmt.aprintf("Post %d from %s", i, year),
-				url = fmt.aprintf("/%s/post-%d", year, i),
-				date = fmt.aprintf("%s-%02d-%02dT10:00:00Z", year, month, day),
-				year = year,
-				excerpt = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-				author = author,
-				tags = tags,
-			})
+			append(
+				&posts,
+				Post {
+					title = fmt.aprintf("Post %d from %s", i, year),
+					url = fmt.aprintf("/%s/post-%d", year, i),
+					date = fmt.aprintf("%s-%02d-%02dT10:00:00Z", year, month, day),
+					year = year,
+					excerpt = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+					author = author,
+					tags = tags,
+				},
+			)
 		}
 	}
 
 	comments := make([dynamic]Comment, 0, 100)
-	for i in 0..<100 {
+	for i in 0 ..< 100 {
 		year := years[i % len(years)]
 		month := (i % 12) + 1
 		day := (i % 28) + 1
-		append(&comments, Comment{
-			author = fmt.aprintf("Commenter %d", i),
-			date = fmt.aprintf("%s-%02d-%02dT12:00:00Z", year, month, day),
-			body = fmt.aprintf("Great post! This is comment number %d.", i),
-		})
+		append(
+			&comments,
+			Comment {
+				author = fmt.aprintf("Commenter %d", i),
+				date = fmt.aprintf("%s-%02d-%02dT12:00:00Z", year, month, day),
+				body = fmt.aprintf("Great post! This is comment number %d.", i),
+			},
+		)
 	}
 
 	nav_items := make([dynamic]Nav_Item, 0, 8)
@@ -193,7 +214,7 @@ generate_data :: proc() -> Page_Data {
 	append(&nav_items, Nav_Item{url = "https://twitter.com/example", label = "Twitter"})
 	append(&nav_items, Nav_Item{url = "mailto:nobody@example.com", label = "Email"})
 
-	return Page_Data{
+	return Page_Data {
 		title = "Post Archive",
 		now = "2025-07-21T12:00:00Z",
 		posts = posts,

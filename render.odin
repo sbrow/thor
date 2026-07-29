@@ -404,4 +404,3 @@ write_file :: proc(path: string, html: string) {
 		log.errorf("cannot write %s: %v", path, err)
 	}
 }
-

@@ -132,4 +132,3 @@ spec_dynamic_names :: proc(t: ^testing.T) {
 spec_inheritance :: proc(t: ^testing.T) {
 	run_spec_file(t, "spec/specs/~inheritance.json")
 }
-

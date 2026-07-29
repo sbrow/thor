@@ -12,7 +12,11 @@ test_heading_simple :: proc(t: ^testing.T) {
 @(test)
 test_heading_dedup :: proc(t: ^testing.T) {
 	result := inject_heading_ids("<h2>Intro</h2><p>text</p><h2>Intro</h2>")
-	testing.expect_value(t, result, `<h2 id="intro">Intro</h2><p>text</p><h2 id="intro-1">Intro</h2>`)
+	testing.expect_value(
+		t,
+		result,
+		`<h2 id="intro">Intro</h2><p>text</p><h2 id="intro-1">Intro</h2>`,
+	)
 }
 
 @(test)
@@ -36,7 +40,9 @@ test_heading_punctuation :: proc(t: ^testing.T) {
 @(test)
 test_heading_all_levels :: proc(t: ^testing.T) {
 	result := inject_heading_ids("<h1>A</h1><h2>B</h2><h3>C</h3><h4>D</h4><h5>E</h5><h6>F</h6>")
-	testing.expect_value(t, result,
+	testing.expect_value(
+		t,
+		result,
 		`<h1 id="a">A</h1>` +
 		`<h2 id="b">B</h2>` +
 		`<h3 id="c">C</h3>` +
@@ -88,9 +94,9 @@ test_heading_numbers :: proc(t: ^testing.T) {
 @(test)
 test_heading_triple_dedup :: proc(t: ^testing.T) {
 	result := inject_heading_ids("<h2>Foo</h2><h2>Foo</h2><h2>Foo</h2>")
-	testing.expect_value(t, result,
-		`<h2 id="foo">Foo</h2>` +
-		`<h2 id="foo-1">Foo</h2>` +
-		`<h2 id="foo-2">Foo</h2>`,
+	testing.expect_value(
+		t,
+		result,
+		`<h2 id="foo">Foo</h2>` + `<h2 id="foo-1">Foo</h2>` + `<h2 id="foo-2">Foo</h2>`,
 	)
 }

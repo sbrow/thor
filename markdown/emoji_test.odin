@@ -30,4 +30,3 @@ test_emoji_skips_invalid_shortcodes :: proc(t: ^testing.T) {
 	testing.expect_value(t, expand_emoji(":Smile:"), ":Smile:")
 	testing.expect_value(t, expand_emoji(": not real :"), ": not real :")
 }
-

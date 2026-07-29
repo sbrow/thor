@@ -434,4 +434,3 @@ expand_emoji :: proc(text: string) -> string {
 
 	return strings.to_string(sb)
 }
-

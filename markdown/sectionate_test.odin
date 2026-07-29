@@ -46,4 +46,3 @@ test_wrap_sections_doesnt_split_content :: proc(t: ^testing.T) {
 		"<section><h1>Big</h1><h3>Small</h3></section>",
 	)
 }
-

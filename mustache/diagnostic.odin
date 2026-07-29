@@ -320,4 +320,3 @@ format_render_error :: proc(err: Error, tmpl: Template, colorize: bool = false) 
 	b := body(err)
 	return format_error(path, tmpl.source, b.pos, b.msg, colorize = colorize)
 }
-

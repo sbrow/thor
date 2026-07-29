@@ -7,4 +7,3 @@ import "core:testing"
 test_true :: proc(t: ^testing.T) {
 	testing.expect(t, true)
 }
-

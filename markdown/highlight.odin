@@ -305,4 +305,3 @@ highlight_code :: proc(html: string, file_path: string) -> string {
 	}
 	return strings.to_string(sb)
 }
-

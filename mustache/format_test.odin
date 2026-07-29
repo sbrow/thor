@@ -104,38 +104,64 @@ test_parse_offset_skips_fractional_seconds :: proc(t: ^testing.T) {
 @(test)
 test_format_date_weekday_full :: proc(t: ^testing.T) {
 	// 2026-01-01 is a Thursday.
-	dt := Date_Components{year = 2026, month = 1, day = 1}
+	dt := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+	}
 	result := format_date(dt, "Monday")
 	testing.expect_value(t, result, "Thursday")
 }
 
 @(test)
 test_format_date_weekday_abbr :: proc(t: ^testing.T) {
-	dt := Date_Components{year = 2026, month = 1, day = 1}
+	dt := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+	}
 	result := format_date(dt, "Mon")
 	testing.expect_value(t, result, "Thu")
 }
 
 @(test)
 test_format_date_month_full_name :: proc(t: ^testing.T) {
-	dt := Date_Components{year = 2026, month = 3, day = 15}
+	dt := Date_Components {
+		year  = 2026,
+		month = 3,
+		day   = 15,
+	}
 	result := format_date(dt, "January")
 	testing.expect_value(t, result, "March")
 }
 
 @(test)
 test_format_date_two_digit_year :: proc(t: ^testing.T) {
-	dt := Date_Components{year = 2026, month = 3, day = 15}
+	dt := Date_Components {
+		year  = 2026,
+		month = 3,
+		day   = 15,
+	}
 	result := format_date(dt, "06")
 	testing.expect_value(t, result, "26")
 }
 
 @(test)
 test_format_date_hour24_padded :: proc(t: ^testing.T) {
-	midnight := Date_Components{year = 2026, month = 1, day = 1, hour = 0}
+	midnight := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 0,
+	}
 	testing.expect_value(t, format_date(midnight, "15"), "00")
 
-	afternoon := Date_Components{year = 2026, month = 1, day = 1, hour = 13}
+	afternoon := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 13,
+	}
 	testing.expect_value(t, format_date(afternoon, "15"), "13")
 }
 
@@ -147,7 +173,12 @@ test_format_date_hour12_padded_am_pm_boundaries :: proc(t: ^testing.T) {
 	}{{0, "12 AM"}, {12, "12 PM"}, {13, "01 PM"}, {23, "11 PM"}}
 
 	for &c in cases {
-		dt := Date_Components{year = 2026, month = 1, day = 1, hour = c.hour}
+		dt := Date_Components {
+			year  = 2026,
+			month = 1,
+			day   = 1,
+			hour  = c.hour,
+		}
 		result := format_date(dt, "03 PM")
 		testing.expect_value(t, result, c.expected)
 	}
@@ -155,32 +186,62 @@ test_format_date_hour12_padded_am_pm_boundaries :: proc(t: ^testing.T) {
 
 @(test)
 test_format_date_hour12_unpadded :: proc(t: ^testing.T) {
-	one_am := Date_Components{year = 2026, month = 1, day = 1, hour = 1}
+	one_am := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 1,
+	}
 	testing.expect_value(t, format_date(one_am, "3"), "1")
 
-	one_pm := Date_Components{year = 2026, month = 1, day = 1, hour = 13}
+	one_pm := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 13,
+	}
 	testing.expect_value(t, format_date(one_pm, "3"), "1")
 }
 
 @(test)
 test_format_date_am_pm_lowercase :: proc(t: ^testing.T) {
-	afternoon := Date_Components{year = 2026, month = 1, day = 1, hour = 13}
+	afternoon := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 13,
+	}
 	testing.expect_value(t, format_date(afternoon, "pm"), "pm")
 
-	morning := Date_Components{year = 2026, month = 1, day = 1, hour = 9}
+	morning := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 9,
+	}
 	testing.expect_value(t, format_date(morning, "pm"), "am")
 }
 
 @(test)
 test_format_date_minute_second_padding :: proc(t: ^testing.T) {
-	dt := Date_Components{year = 2026, month = 1, day = 1, minute = 4, second = 5}
+	dt := Date_Components {
+		year   = 2026,
+		month  = 1,
+		day    = 1,
+		minute = 4,
+		second = 5,
+	}
 	testing.expect_value(t, format_date(dt, "04:05"), "04:05")
 	testing.expect_value(t, format_date(dt, "4:5"), "4:5")
 }
 
 @(test)
 test_format_date_month_day_numeric_padding :: proc(t: ^testing.T) {
-	dt := Date_Components{year = 2026, month = 3, day = 5}
+	dt := Date_Components {
+		year  = 2026,
+		month = 3,
+		day   = 5,
+	}
 	testing.expect_value(t, format_date(dt, "01"), "03")
 	testing.expect_value(t, format_date(dt, "1"), "3")
 	testing.expect_value(t, format_date(dt, "02"), "05")
@@ -191,14 +252,23 @@ test_format_date_month_day_numeric_padding :: proc(t: ^testing.T) {
 test_format_date_mst_defaults_utc :: proc(t: ^testing.T) {
 	// Date_Components constructed directly (not via parse_iso_date)
 	// defaults to UTC for the MST token.
-	dt := Date_Components{year = 2026, month = 1, day = 1, hour = 12}
+	dt := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+		hour  = 12,
+	}
 	result := format_date(dt, "MST")
 	testing.expect_value(t, result, "UTC")
 }
 
 @(test)
 test_format_date_literal_passthrough :: proc(t: ^testing.T) {
-	dt := Date_Components{year = 2026, month = 1, day = 1}
+	dt := Date_Components {
+		year  = 2026,
+		month = 1,
+		day   = 1,
+	}
 	result := format_date(dt, "Year: 2006!")
 	testing.expect_value(t, result, "Year: 2026!")
 }
@@ -206,7 +276,14 @@ test_format_date_literal_passthrough :: proc(t: ^testing.T) {
 @(test)
 test_format_date_combined_go_reference_layout :: proc(t: ^testing.T) {
 	// 2023-10-15 is a Sunday.
-	dt := Date_Components{year = 2023, month = 10, day = 15, hour = 13, minute = 18, second = 50}
+	dt := Date_Components {
+		year   = 2023,
+		month  = 10,
+		day    = 15,
+		hour   = 13,
+		minute = 18,
+		second = 50,
+	}
 	result := format_date(dt, "Mon Jan 2 15:04:05 MST 2006")
 	testing.expect_value(t, result, "Sun Oct 15 13:18:50 UTC 2023")
 }
@@ -241,9 +318,13 @@ test_convert_to_tz_no_offset_assumes_target :: proc(t: ^testing.T) {
 	if !tz_ok do return
 	defer timezone.region_destroy(tz, context.temp_allocator)
 
-	c := Date_Components{
-		year = 2026, month = 3, day = 15,
-		hour = 8, minute = 49, second = 54,
+	c := Date_Components {
+		year   = 2026,
+		month  = 3,
+		day    = 15,
+		hour   = 8,
+		minute = 49,
+		second = 54,
 	}
 	result, ok := convert_to_tz(c, tz)
 	testing.expect_value(t, ok, true)
@@ -260,11 +341,15 @@ test_convert_to_tz_with_offset_converts :: proc(t: ^testing.T) {
 	defer timezone.region_destroy(tz, context.temp_allocator)
 
 	// 2026-03-15T12:49:54Z (UTC) → 08:49:54 EDT (UTC-4)
-	c := Date_Components{
-		year = 2026, month = 3, day = 15,
-		hour = 12, minute = 49, second = 54,
+	c := Date_Components {
+		year           = 2026,
+		month          = 3,
+		day            = 15,
+		hour           = 12,
+		minute         = 49,
+		second         = 54,
 		offset_seconds = 0,
-		has_offset = true,
+		has_offset     = true,
 	}
 	result, ok := convert_to_tz(c, tz)
 	testing.expect_value(t, ok, true)
@@ -281,11 +366,15 @@ test_convert_to_tz_with_negative_offset_converts :: proc(t: ^testing.T) {
 	defer timezone.region_destroy(tz, context.temp_allocator)
 
 	// 2026-03-15T08:49:54-04:00 → UTC 12:49:54 → EDT 08:49:54
-	c := Date_Components{
-		year = 2026, month = 3, day = 15,
-		hour = 8, minute = 49, second = 54,
+	c := Date_Components {
+		year           = 2026,
+		month          = 3,
+		day            = 15,
+		hour           = 8,
+		minute         = 49,
+		second         = 54,
 		offset_seconds = -14400,
-		has_offset = true,
+		has_offset     = true,
 	}
 	result, ok := convert_to_tz(c, tz)
 	testing.expect_value(t, ok, true)

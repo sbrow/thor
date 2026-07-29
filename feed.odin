@@ -149,4 +149,3 @@ xml_escape :: proc(s: string) -> string {
 	r, _ = strings.replace_all(r, ">", "&gt;")
 	return r
 }
-

@@ -184,10 +184,7 @@ collect_partial_names :: proc(
 
 // collect_block_names enumerates the unique `{{$name}}` block definitions in
 // a template's node array.
-collect_block_names :: proc(
-	tmpl: Template,
-	allocator := context.temp_allocator,
-) -> []string {
+collect_block_names :: proc(tmpl: Template, allocator := context.temp_allocator) -> []string {
 	out := make([dynamic]string, 0, 0, allocator)
 	seen := make(map[string]bool, allocator)
 	defer delete(seen)

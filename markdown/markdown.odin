@@ -88,4 +88,3 @@ apply_extension_config :: proc(ext: ^bit_set[Extension], config: json.Object) {
 		}
 	}
 }
-

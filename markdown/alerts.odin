@@ -95,4 +95,3 @@ transform_alert :: proc(sb: ^strings.Builder, bq: string) {
 	strings.write_string(sb, " ")
 	strings.write_string(sb, rest)
 }
-

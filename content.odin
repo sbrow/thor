@@ -238,9 +238,18 @@ load_page :: proc(
 	if page.date == "" {
 		info, stat_err := os.stat(file_path, context.allocator)
 		if stat_err == nil {
-			page.date, _ = time.time_to_rfc3339(info.modification_time, 0, false, context.allocator)
+			page.date, _ = time.time_to_rfc3339(
+				info.modification_time,
+				0,
+				false,
+				context.allocator,
+			)
 			os.file_info_delete(info, context.allocator)
-			log.warnf("no date in frontmatter for %s, using file modification time: %s", file_path, page.date)
+			log.warnf(
+				"no date in frontmatter for %s, using file modification time: %s",
+				file_path,
+				page.date,
+			)
 		}
 	}
 	page.year = get_year(page.date)
@@ -282,4 +291,3 @@ strip_extension :: proc(name: string) -> string {
 	}
 	return name[:dot]
 }
-

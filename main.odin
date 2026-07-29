@@ -94,4 +94,3 @@ when SPALL {
 		spall._buffer_end(&spall_ctx, &spall_buffer)
 	}
 }
-

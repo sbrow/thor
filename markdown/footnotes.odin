@@ -210,4 +210,3 @@ strip_p_tags :: proc(html: string) -> string {
 	}
 	return s
 }
-
