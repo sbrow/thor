@@ -12,9 +12,9 @@
   };
 
   outputs =
-    inputs@{
-      flake-parts,
-      nixpkgs,
+    inputs@{ flake-parts
+    , nixpkgs
+    , ...
       # , process-compose-flake
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -25,11 +25,10 @@
       systems = [ "x86_64-linux" ];
 
       perSystem =
-        {
-          pkgs,
-          system,
-          inputs',
-          ...
+        { pkgs
+        , system
+        , inputs'
+        , ...
         }:
         let
           mkGrammarStaticLib = name: src: pkgs.stdenv.mkDerivation {
@@ -142,7 +141,7 @@
           };
 
           devShells.default = pkgs.mkShell {
-            buildInputs = [odin ols ] ++ (with pkgs; [
+            buildInputs = [ odin ols ] ++ (with pkgs; [
               cmark
               tree-sitter
 
