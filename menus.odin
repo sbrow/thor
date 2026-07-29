@@ -7,6 +7,8 @@ import "core:mem"
 import "core:os"
 import "core:strings"
 
+DEFAULT_WEIGHT :: 10
+
 Menu_Entry :: struct {
 	name:   string,
 	url:    string,
@@ -33,8 +35,9 @@ parse_page_menus :: proc(
 	case json.String:
 		result = make(map[string]Menu_Entry, allocator)
 		result[string(v)] = Menu_Entry {
-			name = page.title,
-			url  = page.permalink,
+			name   = page.title,
+			url    = page.permalink,
+			weight = DEFAULT_WEIGHT,
 		}
 
 	case json.Array:
@@ -42,8 +45,9 @@ parse_page_menus :: proc(
 		for item in v {
 			if s, ok := item.(json.String); ok {
 				result[string(s)] = Menu_Entry {
-					name = page.title,
-					url  = page.permalink,
+					name   = page.title,
+					url    = page.permalink,
+					weight = DEFAULT_WEIGHT,
 				}
 			} else {
 				log.warnf("menus: ignoring non-string item in menus array: %v", item)
@@ -53,7 +57,7 @@ parse_page_menus :: proc(
 	case json.Object:
 		result = make(map[string]Menu_Entry, allocator)
 		for menu_name, entry_val in v {
-			weight := 0
+			weight := DEFAULT_WEIGHT
 			if entry_obj, ok := entry_val.(json.Object); ok {
 				if w, ok := entry_obj["weight"]; ok {
 					#partial switch wval in w {
@@ -217,7 +221,7 @@ collect_auto_menus :: proc(site: ^Site) {
 				break
 			}
 		}
-		append(&entries, Menu_Entry{name = name, url = url})
+		append(&entries, Menu_Entry{name = name, url = url, weight = DEFAULT_WEIGHT})
 	}
 
 	// Root-level page entries (section = "", not index)
@@ -225,7 +229,10 @@ collect_auto_menus :: proc(site: ^Site) {
 		if page._is_index || page.section != "" || page.title == "" {
 			continue
 		}
-		append(&entries, Menu_Entry{name = page.title, url = page.permalink})
+		append(
+			&entries,
+			Menu_Entry{name = page.title, url = page.permalink, weight = DEFAULT_WEIGHT},
+		)
 	}
 
 	if len(entries) == 0 {
@@ -237,11 +244,16 @@ collect_auto_menus :: proc(site: ^Site) {
 	site.menus["main"] = entries[:]
 }
 
+compare_menu_entries :: proc(a, b: Menu_Entry) -> int {
+	if a.weight != b.weight do return a.weight - b.weight
+	return strings.compare(a.name, b.name)
+}
+
 sort_menu_entries :: proc(entries: []Menu_Entry) {
 	for i in 1 ..< len(entries) {
 		key := entries[i]
 		j := i - 1
-		for j >= 0 && strings.compare(entries[j].name, key.name) > 0 {
+		for j >= 0 && compare_menu_entries(entries[j], key) > 0 {
 			entries[j + 1] = entries[j]
 			j -= 1
 		}
@@ -250,7 +262,7 @@ sort_menu_entries :: proc(entries: []Menu_Entry) {
 }
 
 // parse_config_menus converts raw JSON from thor.json into map[string][]Menu_Entry.
-// Preserves array order as-declared.
+// Entries are sorted by weight, then name.
 parse_config_menus :: proc(
 	raw: json.Value,
 	allocator := context.allocator,
@@ -278,6 +290,7 @@ parse_config_menus :: proc(
 
 			name := ""
 			url := ""
+			weight := DEFAULT_WEIGHT
 
 			if v, ok := entry_obj["name"]; ok {
 				if s, ok2 := v.(json.String); ok2 {
@@ -307,16 +320,32 @@ parse_config_menus :: proc(
 				}
 			}
 
+			if v, ok := entry_obj["weight"]; ok {
+				switch wval in v {
+				case json.Integer:
+					weight = int(wval)
+				case json.Float:
+					weight = int(wval)
+				case json.Null, json.Boolean, json.String, json.Array, json.Object:
+					log.warnf(
+						"menus: '%s' entry %d: 'weight' must be a number, got %v",
+						menu_name,
+						idx,
+						v,
+					)
+				}
+			}
+
 			if name == "" {
 				log.warnf("menus: '%s' entry %d missing 'name', skipping", menu_name, idx)
 				continue
 			}
 
-			append(&entries, Menu_Entry{name = name, url = url})
+			append(&entries, Menu_Entry{name = name, url = url, weight = weight})
 		}
+		sort_menu_entries(entries[:])
 		result[menu_name] = entries[:]
 	}
 
 	return result
 }
-

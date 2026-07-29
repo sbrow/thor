@@ -22,7 +22,7 @@
   - [ ] Test menu diagnostics
   - [ ] Honestly, Test **all** diagnostics
   - [ ] Need to be careful about diagnostics across module boundaries.
-    - we don't necessarilly want to warn users about theme designers mistakes. (though perhaps we do)
+    - we don't necessarily want to warn users about theme designers mistakes. (though perhaps we do)
 - [x] Simplify / unify template context stack. Come up with a name for it.
   - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
@@ -39,7 +39,7 @@
     - i.e. force the user to choose one or the other.
 - [ ] Don't show annoying log output in tests.
 - [ ] improve home link customization.
-  - [ ] currently an accessability issue.
+  - [ ] currently an accessibility issue.
 - [ ] support JSON5 in in frontmatter
 - [ ] Create a json schema file for `thor.json`.
 - [ ] cleanup `#partial switch`es.
