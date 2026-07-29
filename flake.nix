@@ -13,12 +13,9 @@
 
   outputs =
     inputs@{
-      self,
       flake-parts,
       nixpkgs,
-      nixpkgs-unstable,
       # , process-compose-flake
-      treefmt-nix,
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
@@ -71,7 +68,7 @@
             config.allowUnfree = true;
 
             overlays = [
-              (final: prev: { unstable = inputs'.nixpkgs-unstable.legacyPackages; })
+              (_final: _prev: { unstable = inputs'.nixpkgs-unstable.legacyPackages; })
             ];
           };
 
