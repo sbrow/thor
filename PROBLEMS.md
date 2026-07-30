@@ -264,6 +264,29 @@ User's custom layout silently ignored, defaults used.
 (Same as B1 — restated here for the template-authoring perspective.) One bad
 tag → whole page `""`. The most impactful silent failure in the system.
 
+### G3. Pipe errors lack "did you mean?" suggestions — High
+`mustache/pipes.odin:241`
+
+Unknown key errors (`{{tittle}}`), missing partials, and unmatched block
+overrides all get Levenshtein "did you mean?" hints via `suggest_correction`.
+But unknown pipe operations (`{{date | formats}}`) get only `"unknown pipe op
+'formats'"` with no suggestion. The known filter names (`"format"`,
+`"group_by"`) are a small fixed set — perfect for suggestions.
+
+Structural gap: `Error_Body` has no `hint` field, and
+`format_render_error` doesn't pass `hint` to `format_error` (defaults to
+`""`). So even if a suggestion were computed, there's nowhere to put it
+without either appending to `msg` or adding `hint` to `Error_Body`.
+
+### G4. Triple-mustache `{{{` mishandled by `tag_content_base` — Medium
+`mustache/mustache.odin:230`
+
+`tag_content_base` skips `{{` and sigils (`#^/&><$!`) to find where tag
+content begins. But triple-mustache `{{{key}}}` is common — after `{{`,
+the next char is `{`, which is not in the sigil list, so `base` points at
+`{` instead of the actual key content. Any pipe position calculation for
+`{{{key | format}}}` will be off by one byte.
+
 ---
 
 ## Cross-cutting themes

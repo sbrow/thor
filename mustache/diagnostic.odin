@@ -185,6 +185,7 @@ format_error :: proc(
 	context_before: int = 2,
 	context_after: int = 2,
 	colorize: bool = false,
+	span: int = 0,
 ) -> string {
 	line, col := line_col(source, pos)
 	total_lines := count_lines(source)
@@ -232,8 +233,11 @@ format_error :: proc(
 	write_gutter(&sb, width, faint, reset)
 
 	// Caret extent for the error line.
-	_, token_start, token_end := context_extent(source, pos)
-	line_start, _, _ := context_extent(source, pos)
+	line_start, token_start, token_end := context_extent(source, pos)
+	if span > 0 {
+		token_start = pos
+		token_end = pos + span
+	}
 	caret_start_col := token_start - line_start + 1
 	caret_end_col := token_end - line_start + 1
 	if caret_end_col <= caret_start_col {
@@ -322,5 +326,5 @@ format_render_error :: proc(err: Error, tmpl: Template, colorize: bool = false) 
 	if path == "" {
 		path = "<input>"
 	}
-	return format_error(path, source, b.pos, b.msg, colorize = colorize)
+	return format_error(path, source, b.pos, b.msg, colorize = colorize, span = b.span)
 }

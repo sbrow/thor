@@ -31,6 +31,7 @@ Error_Body :: struct {
 	kind:   Error_Kind,
 	source: string,
 	path:   string,
+	span:   int,
 }
 
 // Error is nil when no error occurred.
@@ -55,11 +56,12 @@ tag_error :: proc(err: Error, tmpl: Template) -> Error {
 	if err == nil do return nil
 	b := body(err)
 	return Error_Body {
-		msg = b.msg,
-		pos = b.pos,
-		kind = b.kind,
+		msg    = b.msg,
+		pos    = b.pos,
+		span   = b.span,
+		kind   = b.kind,
 		source = tmpl.source,
-		path = tmpl.path,
+		path   = tmpl.path,
 	}
 }
 
@@ -225,6 +227,22 @@ parse_tokens :: proc(
 	return
 }
 
+// tag_content_base returns the absolute byte offset in source where the
+// trimmed tag content begins (after {{, optional sigil, and whitespace).
+tag_content_base :: proc(source: string, tag_pos: int) -> int {
+	base := tag_pos + 2 // skip {{
+	if base < len(source) {
+		switch source[base] {
+		case '#', '^', '/', '&', '>', '<', '$', '!':
+			base += 1
+		}
+	}
+	for base < len(source) && (source[base] == ' ' || source[base] == '\t') {
+		base += 1
+	}
+	return base
+}
+
 parse_section :: proc(
 	tokens: []Token,
 	pos: ^int,
@@ -245,7 +263,7 @@ parse_section :: proc(
 		case .Variable:
 			idx := len(nodes)
 			append(nodes, Node{kind = .Variable})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{%s}}}}': %v", tok.value, perr),
@@ -259,7 +277,7 @@ parse_section :: proc(
 		case .Unescaped:
 			idx := len(nodes)
 			append(nodes, Node{kind = .Unescaped})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{&%s}}}}': %v", tok.value, perr),
@@ -279,7 +297,7 @@ parse_section :: proc(
 			content_start := 0
 			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
 			append(nodes, Node{kind = .Section, pos = tok.pos})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{#%s}}}}': %v", tok.value, perr),
@@ -300,7 +318,7 @@ parse_section :: proc(
 			content_start := 0
 			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
 			append(nodes, Node{kind = .Inverted, pos = tok.pos})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos)
+			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{^%s}}}}': %v", tok.value, perr),

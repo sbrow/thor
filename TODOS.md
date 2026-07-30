@@ -22,6 +22,11 @@
   - [ ] Need to be careful about diagnostics across module boundaries.
     - we don't necessarily want to warn users about theme designers mistakes. (though perhaps we do)
   - [ ] consider reporting duplicate weights outside of menus
+  - [ ] Extend `tag_error` to all render-time errors, not just pipe errors.
+    Currently only pipe errors (4 sites in `render_nodes`) get stamped with
+    the correct template source/path. Other render errors still use the
+    content template's source/path, which can point at the wrong file.
+  - [ ] try to make file paths clickable links.
 - [ ] Load grammars dynamically
 - [ ] starred must be a param.
 - [ ] Documentation
@@ -36,6 +41,7 @@
 - [ ] cleanup `#partial switch`es.
 - [ ] improve json diagnostics.
   - i.e. "Missing quotes around string", etc.
+- [ ] don't use bullshit "sub-tokens", add filters and pipes as proper tokens.
 
 ## Performance
 

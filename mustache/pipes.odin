@@ -17,8 +17,9 @@ MAX_PIPE_ARGS :: 2
 DEFAULT_DATE_FORMAT :: "2 Jan 2006"
 
 Pipe_Filter :: struct {
-	op:   string,
-	args: [dynamic; MAX_PIPE_ARGS]string,
+	op:     string,
+	args:   [dynamic; MAX_PIPE_ARGS]string,
+	op_pos: int,
 }
 
 Group :: struct {
@@ -77,6 +78,7 @@ parse_pipeline :: proc(
 	content: string,
 	filters_out: ^[dynamic; MAX_PIPES]Pipe_Filter,
 	pos: int,
+	content_base: int,
 ) -> (
 	key: string,
 	err: Error,
@@ -86,14 +88,13 @@ parse_pipeline :: proc(
 		return key, nil
 	}
 
-	segments := strings.split(content, "|", allocator = context.temp_allocator)
-
-	filter_count := len(segments) - 1
-	if filter_count > MAX_PIPES {
+	// Count pipes to validate against MAX_PIPES.
+	pipe_count := strings.count(content, "|")
+	if pipe_count > MAX_PIPES {
 		return "", Error_Body {
 			msg = fmt.tprintf(
 				"pipe expression has %d filters, max is %d",
-				filter_count,
+				pipe_count,
 				MAX_PIPES,
 			),
 			pos = pos,
@@ -101,20 +102,37 @@ parse_pipeline :: proc(
 		}
 	}
 
-	key = strings.trim_space(segments[0])
+	// Key is everything before the first |.
+	first_pipe := strings.index(content, "|")
+	key = strings.trim_space(content[:first_pipe])
 	if len(key) == 0 {
 		return "", Error_Body{msg = "pipe expression missing key", pos = pos, kind = .Syntax}
 	}
 
-	if filter_count == 0 {
+	if pipe_count == 0 {
 		return key, nil
 	}
 
-	for i in 0 ..< filter_count {
-		seg := strings.trim_space(segments[i + 1])
+	// Walk pipe-delimited segments, tracking byte offsets within content.
+	seg_start := first_pipe + 1 // offset in content, just after |
+	for seg_start <= len(content) {
+		next_pipe := strings.index(content[seg_start:], "|")
+
+		// Raw segment text (may have leading/trailing whitespace).
+		seg_end := seg_start + next_pipe if next_pipe >= 0 else len(content)
+		raw_seg := content[seg_start:seg_end]
+
+		// Count leading whitespace to find op offset within content.
+		ws := 0
+		for ws < len(raw_seg) && is_pipe_space(raw_seg[ws]) {
+			ws += 1
+		}
+		seg := strings.trim_space(raw_seg)
 		if len(seg) == 0 {
 			return "", Error_Body{msg = "empty filter", pos = pos, kind = .Syntax}
 		}
+
+		op_offset_in_content := seg_start + ws
 
 		tokens, terr := tokenize_fields(seg, pos)
 		if terr != nil {
@@ -140,13 +158,19 @@ parse_pipeline :: proc(
 		}
 
 		filter := Pipe_Filter {
-			op = tokens[0],
+			op     = tokens[0],
+			op_pos = content_base + op_offset_in_content,
 		}
 		for j in 1 ..< len(tokens) {
 			append(&filter.args, tokens[j])
 		}
 		append(filters_out, filter)
 		delete(tokens)
+
+		if next_pipe < 0 {
+			break
+		}
+		seg_start = seg_end + 1
 	}
 
 	return key, nil
@@ -239,8 +263,9 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 
 	case:
 		return nil, Error_Body {
-			msg = fmt.tprintf("unknown pipe op '%s'", filter.op),
-			pos = pos,
+			msg  = fmt.tprintf("unknown pipe op '%s'", filter.op),
+			pos  = filter.op_pos,
+			span = len(filter.op),
 			kind = .Data,
 		}
 	}
