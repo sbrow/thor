@@ -20,6 +20,7 @@
   - [ ] Honestly, Test **all** diagnostics
   - [ ] Need to be careful about diagnostics across module boundaries.
     - we don't necessarily want to warn users about theme designers mistakes. (though perhaps we do)
+  - [ ] consider reporting duplicate weights outside of menus
 - [ ] Load grammars dynamically
 - [ ] starred must be a param.
 - [ ] Documentation
@@ -32,6 +33,8 @@
 - [ ] support JSON5 in in frontmatter
 - [ ] Create a json schema file for `thor.json`.
 - [ ] cleanup `#partial switch`es.
+- [ ] improve json diagnostics.
+  - i.e. "Missing quotes around string", etc.
 
 ## Performance
 
@@ -91,7 +94,9 @@
 - [ ] Do we *need* mustache.Date_Components, or can we use core:time/datetime.DateTime?
 
 ## General 
-- [ ] configure opt-out of automatic sections being added to menu.
+- [ ] Menus
+  - [ ] configure opt-out of automatic sections being added to menu.
+  - [ ] nested menus (i.e. `parent` support)
 - [ ] get rid of the global variables in the `treesitter` package.
 - [ ] Consider using `or_else` when applying default values to structs. i.e.
 ```odin

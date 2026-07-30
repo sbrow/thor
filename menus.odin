@@ -262,6 +262,11 @@ compare_menu_entries :: proc(a, b: Menu_Entry) -> int {
 	aw := a.weight.? or_else DEFAULT_WEIGHT
 	bw := b.weight.? or_else DEFAULT_WEIGHT
 	if aw != bw do return aw - bw
+	a_set := a.weight != nil
+	b_set := b.weight != nil
+	if a_set != b_set {
+		return a_set ? -1 : 1
+	}
 	return strings.compare(a.name, b.name)
 }
 
@@ -284,7 +289,7 @@ warn_duplicate_weights :: proc(menu_name: string, entries: []Menu_Entry) {
 	for i in 0 ..< len(entries) - 1 {
 		if entries[i].weight != nil && entries[i].weight == entries[i + 1].weight {
 			log.warnf(
-				"menus('%s'):'%s' and '%s' share the same weight (%d).",
+				"menus('%s'): '%s' and '%s' share the same menu weight (%d).",
 				menu_name,
 				entries[i].name,
 				entries[i + 1].name,
@@ -388,3 +393,4 @@ parse_config_menus :: proc(
 
 	return result
 }
+
