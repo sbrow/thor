@@ -387,8 +387,8 @@ sort_pages :: proc(pages: #soa[]Page) {
 }
 
 compare_pages :: proc(pages: #soa[]Page, j: int, key: Page) -> int {
-	wj := pages.weight[j]
-	wk := key.weight
+	wj := pages.weight[j].? or_else DEFAULT_WEIGHT
+	wk := key.weight.? or_else DEFAULT_WEIGHT
 	if wj != wk do return wj - wk
 	// Equal weight → date descending
 	if pages.date[j] < key.date do return 1

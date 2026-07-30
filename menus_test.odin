@@ -30,7 +30,7 @@ test_menus_string_form :: proc(t: ^testing.T) {
 	testing.expect(t, ok, "expected 'main' menu")
 	testing.expect_value(t, entry.name, "About")
 	testing.expect_value(t, entry.url, "/about/")
-	testing.expect_value(t, entry.weight, DEFAULT_WEIGHT)
+	testing.expect(t, entry.weight == nil, "string form should have nil weight")
 }
 
 @(test)
@@ -81,7 +81,7 @@ test_menus_object_no_weight :: proc(t: ^testing.T) {
 	testing.expect(t, len(menus) == 1)
 	entry, ok := menus["main"]
 	testing.expect(t, ok)
-	testing.expect_value(t, entry.weight, DEFAULT_WEIGHT)
+	testing.expect(t, entry.weight == nil, "object without weight key should have nil weight")
 }
 
 @(test)
@@ -139,7 +139,7 @@ test_menus_object_non_object_value :: proc(t: ^testing.T) {
 	testing.expect(t, len(menus) == 1, "entry created with defaults")
 	entry, ok := menus["main"]
 	testing.expect(t, ok)
-	testing.expect_value(t, entry.weight, DEFAULT_WEIGHT)
+	testing.expect(t, entry.weight == nil, "non-object value should have nil weight")
 }
 
 @(test)
@@ -154,7 +154,7 @@ test_menus_non_numeric_weight :: proc(t: ^testing.T) {
 	menus := parse_page_menus(parse_raw(`{"main": {"weight": "30"}}`), page, context.allocator)
 	entry, ok := menus["main"]
 	testing.expect(t, ok)
-	testing.expect_value(t, entry.weight, DEFAULT_WEIGHT)
+	testing.expect(t, entry.weight == nil, "non-numeric weight should have nil weight")
 }
 
 @(test)
@@ -204,12 +204,12 @@ test_menus_null_json :: proc(t: ^testing.T) {
 @(test)
 test_sort_weight_orders_correctly :: proc(t: ^testing.T) {
 	entries := []Menu_Entry {
-		{name = "Zeta", url = "/z/", weight = DEFAULT_WEIGHT},
+		{name = "Zeta", url = "/z/"},
 		{name = "Alpha", url = "/a/", weight = 5},
 		{name = "Beta", url = "/b/", weight = 1},
 	}
 	sort_menu_entries(entries)
-	// weight 1 first, then weight 5, then default weight 10
+	// weight 1 first, then weight 5, then nil (DEFAULT_WEIGHT)
 	testing.expect_value(t, entries[0].name, "Beta")
 	testing.expect_value(t, entries[1].name, "Alpha")
 	testing.expect_value(t, entries[2].name, "Zeta")
@@ -218,9 +218,9 @@ test_sort_weight_orders_correctly :: proc(t: ^testing.T) {
 @(test)
 test_sort_equal_weights_alphabetical :: proc(t: ^testing.T) {
 	entries := []Menu_Entry {
-		{name = "Zebra", url = "/z/", weight = DEFAULT_WEIGHT},
-		{name = "Apple", url = "/a/", weight = DEFAULT_WEIGHT},
-		{name = "Mango", url = "/m/", weight = DEFAULT_WEIGHT},
+		{name = "Zebra", url = "/z/"},
+		{name = "Apple", url = "/a/"},
+		{name = "Mango", url = "/m/"},
 	}
 	sort_menu_entries(entries)
 	testing.expect_value(t, entries[0].name, "Apple")
@@ -231,17 +231,33 @@ test_sort_equal_weights_alphabetical :: proc(t: ^testing.T) {
 @(test)
 test_sort_mixed_weights :: proc(t: ^testing.T) {
 	entries := []Menu_Entry {
-		{name = "Charlie", url = "/c/", weight = DEFAULT_WEIGHT},
-		{name = "Alpha", url = "/a/", weight = DEFAULT_WEIGHT},
+		{name = "Charlie", url = "/c/"},
+		{name = "Alpha", url = "/a/"},
 		{name = "Bravo", url = "/b/", weight = 3},
 		{name = "Delta", url = "/d/", weight = 1},
 	}
 	sort_menu_entries(entries)
-	// weight 1 (Delta), weight 3 (Bravo), then default weight alphabetical (Alpha, Charlie)
+	// weight 1 (Delta), weight 3 (Bravo), then nil weight alphabetical (Alpha, Charlie)
 	testing.expect_value(t, entries[0].name, "Delta")
 	testing.expect_value(t, entries[1].name, "Bravo")
 	testing.expect_value(t, entries[2].name, "Alpha")
 	testing.expect_value(t, entries[3].name, "Charlie")
+}
+
+@(test)
+test_sort_explicit_zero_before_nil :: proc(t: ^testing.T) {
+	// Explicit weight 0 is distinguishable from unset (nil → DEFAULT_WEIGHT).
+	// This is the key behavioral improvement of Maybe(int).
+	entries := []Menu_Entry {
+		{name = "Unset", url = "/u/"},
+		{name = "ExplicitZero", url = "/0/", weight = 0},
+		{name = "ExplicitFive", url = "/5/", weight = 5},
+	}
+	sort_menu_entries(entries)
+	// weight 0 first, then weight 5, then nil (DEFAULT_WEIGHT = 10)
+	testing.expect_value(t, entries[0].name, "ExplicitZero")
+	testing.expect_value(t, entries[1].name, "ExplicitFive")
+	testing.expect_value(t, entries[2].name, "Unset")
 }
 
 @(test)
@@ -268,7 +284,7 @@ test_config_weight_parsing_and_sort :: proc(t: ^testing.T) {
 	testing.expect_value(t, main[0].name, "Light")
 	testing.expect_value(t, main[0].weight, 1)
 	testing.expect_value(t, main[1].name, "Default")
-	testing.expect_value(t, main[1].weight, DEFAULT_WEIGHT)
+	testing.expect(t, main[1].weight == nil, "entry without weight should be nil")
 	testing.expect_value(t, main[2].name, "Heavy")
 	testing.expect_value(t, main[2].weight, 20)
 }
@@ -296,7 +312,7 @@ test_json_get_int_missing :: proc(t: ^testing.T) {
 	obj, _ := json.parse_string(`{}`, spec = .JSON)
 	defer json.destroy_value(obj)
 	o, _ := obj.(json.Object)
-	testing.expect_value(t, json_get_int(o, "weight"), 0)
+	testing.expect(t, json_get_int(o, "weight") == nil, "missing key should return nil")
 }
 
 @(test)
@@ -304,7 +320,7 @@ test_json_get_int_non_numeric :: proc(t: ^testing.T) {
 	obj, _ := json.parse_string(`{"weight": "5"}`, spec = .JSON)
 	defer json.destroy_value(obj)
 	o, _ := obj.(json.Object)
-	testing.expect_value(t, json_get_int(o, "weight"), 0)
+	testing.expect(t, json_get_int(o, "weight") == nil, "non-numeric should return nil")
 }
 
 // --- sort_pages tests ---
@@ -313,13 +329,13 @@ test_json_get_int_non_numeric :: proc(t: ^testing.T) {
 test_sort_pages_weight_primary :: proc(t: ^testing.T) {
 	pages := make(#soa[dynamic]Page, 0, 3)
 	defer delete(pages)
-	append(&pages, Page{title = "Gamma", date = "2025-01-03", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "Gamma", date = "2025-01-03"})
 	append(&pages, Page{title = "Alpha", date = "2025-01-01", weight = 5})
 	append(&pages, Page{title = "Beta", date = "2025-01-02", weight = 1})
 
 	sort_pages(pages[:])
 
-	// weight 1, weight 5, then default weight 10
+	// weight 1, weight 5, then nil weight (DEFAULT_WEIGHT)
 	testing.expect_value(t, pages.title[0], "Beta")
 	testing.expect_value(t, pages.title[1], "Alpha")
 	testing.expect_value(t, pages.title[2], "Gamma")
@@ -329,13 +345,13 @@ test_sort_pages_weight_primary :: proc(t: ^testing.T) {
 test_sort_pages_equal_weights_by_date :: proc(t: ^testing.T) {
 	pages := make(#soa[dynamic]Page, 0, 3)
 	defer delete(pages)
-	append(&pages, Page{title = "Old", date = "2025-01-01", weight = DEFAULT_WEIGHT})
-	append(&pages, Page{title = "New", date = "2025-06-01", weight = DEFAULT_WEIGHT})
-	append(&pages, Page{title = "Mid", date = "2025-03-01", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "Old", date = "2025-01-01"})
+	append(&pages, Page{title = "New", date = "2025-06-01"})
+	append(&pages, Page{title = "Mid", date = "2025-03-01"})
 
 	sort_pages(pages[:])
 
-	// All same weight → date descending
+	// All nil weight → date descending
 	testing.expect_value(t, pages.title[0], "New")
 	testing.expect_value(t, pages.title[1], "Mid")
 	testing.expect_value(t, pages.title[2], "Old")
@@ -345,14 +361,14 @@ test_sort_pages_equal_weights_by_date :: proc(t: ^testing.T) {
 test_sort_pages_mixed :: proc(t: ^testing.T) {
 	pages := make(#soa[dynamic]Page, 0, 4)
 	defer delete(pages)
-	append(&pages, Page{title = "DefaultOld", date = "2025-01-01", weight = DEFAULT_WEIGHT})
-	append(&pages, Page{title = "DefaultNew", date = "2025-06-01", weight = DEFAULT_WEIGHT})
+	append(&pages, Page{title = "DefaultOld", date = "2025-01-01"})
+	append(&pages, Page{title = "DefaultNew", date = "2025-06-01"})
 	append(&pages, Page{title = "Heavy", date = "2025-03-01", weight = 20})
 	append(&pages, Page{title = "Light", date = "2025-02-01", weight = 1})
 
 	sort_pages(pages[:])
 
-	// weight 1, weight 10 (DefaultNew by date), weight 10 (DefaultOld by date), weight 20
+	// weight 1, nil weight (DefaultNew by date), nil weight (DefaultOld by date), weight 20
 	testing.expect_value(t, pages.title[0], "Light")
 	testing.expect_value(t, pages.title[1], "DefaultNew")
 	testing.expect_value(t, pages.title[2], "DefaultOld")

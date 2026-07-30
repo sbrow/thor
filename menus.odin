@@ -12,12 +12,12 @@ DEFAULT_WEIGHT :: 10
 Menu_Entry :: struct {
 	name:   string,
 	url:    string,
-	weight: int,
+	weight: Maybe(int),
 }
 
 // parse_page_menus converts raw frontmatter JSON into map[string]Menu_Entry.
 // Supports three forms:
-//   "menus": "main"                              → {main: {name=title, url=permalink, weight=0}}
+//   "menus": "main"                              → {main: {name=title, url=permalink, weight=nil}}
 //   "menus": ["main", "footer"]                  → {main: {...}, footer: {...}}
 //   "menus": {"main": {"weight": 30}}            → {main: {name=title, url=permalink, weight=30}}
 parse_page_menus :: proc(
@@ -37,7 +37,6 @@ parse_page_menus :: proc(
 		result[string(v)] = Menu_Entry {
 			name   = page.title,
 			url    = page.permalink,
-			weight = DEFAULT_WEIGHT,
 		}
 
 	case json.Array:
@@ -45,9 +44,8 @@ parse_page_menus :: proc(
 		for item in v {
 			if s, ok := item.(json.String); ok {
 				result[string(s)] = Menu_Entry {
-					name   = page.title,
-					url    = page.permalink,
-					weight = DEFAULT_WEIGHT,
+					name = page.title,
+					url  = page.permalink,
 				}
 			} else {
 				log.warnf("menus: ignoring non-string item in menus array: %v", item)
@@ -57,15 +55,15 @@ parse_page_menus :: proc(
 	case json.Object:
 		result = make(map[string]Menu_Entry, allocator)
 		for menu_name, entry_val in v {
-			weight := DEFAULT_WEIGHT
+			weight: Maybe(int) = nil
 			if entry_obj, ok := entry_val.(json.Object); ok {
 				if w, ok := entry_obj["weight"]; ok {
-					#partial switch wval in w {
+					switch wval in w {
 					case json.Integer:
 						weight = int(wval)
 					case json.Float:
 						weight = int(wval)
-					case:
+					case json.Boolean, json.String, json.Array, json.Object, json.Null:
 						log.warnf(
 							"menus: '%s' entry 'weight' must be a number, got %v",
 							menu_name,
@@ -166,9 +164,9 @@ merge_page_menus :: proc(site: ^Site) {
 			if _, ok := page_entries[menu_name]; !ok {
 				page_entries[menu_name] = make([dynamic]Menu_Entry, 0, 4, alloc)
 			}
-			// Effective weight: per-menu weight if explicit, else page.weight
+			// Effective weight: per-menu weight if set, else page.weight
 			effective := entry.weight
-			if effective == DEFAULT_WEIGHT {
+			if effective == nil {
 				effective = page.weight
 			}
 			append(&page_entries[menu_name], Menu_Entry{
@@ -235,7 +233,7 @@ collect_auto_menus :: proc(site: ^Site) {
 			}
 		}
 		if !skip {
-			append(&entries, Menu_Entry{name = name, url = url, weight = DEFAULT_WEIGHT})
+			append(&entries, Menu_Entry{name = name, url = url})
 		}
 	}
 
@@ -263,7 +261,9 @@ collect_auto_menus :: proc(site: ^Site) {
 }
 
 compare_menu_entries :: proc(a, b: Menu_Entry) -> int {
-	if a.weight != b.weight do return a.weight - b.weight
+	aw := a.weight.? or_else DEFAULT_WEIGHT
+	bw := b.weight.? or_else DEFAULT_WEIGHT
+	if aw != bw do return aw - bw
 	return strings.compare(a.name, b.name)
 }
 
@@ -308,7 +308,7 @@ parse_config_menus :: proc(
 
 			name := ""
 			url := ""
-			weight := DEFAULT_WEIGHT
+			weight: Maybe(int) = nil
 
 			if v, ok := entry_obj["name"]; ok {
 				if s, ok2 := v.(json.String); ok2 {

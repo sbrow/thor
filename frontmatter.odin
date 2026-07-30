@@ -10,7 +10,7 @@ Frontmatter :: struct {
 	date:        string,
 	lastmod:     string,
 	publishDate: string,
-	weight:      int,
+	weight:      Maybe(int),
 	menus:       json.Value,
 	layout:      string,
 	og:          Open_Graph,
@@ -85,7 +85,7 @@ json_get_bool :: proc(obj: json.Object, key: string) -> bool {
 	return false
 }
 
-json_get_int :: proc(obj: json.Object, key: string) -> int {
+json_get_int :: proc(obj: json.Object, key: string) -> Maybe(int) {
 	if v, ok := obj[key]; ok {
 		switch val in v {
 		case json.Integer:
@@ -93,10 +93,10 @@ json_get_int :: proc(obj: json.Object, key: string) -> int {
 		case json.Float:
 			return int(val)
 		case json.Boolean, json.String, json.Array, json.Object, json.Null:
-			return 0
+			return nil
 		}
 	}
-	return 0
+	return nil
 }
 
 json_get_open_graph :: proc(obj: json.Object, key: string) -> Open_Graph {
