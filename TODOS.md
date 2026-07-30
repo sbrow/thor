@@ -1,10 +1,6 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
-- [x] Add Weights
-  - [x] sort by `page.weight` when loading
-  - [x] re-sort by `page.menu.weight` when building menus.
-	- [x] warn user when 2 pages with explicit weights match. 
 - [ ] Improve diagnostics
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
@@ -24,20 +20,12 @@
   - [ ] Honestly, Test **all** diagnostics
   - [ ] Need to be careful about diagnostics across module boundaries.
     - we don't necessarily want to warn users about theme designers mistakes. (though perhaps we do)
-- [x] Simplify / unify template context stack. Come up with a name for it.
-  - [x] `render_template` should accept `Template_Context`, not `any`
 - [ ] Load grammars dynamically
-- [x] consider adding a limit to the context stack in mustache.
-- [x] Add heading ids as a default on extension.
 - [ ] starred must be a param.
-- [x] Add a `#config(MAX_CONTEXT_DEPTH, 16?)` to `mustache`.
 - [ ] Documentation
   - [ ] talk about the context stack (and its limit).
   - [ ] highlight the differences in the way menus are handled.
 - [ ] consider sites with data based urls.
-- [ ] menu system
-  - [ ] like Hugo's, but warn(/fail?) if menus are defined in the config *and* pages.
-    - i.e. force the user to choose one or the other.
 - [ ] Don't show annoying log output in tests.
 - [ ] improve home link customization.
   - [ ] currently an accessibility issue.
