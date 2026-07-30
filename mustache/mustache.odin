@@ -78,9 +78,11 @@ Node :: struct {
 // 1 for leaf nodes, 1 + len(children) for container nodes (whose children
 // are stored contiguously after them in the array).
 node_span :: proc(n: Node) -> int {
-	#partial switch n.kind {
+	switch n.kind {
 	case .Section, .Inverted, .Parent, .Block:
 		return 1 + len(n.children)
+	case .Text, .Variable, .Unescaped, .Partial:
+		fallthrough
 	case:
 		return 1
 	}
@@ -374,7 +376,7 @@ parse_section :: proc(
 deindent_blocks :: proc(nodes: []Node, allocator := context.allocator) {
 	i := 0
 	for i < len(nodes) {
-		#partial switch nodes[i].kind {
+		switch nodes[i].kind {
 		case .Block:
 			if len(nodes[i].children) > 0 {
 				children := nodes[i].children
@@ -401,6 +403,8 @@ deindent_blocks :: proc(nodes: []Node, allocator := context.allocator) {
 			if len(nodes[i].children) > 0 {
 				deindent_blocks(nodes[i].children, allocator)
 			}
+		case .Text, .Variable, .Unescaped, .Partial:
+		// Do nothing
 		}
 		i += node_span(nodes[i])
 	}
@@ -981,3 +985,4 @@ warn_context_depth :: proc(current: Template, node: Node) {
 	diag := format_error(path, current.source, node.pos, msg, "", colorize = should_colorize())
 	log.warnf("%s", diag)
 }
+

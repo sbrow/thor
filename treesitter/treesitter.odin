@@ -269,7 +269,7 @@ compile_query :: proc(
 	if query == nil {
 		tok := extract_query_token(transmute([]byte)query_src, err_offset)
 		cause := fmt.tprintf("query error at byte %d (type %v)", err_offset, err_type)
-		#partial switch err_type {
+		switch err_type {
 		case .NodeType:
 			if tok != "" {
 				cause = fmt.tprintf(
@@ -295,6 +295,7 @@ compile_query :: proc(
 			cause = fmt.tprintf("query has an illegal pattern structure at byte %d", err_offset)
 		case .Language:
 			cause = "grammar language is null (broken grammar .so)"
+		case .None:
 		}
 		log.errorf("treesitter: %s query failed: %s", lang, cause)
 
@@ -458,3 +459,4 @@ helix_version_from_path :: proc(path: string) -> string {
 	if end <= start do return ""
 	return path[start:end]
 }
+

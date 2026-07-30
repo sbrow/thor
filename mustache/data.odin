@@ -302,3 +302,4 @@ write_value :: proc(b: ^strings.Builder, a: any, escape: bool) {
 		strings.write_string(b, s[start:])
 	}
 }
+

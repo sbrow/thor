@@ -49,7 +49,7 @@ mount_recursive :: proc(vfs: ^VFS, current_dir: string, target_prefix: string) {
 	defer os.file_info_slice_delete(entries, context.allocator)
 
 	for entry in entries {
-		#partial switch entry.type {
+		switch entry.type {
 		case .Regular:
 			virtual := fmt.tprintf("%s/%s", target_prefix, entry.name)
 			vfs.files[virtual] = VFS_Entry {
@@ -58,7 +58,7 @@ mount_recursive :: proc(vfs: ^VFS, current_dir: string, target_prefix: string) {
 		case .Directory:
 			sub_prefix := fmt.tprintf("%s/%s", target_prefix, entry.name)
 			mount_recursive(vfs, entry.fullpath, sub_prefix)
-		case:
+		case .Undetermined, .Symlink, .Named_Pipe, .Socket, .Block_Device, .Character_Device:
 		}
 	}
 }
@@ -109,3 +109,4 @@ vfs_entry_data :: proc(entry: VFS_Entry) -> ([]byte, bool) {
 	}
 	return data, true
 }
+
