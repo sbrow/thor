@@ -388,4 +388,3 @@ parse_config_menus :: proc(
 
 	return result
 }
-

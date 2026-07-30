@@ -985,4 +985,3 @@ warn_context_depth :: proc(current: Template, node: Node) {
 	diag := format_error(path, current.source, node.pos, msg, "", colorize = should_colorize())
 	log.warnf("%s", diag)
 }
-

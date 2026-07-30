@@ -91,10 +91,21 @@
             settings.formatter.prettier = {
               excludes = [
                 "public/**"
-                "resources/js/modernizr.js"
-                "storage/app/caniuse.json"
+                "mustache/spec/specs/**"
+                "*.html"
                 "*.md"
               ];
+            };
+
+            settings.formatter.ols = {
+              command = "${pkgs.bash}/bin/bash";
+              options = [
+                "-euc"
+                ''
+                  ${pkgs.ols}/bin/odinfmt -w .
+                ''
+              ];
+              includes = [ "*.odin" ];
             };
           };
 

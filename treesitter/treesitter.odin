@@ -459,4 +459,3 @@ helix_version_from_path :: proc(path: string) -> string {
 	if end <= start do return ""
 	return path[start:end]
 }
-

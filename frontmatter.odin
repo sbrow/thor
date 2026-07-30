@@ -117,4 +117,3 @@ json_get_open_graph :: proc(obj: json.Object, key: string) -> Open_Graph {
 	}
 	return og
 }
-

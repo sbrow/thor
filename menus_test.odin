@@ -472,10 +472,7 @@ test_warn_duplicate_weights_nil_not_flagged :: proc(t: ^testing.T) {
 	logger := log.create_file_logger(f)
 	context.logger = logger
 
-	entries := []Menu_Entry {
-		{name = "Alpha", url = "/a/"},
-		{name = "Beta", url = "/b/"},
-	}
+	entries := []Menu_Entry{{name = "Alpha", url = "/a/"}, {name = "Beta", url = "/b/"}}
 	warn_duplicate_weights("main", entries)
 
 	log.destroy_file_logger(logger)

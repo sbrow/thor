@@ -109,4 +109,3 @@ vfs_entry_data :: proc(entry: VFS_Entry) -> ([]byte, bool) {
 	}
 	return data, true
 }
-
