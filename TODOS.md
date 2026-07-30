@@ -2,6 +2,7 @@
 
 - Polish existing features before moving on to new ones.
 - [ ] Improve diagnostics
+  - [ ] keep track of every error and don't report them more than once.
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
     - [ ] *where* (in the file)

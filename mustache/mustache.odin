@@ -26,9 +26,11 @@ Error_Kind :: enum {
 }
 
 Error_Body :: struct {
-	msg:  string,
-	pos:  int,
-	kind: Error_Kind,
+	msg:    string,
+	pos:    int,
+	kind:   Error_Kind,
+	source: string,
+	path:   string,
 }
 
 // Error is nil when no error occurred.
@@ -44,6 +46,20 @@ body :: proc(err: Error) -> Error_Body {
 		return e
 	case:
 		return {}
+	}
+}
+
+// tag_error stamps an Error with the source/path of the template where it
+// originated, so diagnostics point at the correct file (e.g. a partial).
+tag_error :: proc(err: Error, tmpl: Template) -> Error {
+	if err == nil do return nil
+	b := body(err)
+	return Error_Body {
+		msg = b.msg,
+		pos = b.pos,
+		kind = b.kind,
+		source = tmpl.source,
+		path = tmpl.path,
 	}
 }
 
@@ -585,7 +601,7 @@ render_nodes :: proc(
 			if len(node.filters) > 0 {
 				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
-					return perr
+					return tag_error(perr, current)
 				}
 				val = transformed
 			}
@@ -627,7 +643,7 @@ render_nodes :: proc(
 			if len(node.filters) > 0 {
 				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
-					return perr
+					return tag_error(perr, current)
 				}
 				val = transformed
 			}
@@ -665,7 +681,7 @@ render_nodes :: proc(
 			if len(node.filters) > 0 {
 				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
-					return perr
+					return tag_error(perr, current)
 				}
 				val = transformed
 			}
@@ -729,7 +745,7 @@ render_nodes :: proc(
 			if len(node.filters) > 0 {
 				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
 				if perr != nil {
-					return perr
+					return tag_error(perr, current)
 				}
 				val = transformed
 			}

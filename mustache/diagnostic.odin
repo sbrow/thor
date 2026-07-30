@@ -309,14 +309,18 @@ write_gutter :: proc(sb: ^strings.Builder, width: int, faint: string, reset: str
 
 // format_render_error produces a diagnostic for an Error value using the
 // template's path and source for context. Returns "" for nil errors.
+// If the error carries its own source/path (from tag_error), those are used
+// instead of the passed-in template — this ensures errors inside partials
+// point at the correct file.
 format_render_error :: proc(err: Error, tmpl: Template, colorize: bool = false) -> string {
 	if err == nil {
 		return ""
 	}
-	path := tmpl.path
+	b := body(err)
+	source := b.source != "" ? b.source : tmpl.source
+	path := b.path != "" ? b.path : tmpl.path
 	if path == "" {
 		path = "<input>"
 	}
-	b := body(err)
-	return format_error(path, tmpl.source, b.pos, b.msg, colorize = colorize)
+	return format_error(path, source, b.pos, b.msg, colorize = colorize)
 }
