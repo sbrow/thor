@@ -442,8 +442,9 @@ Rust-style error messages with multi-line source context, caret underlines, and 
 
 **Exceptions** (no warning):
 - `{{.}}` and dot-prefixed names (current context)
-- Paths that cross a map (e.g., `params.*` — user-defined namespace)
+- Paths that cross a map (e.g., `params.*`) — validated for typos via Levenshtein: close matches warn with a suggestion, genuinely absent keys are suppressed silently
 - `Maybe(bool)` fields with nil value (field exists, value is nil — distinguished via `struct_has_field`)
+- Found fields whose value is nil/empty (e.g., nil `json.Value` union) — the field exists, looking up sub-keys is valid "not found" behavior
 
 **Block override source tracking**: `Block_Override.source: Template` ensures warnings inside block overrides point at the override's source file (e.g., `page.html`), not the parent template (`base.html`).
 

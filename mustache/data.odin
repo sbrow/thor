@@ -137,6 +137,22 @@ resolve_name :: proc(name: string, ctx: []any) -> any {
 	return result
 }
 
+collect_map_keys :: proc(container: any, allocator := context.temp_allocator) -> []string {
+	val, info := base_value(container)
+	if info == nil do return nil
+	if _, ok := info.variant.(runtime.Type_Info_Map); !ok {
+		return nil
+	}
+	out := make([dynamic]string, 0, 4, allocator)
+	it := 0
+	for {
+		key, _ := reflect.iterate_map(val, &it) or_break
+		key_str := key.(string) or_continue
+		append(&out, key_str)
+	}
+	return out[:]
+}
+
 // is_truthy checks mustache truthiness.
 is_truthy :: proc(a: any) -> bool {
 	if a == nil {
@@ -302,3 +318,4 @@ write_value :: proc(b: ^strings.Builder, a: any, escape: bool) {
 		strings.write_string(b, s[start:])
 	}
 }
+

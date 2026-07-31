@@ -121,9 +121,18 @@ validate_key_path :: proc(
 	for i in 1 ..< part_count {
 		v, info := base_value(current)
 		if info == nil {
-			return false, parts[i], nil
+			return true, "", nil
 		}
 		if _, is_map := info.variant.(runtime.Type_Info_Map); is_map {
+			val, found := lookup_in(current, parts[i])
+			if found {
+				current = val
+				continue
+			}
+			available := collect_map_keys(current, allocator)
+			if suggest_correction(available, parts[i]) != "" {
+				return false, parts[i], available
+			}
 			return true, "", nil
 		}
 		if _, is_struct := info.variant.(runtime.Type_Info_Struct); is_struct {

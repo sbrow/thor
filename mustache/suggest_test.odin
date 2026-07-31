@@ -2,6 +2,7 @@
 #+feature dynamic-literals
 package mustache
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:testing"
 
@@ -195,4 +196,69 @@ test_warn_no_false_positive_for_valid_keys :: proc(t: ^testing.T) {
 
 	ok, missing, _ := validate_key_path(ctx[:], "name")
 	testing.expect_value(t, ok, true)
+}
+
+// --- json.Value map crossing tests ---
+
+JSON_Params_Context :: struct {
+	params: json.Value,
+}
+
+@(test)
+test_validate_key_path_crosses_json_value_map :: proc(t: ^testing.T) {
+	params_map := make(json.Object, context.temp_allocator)
+	params_map["author"] = json.String("Tester")
+
+	data := JSON_Params_Context { params = params_map }
+	ctx := make([dynamic]any, 0, 1, context.temp_allocator)
+	append(&ctx, data)
+
+	ok, missing, _ := validate_key_path(ctx[:], "params.starred")
+	testing.expect(t, ok, "path crossing json.Value map should be ok")
+	testing.expect(t, missing == "", "no missing segment for map crossing")
+}
+
+@(test)
+test_validate_key_path_json_value_map_existing_key :: proc(t: ^testing.T) {
+	params_map := make(json.Object, context.temp_allocator)
+	params_map["author"] = json.String("Tester")
+
+	data := JSON_Params_Context { params = params_map }
+	ctx := make([dynamic]any, 0, 1, context.temp_allocator)
+	append(&ctx, data)
+
+	ok, missing, _ := validate_key_path(ctx[:], "params.author")
+	testing.expect(t, ok, "existing key in json.Value map should be ok")
+}
+
+@(test)
+test_validate_key_path_map_typo :: proc(t: ^testing.T) {
+	params_map := make(json.Object, context.temp_allocator)
+	params_map["author"] = json.String("Tester")
+	params_map["social"] = json.String("")
+
+	data := JSON_Params_Context { params = params_map }
+	ctx := make([dynamic]any, 0, 1, context.temp_allocator)
+	append(&ctx, data)
+
+	ok, missing, available := validate_key_path(ctx[:], "params.authr")
+	testing.expect(t, !ok, "typo of map key should not be ok")
+	testing.expect_value(t, missing, "authr")
+	suggestion := suggest_correction(available, "authr")
+	testing.expect_value(t, suggestion, "author")
+}
+
+@(test)
+test_validate_key_path_map_no_close_match :: proc(t: ^testing.T) {
+	params_map := make(json.Object, context.temp_allocator)
+	params_map["author"] = json.String("Tester")
+	params_map["social"] = json.String("")
+
+	data := JSON_Params_Context { params = params_map }
+	ctx := make([dynamic]any, 0, 1, context.temp_allocator)
+	append(&ctx, data)
+
+	ok, missing, _ := validate_key_path(ctx[:], "params.xyz")
+	testing.expect(t, ok, "unknown key with no close match should be ok (suppressed)")
+	testing.expect(t, missing == "", "no missing segment when suppressed")
 }
