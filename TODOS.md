@@ -145,9 +145,9 @@ main :: proc () {
   - wrong cwd?
 - [ ] Clean up the default layouts
 - [ ] Menus
-  - [ ] Detailed frontmatter menu form ("menu": {"main": {"weight": 5}})
+  - [x] Detailed frontmatter menu form ("menu": {"main": {"weight": 5}})
   - [ ] Menu active state (pre-compute is_active based on page.permalink prefix match)
-  - [ ] Page.weight field for general-purpose page ordering (menus, lists, related posts)
+  - [x] Page.weight field for general-purpose page ordering (menus, lists, related posts)
 - [ ] if no `html` tag detected in output, re-render output with base template
       (or whatever template is next in the chain)
 - [ ] Add `-production` flag
@@ -155,7 +155,7 @@ main :: proc () {
 - [ ] Mustache diagnostics
   - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
   - [ ] Could be better error message when missing a closing (or opening) brace
-  - [ ] Error message doesn't show position of faulty pipe name correctly.
+  - [x] Error message doesn't show position of faulty pipe name correctly.
   - [ ] `render_template` (`render.odin`) blanks the *entire page* to `""` on any
         mustache render error and only `log.errorf`s it — a single bad tag/pipe
         anywhere on the page silently kills the whole output with no visible
