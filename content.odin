@@ -5,6 +5,7 @@ import ts "treesitter"
 
 import "core:fmt"
 import "core:log"
+import "core:encoding/json"
 import "core:os"
 import "core:strings"
 import "core:time"
@@ -23,10 +24,10 @@ Page :: struct {
 	weight:      Maybe(int),
 	lastmod:     string,
 	menus:       map[string]Menu_Entry,
+	params: json.Value,
 	content:     string,
 	og:          Open_Graph,
 	draft:       bool,
-	starred:     bool,
 	_is_index:   bool `private`,
 }
 
@@ -257,7 +258,7 @@ load_page :: proc(
 	page.weight = fm.weight
 	page.lastmod = fm.lastmod
 	page.draft = fm.draft
-	page.starred = fm.isStarred
+	page.params = fm.params
 
 	if section == "" && is_index {
 		page.permalink = "/"

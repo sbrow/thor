@@ -202,3 +202,70 @@ test_init_site_config_paths :: proc(t: ^testing.T) {
 	testing.expect_value(t, site.output_dir, "/custom/output")
 	testing.expect_value(t, site.layouts_dir, "/custom/layouts")
 }
+
+// --- merge_params tests ---
+
+@(test)
+test_merge_params_both_present :: proc(t: ^testing.T) {
+	site_params, _ := json.parse_string(`{"social": [], "author": "Tester"}`, spec = .JSON)
+	page_params, _ := json.parse_string(`{"starred": true}`, spec = .JSON)
+
+	merged_val := merge_params(site_params, page_params)
+	merged, ok := merged_val.(json.Object)
+	testing.expect(t, ok, "merged should be a json.Object")
+
+	_, has_social := merged["social"]
+	testing.expect(t, has_social, "site param 'social' should survive merge")
+
+	_, has_author := merged["author"]
+	testing.expect(t, has_author, "site param 'author' should survive merge")
+
+	starred, has_starred := merged["starred"]
+	testing.expect(t, has_starred, "page param 'starred' should be present")
+	starred_bool, _ := starred.(json.Boolean)
+	testing.expect(t, bool(starred_bool), "starred should be true")
+}
+
+@(test)
+test_merge_params_nil_page :: proc(t: ^testing.T) {
+	site_params, _ := json.parse_string(`{"author": "Tester"}`, spec = .JSON)
+
+	merged_val := merge_params(site_params, nil)
+	merged, ok := merged_val.(json.Object)
+	testing.expect(t, ok, "should return site params when page is nil")
+
+	_, has_author := merged["author"]
+	testing.expect(t, has_author, "site param should survive")
+}
+
+@(test)
+test_merge_params_nil_site :: proc(t: ^testing.T) {
+	page_params, _ := json.parse_string(`{"starred": true}`, spec = .JSON)
+
+	merged_val := merge_params(nil, page_params)
+	merged, ok := merged_val.(json.Object)
+	testing.expect(t, ok, "should return page params when site is nil")
+
+	_, has_starred := merged["starred"]
+	testing.expect(t, has_starred, "page param should survive")
+}
+
+@(test)
+test_merge_params_both_nil :: proc(t: ^testing.T) {
+	merged_val := merge_params(nil, nil)
+	testing.expect(t, merged_val == nil, "both nil should return nil")
+}
+
+@(test)
+test_merge_params_page_overrides_site :: proc(t: ^testing.T) {
+	site_params, _ := json.parse_string(`{"key": "site_value"}`, spec = .JSON)
+	page_params, _ := json.parse_string(`{"key": "page_value"}`, spec = .JSON)
+
+	merged_val := merge_params(site_params, page_params)
+	merged, ok := merged_val.(json.Object)
+	testing.expect(t, ok)
+
+	val := merged["key"]
+	str, _ := val.(json.String)
+	testing.expect_value(t, string(str), "page_value")
+}

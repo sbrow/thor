@@ -2,6 +2,7 @@ package main
 
 import "mustache"
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:os"
@@ -15,6 +16,7 @@ Template_Context :: struct {
 	date_format: string,
 	timezone:    ^datetime.TZ_Region,
 	og:          Open_Graph,
+	params:      json.Value,
 	site:        Site_Context,
 	menus:       map[string][]Menu_Entry,
 	page:        Page,
@@ -117,6 +119,19 @@ to_title_case :: proc(s: string, allocator := context.allocator) -> string {
 	return string(out)
 }
 
+merge_params :: proc(site, page: json.Value) -> json.Value {
+	if page == nil do return site
+	if site == nil do return page
+	site_obj, ok1 := site.(json.Object)
+	page_obj, ok2 := page.(json.Object)
+	if !ok1 do return page
+	if !ok2 do return site
+	merged := make(json.Object, len(site_obj) + len(page_obj), context.temp_allocator)
+	for k, v in site_obj { merged[k] = v }
+	for k, v in page_obj { merged[k] = v }
+	return merged
+}
+
 render_template :: proc(
 	content_tpl: mustache.Template,
 	ctx: Template_Context,
@@ -195,7 +210,7 @@ render_site :: proc(site: ^Site) {
 			continue
 		}
 		tpl := get_template(&site.vfs, page.layout, &template_cache)
-		html := render_page_html(page, site, tpl, partials, ctx, &seen)
+		html := render_page_html(page, site, tpl, partials, ctx, &errors)
 		if .Minify in site.features {
 			html = minify_html(html)
 		}
@@ -224,7 +239,7 @@ render_site :: proc(site: ^Site) {
 			section_tpl,
 			partials,
 			ctx,
-			&seen,
+			&errors,
 		)
 		if .Minify in site.features {
 			html = minify_html(html)
@@ -235,7 +250,7 @@ render_site :: proc(site: ^Site) {
 	// Render home page
 	if has_home {
 		home_tpl := get_template(&site.vfs, "home", &template_cache)
-		home_html := render_home_html(home, site, home_tpl, partials, ctx, &seen)
+		home_html := render_home_html(home, site, home_tpl, partials, ctx, &errors)
 		if .Minify in site.features {
 			home_html = minify_html(home_html)
 		}
@@ -276,6 +291,7 @@ render_page_html :: proc(
 	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
 	ctx.page = page
 	ctx.og = og_for_page(site.og, page)
+	ctx.params = merge_params(site.params, page.params)
 	return render_template(content_tpl, ctx, partials, seen)
 }
 
@@ -299,6 +315,7 @@ render_home_html :: proc(
 	ctx.title = site.title
 	ctx.pages = list_pages
 	ctx.og = og_for_page(site.og, home)
+	ctx.params = merge_params(site.params, home.params)
 
 	return render_template(content_tpl, ctx, partials, seen)
 }
@@ -340,6 +357,7 @@ render_section :: proc(
 		ctx.og.is_article = false
 	}
 	ctx.posts = posts
+	ctx.params = merge_params(site.params, ctx.page.params)
 	return render_template(content_tpl, ctx, partials, seen)
 }
 

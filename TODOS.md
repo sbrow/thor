@@ -30,7 +30,7 @@
   - [ ] centralize diagnostics to one place.
   - [ ] consider logging the number of times an error occurred.
 - [ ] Load grammars dynamically
-- [ ] starred must be a param.
+- [x] starred must be a param.
 - [ ] Documentation
   - [ ] talk about the context stack (and its limit).
   - [ ] highlight the differences in the way menus are handled.
@@ -44,6 +44,8 @@
 - [ ] improve json diagnostics.
   - i.e. "Missing quotes around string", etc.
 - [ ] don't use bullshit "sub-tokens", add filters and pipes as proper tokens.
+- [ ] Ideas is now in the wrong spot. Date is wrong, and it is showing date
+      when it shouldn't be.
 
 ## Performance
 
@@ -138,7 +140,7 @@ main :: proc () {
   - [ ] etc
 - [ ] Avoid `json.Value` / `json.Object` where possible.
 - [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.
-- [ ] Add page params
+- [x] Add page params
 - [ ] We must remove all mention of `posts` from the odin code.
       At present, "posts" are a user-level construct defined as pages in a
       particular collection.

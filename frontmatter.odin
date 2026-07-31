@@ -12,10 +12,10 @@ Frontmatter :: struct {
 	publishDate: string,
 	weight:      Maybe(int),
 	menus:       json.Value,
+	params: json.Value,
 	layout:      string,
 	og:          Open_Graph,
 	draft:       bool,
-	isStarred:   bool,
 }
 
 // parse_frontmatter splits raw file content into a Frontmatter struct and the
@@ -56,12 +56,12 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	fm.publishDate = json_get_string(obj, "publishDate")
 	fm.weight = json_get_int(obj, "weight")
 	fm.draft = json_get_bool(obj, "draft")
-	fm.isStarred = json_get_bool(obj, "isStarred")
 	if v, ok := obj["menus"]; ok {
 		fm.menus = v
 	}
 	fm.layout = json_get_string(obj, "layout")
 	fm.og = json_get_open_graph(obj, "og")
+	if v, ok := obj["params"]; ok { fm.params = v }
 
 	ok = true
 	return
