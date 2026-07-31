@@ -259,11 +259,17 @@ resolve_format_string :: proc(name: string, ctx: []any, pos: int) -> (string, Er
 apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> (any, Error) {
 	op, ok := pipe_op_from_string(filter.op)
 	if !ok {
+		hint := ""
+		suggestion := suggest_correction(pipe_op_candidates(), filter.op)
+		if suggestion != "" {
+			hint = fmt.tprintf("did you mean '%s'?", suggestion)
+		}
 		return nil, Error_Body {
 			msg  = fmt.tprintf("unknown pipe op '%s'", filter.op),
 			pos  = filter.op_pos,
 			span = len(filter.op),
 			kind = .Data,
+			hint = hint,
 		}
 	}
 

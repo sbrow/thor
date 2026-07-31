@@ -326,5 +326,5 @@ format_render_error :: proc(err: Error, tmpl: Template, colorize: bool = false) 
 	if path == "" {
 		path = "<input>"
 	}
-	return format_error(path, source, b.pos, b.msg, colorize = colorize, span = b.span)
+	return format_error(path, source, b.pos, b.msg, hint = b.hint, colorize = colorize, span = b.span)
 }

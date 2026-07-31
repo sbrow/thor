@@ -32,6 +32,7 @@ Error_Body :: struct {
 	source: string,
 	path:   string,
 	span:   int,
+	hint:   string,
 }
 
 // Error is nil when no error occurred.
@@ -59,6 +60,7 @@ tag_error :: proc(err: Error, tmpl: Template) -> Error {
 		msg    = b.msg,
 		pos    = b.pos,
 		span   = b.span,
+		hint   = b.hint,
 		kind   = b.kind,
 		source = tmpl.source,
 		path   = tmpl.path,

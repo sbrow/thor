@@ -2,6 +2,7 @@
 package mustache
 
 import "core:fmt"
+import "core:strings"
 import "core:testing"
 import "core:time/datetime"
 import "core:time/timezone"
@@ -560,4 +561,25 @@ test_format_mst_no_offset_no_timezone :: proc(t: ^testing.T) {
 	tpl, _ := parse("{{date | format}}", "<test>", allocator = context.temp_allocator)
 	result, _ := render(tpl, data, {}, context.temp_allocator)
 	testing.expect_value(t, result, "UTC")
+}
+
+// --- pipe op suggestion tests ---
+
+@(test)
+test_unknown_pipe_op_suggestion :: proc(t: ^testing.T) {
+	filter := Pipe_Filter{op = "formats", op_pos = 0}
+	_, err := apply_filter("2026-01-15", &filter, 0, nil)
+	testing.expect(t, err != nil, "should error on unknown op")
+	b := body(err)
+	testing.expect(t, strings.contains(b.hint, "format"), "hint should suggest 'format'")
+	testing.expect(t, strings.contains(b.hint, "did you mean"), "hint should be a suggestion")
+}
+
+@(test)
+test_unknown_pipe_op_no_suggestion :: proc(t: ^testing.T) {
+	filter := Pipe_Filter{op = "xyz", op_pos = 0}
+	_, err := apply_filter("2026-01-15", &filter, 0, nil)
+	testing.expect(t, err != nil, "should error on unknown op")
+	b := body(err)
+	testing.expect(t, b.hint == "", "no suggestion expected for 'xyz'")
 }
