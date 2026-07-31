@@ -7,6 +7,8 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:testing"
+import "core:time/datetime"
+import "core:time/timezone"
 
 write_temp_config :: proc(name: string, content: string) -> string {
 	path := fmt.tprintf("./test_thor_%s.json", name)
@@ -103,6 +105,8 @@ test_load_config_file_partial :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_defaults_no_config :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
 	site: Site
 	args := []string{"thor", "-config:./nonexistent.json"}
 	init_site(&site, args)
@@ -120,6 +124,8 @@ test_init_site_defaults_no_config :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_config_dir_relative :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
 	site: Site
 	args := []string{"thor", "-config:./sub/nonexistent.json"}
 	init_site(&site, args)
@@ -133,6 +139,8 @@ test_init_site_config_dir_relative :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_flag_overrides_default :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
 	site: Site
 	args := []string{"thor", "-config:./nonexistent.json", "-drafts", "-base-url:https://flag.com"}
 	init_site(&site, args)
@@ -144,6 +152,8 @@ test_init_site_flag_overrides_default :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_full_pipeline :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
 	path := write_temp_config(
 		"pipeline",
 		`{"title":"Pipeline Test","description":"Full","base_url":"https://config.com"}`,
@@ -163,6 +173,8 @@ test_init_site_full_pipeline :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_md_enable_disable :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
 	site: Site
 	args := []string {
 		"thor",
@@ -181,6 +193,8 @@ test_init_site_md_enable_disable :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_config_paths :: proc(t: ^testing.T) {
+	context.logger = log.nil_logger()
+
 	path := write_temp_config(
 		"paths",
 		`{
@@ -207,8 +221,16 @@ test_init_site_config_paths :: proc(t: ^testing.T) {
 
 @(test)
 test_merge_params_both_present :: proc(t: ^testing.T) {
-	site_params, _ := json.parse_string(`{"social": [], "author": "Tester"}`, spec = .JSON)
-	page_params, _ := json.parse_string(`{"starred": true}`, spec = .JSON)
+	site_params, _ := json.parse_string(
+		`{"social": [], "author": "Tester"}`,
+		spec = .JSON,
+		allocator = context.temp_allocator,
+	)
+	page_params, _ := json.parse_string(
+		`{"starred": true}`,
+		spec = .JSON,
+		allocator = context.temp_allocator,
+	)
 
 	merged_val := merge_params(site_params, page_params)
 	merged, ok := merged_val.(json.Object)
@@ -228,7 +250,11 @@ test_merge_params_both_present :: proc(t: ^testing.T) {
 
 @(test)
 test_merge_params_nil_page :: proc(t: ^testing.T) {
-	site_params, _ := json.parse_string(`{"author": "Tester"}`, spec = .JSON)
+	site_params, _ := json.parse_string(
+		`{"author": "Tester"}`,
+		spec = .JSON,
+		allocator = context.temp_allocator,
+	)
 
 	merged_val := merge_params(site_params, nil)
 	merged, ok := merged_val.(json.Object)
@@ -240,7 +266,11 @@ test_merge_params_nil_page :: proc(t: ^testing.T) {
 
 @(test)
 test_merge_params_nil_site :: proc(t: ^testing.T) {
-	page_params, _ := json.parse_string(`{"starred": true}`, spec = .JSON)
+	page_params, _ := json.parse_string(
+		`{"starred": true}`,
+		spec = .JSON,
+		allocator = context.temp_allocator,
+	)
 
 	merged_val := merge_params(nil, page_params)
 	merged, ok := merged_val.(json.Object)
@@ -258,8 +288,16 @@ test_merge_params_both_nil :: proc(t: ^testing.T) {
 
 @(test)
 test_merge_params_page_overrides_site :: proc(t: ^testing.T) {
-	site_params, _ := json.parse_string(`{"key": "site_value"}`, spec = .JSON)
-	page_params, _ := json.parse_string(`{"key": "page_value"}`, spec = .JSON)
+	site_params, _ := json.parse_string(
+		`{"key": "site_value"}`,
+		spec = .JSON,
+		allocator = context.temp_allocator,
+	)
+	page_params, _ := json.parse_string(
+		`{"key": "page_value"}`,
+		spec = .JSON,
+		allocator = context.temp_allocator,
+	)
 
 	merged_val := merge_params(site_params, page_params)
 	merged, ok := merged_val.(json.Object)
@@ -269,3 +307,4 @@ test_merge_params_page_overrides_site :: proc(t: ^testing.T) {
 	str, _ := val.(json.String)
 	testing.expect_value(t, string(str), "page_value")
 }
+
