@@ -27,12 +27,13 @@
     the correct template source/path. Other render errors still use the
     content template's source/path, which can point at the wrong file.
   - [ ] try to make file paths clickable links.
+  - [ ] centralize diagnostics to one place.
 - [ ] Load grammars dynamically
 - [ ] starred must be a param.
 - [ ] Documentation
   - [ ] talk about the context stack (and its limit).
   - [ ] highlight the differences in the way menus are handled.
-- [ ] consider sites with data based urls.
+- [ ] consider sites with date based urls.
 - [ ] Don't show annoying log output in tests.
 - [ ] improve home link customization.
   - [ ] currently an accessibility issue.

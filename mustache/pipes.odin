@@ -1,5 +1,6 @@
 package mustache
 
+import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:reflect"
@@ -15,6 +16,44 @@ MAX_PIPES :: 8
 MAX_PIPE_ARGS :: 2
 
 DEFAULT_DATE_FORMAT :: "2 Jan 2006"
+
+Pipe_Op :: enum {
+	Format,
+	Group_By,
+}
+
+// Pipe op names are derived from the enum via reflection (lowercased).
+// Adding a new op only requires adding it to the enum AND handling it in
+// apply_filter's switch — the compiler enforces exhaustive matching.
+
+pipe_op_from_string :: proc(s: string) -> (Pipe_Op, bool) {
+	ti := type_info_of(typeid_of(Pipe_Op))
+	base := runtime.type_info_base(ti)
+	#partial switch &e in base.variant {
+	case runtime.Type_Info_Enum:
+		for name, idx in e.names {
+			lower := strings.to_lower(name, context.temp_allocator) or_else name
+			if lower == s {
+				return cast(Pipe_Op)idx, true
+			}
+		}
+	}
+	return {}, false
+}
+
+pipe_op_candidates :: proc(allocator := context.temp_allocator) -> []string {
+	ti := type_info_of(typeid_of(Pipe_Op))
+	base := runtime.type_info_base(ti)
+	out := make([dynamic]string, 0, 2, allocator)
+	#partial switch &e in base.variant {
+	case runtime.Type_Info_Enum:
+		for name in e.names {
+			lower := strings.to_lower(name, allocator) or_else name
+			append(&out, lower)
+		}
+	}
+	return out[:]
+}
 
 Pipe_Filter :: struct {
 	op:     string,
@@ -217,12 +256,21 @@ resolve_format_string :: proc(name: string, ctx: []any, pos: int) -> (string, Er
 	return str, nil
 }
 
-// TODO: diagnostics don't  show anything relevant
 apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> (any, Error) {
-	switch filter.op {
-	case "group_by":
+	op, ok := pipe_op_from_string(filter.op)
+	if !ok {
+		return nil, Error_Body {
+			msg  = fmt.tprintf("unknown pipe op '%s'", filter.op),
+			pos  = filter.op_pos,
+			span = len(filter.op),
+			kind = .Data,
+		}
+	}
+
+	switch op {
+	case .Group_By:
 		return apply_group_by(value, filter.args[:], pos)
-	case "format":
+	case .Format:
 		str, ok := reflect.as_string(value)
 		if !ok {
 			return value, Error_Body {
@@ -260,15 +308,8 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 		} else {
 			return any{new_clone(str2, context.temp_allocator), typeid_of(string)}, nil
 		}
-
-	case:
-		return nil, Error_Body {
-			msg  = fmt.tprintf("unknown pipe op '%s'", filter.op),
-			pos  = filter.op_pos,
-			span = len(filter.op),
-			kind = .Data,
-		}
 	}
+	return {}, nil
 }
 
 apply_format :: proc(
