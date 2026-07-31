@@ -121,13 +121,20 @@ render_template :: proc(
 	content_tpl: mustache.Template,
 	ctx: Template_Context,
 	partials: map[string]mustache.Template,
+	reported_errors: ^map[string]bool,
 ) -> string {
 	result, err := mustache.render(content_tpl, []any{ctx.site, ctx.page, ctx}, partials)
 	if err != nil {
-		log.errorf(
-			"%s",
-			mustache.format_render_error(err, content_tpl, colorize = mustache.should_colorize()),
+		formatted := mustache.format_render_error(
+			err,
+			content_tpl,
+			colorize = mustache.should_colorize(),
 		)
+		if formatted in reported_errors^ {
+			return ""
+		}
+		reported_errors[formatted] = true
+		log.errorf("%s", formatted)
 		return ""
 	}
 	return result
@@ -144,6 +151,8 @@ render_site :: proc(site: ^Site) {
 
 	template_cache: map[string]mustache.Template
 	defer delete(template_cache)
+
+	errors := make(map[string]bool, context.temp_allocator)
 
 	offset, ok := mustache.compute_utc_offset(site.tz)
 	assert(ok)
@@ -186,7 +195,7 @@ render_site :: proc(site: ^Site) {
 			continue
 		}
 		tpl := get_template(&site.vfs, page.layout, &template_cache)
-		html := render_page_html(page, site, tpl, partials, ctx)
+		html := render_page_html(page, site, tpl, partials, ctx, &seen)
 		if .Minify in site.features {
 			html = minify_html(html)
 		}
@@ -215,6 +224,7 @@ render_site :: proc(site: ^Site) {
 			section_tpl,
 			partials,
 			ctx,
+			&seen,
 		)
 		if .Minify in site.features {
 			html = minify_html(html)
@@ -225,7 +235,7 @@ render_site :: proc(site: ^Site) {
 	// Render home page
 	if has_home {
 		home_tpl := get_template(&site.vfs, "home", &template_cache)
-		home_html := render_home_html(home, site, home_tpl, partials, ctx)
+		home_html := render_home_html(home, site, home_tpl, partials, ctx, &seen)
 		if .Minify in site.features {
 			home_html = minify_html(home_html)
 		}
@@ -260,12 +270,13 @@ render_page_html :: proc(
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	ctx: Template_Context,
+	seen: ^map[string]bool,
 ) -> string {
 	ctx := ctx
 	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
 	ctx.page = page
 	ctx.og = og_for_page(site.og, page)
-	return render_template(content_tpl, ctx, partials)
+	return render_template(content_tpl, ctx, partials, seen)
 }
 
 render_home_html :: proc(
@@ -274,6 +285,7 @@ render_home_html :: proc(
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	ctx: Template_Context,
+	seen: ^map[string]bool,
 ) -> string {
 	list_pages := make([dynamic]Page, 0, 8, context.temp_allocator)
 	for page in site.pages {
@@ -288,7 +300,7 @@ render_home_html :: proc(
 	ctx.pages = list_pages
 	ctx.og = og_for_page(site.og, home)
 
-	return render_template(content_tpl, ctx, partials)
+	return render_template(content_tpl, ctx, partials, seen)
 }
 
 render_section :: proc(
@@ -299,6 +311,7 @@ render_section :: proc(
 	content_tpl: mustache.Template,
 	partials: map[string]mustache.Template,
 	ctx: Template_Context,
+	seen: ^map[string]bool,
 ) -> string {
 	alloc := site_allocator(site)
 	posts := make([dynamic]Page, 0, len(site.pages) / 2, context.temp_allocator)
@@ -327,7 +340,7 @@ render_section :: proc(
 		ctx.og.is_article = false
 	}
 	ctx.posts = posts
-	return render_template(content_tpl, ctx, partials)
+	return render_template(content_tpl, ctx, partials, seen)
 }
 
 load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
@@ -417,3 +430,4 @@ write_file :: proc(path: string, html: string) {
 		log.errorf("cannot write %s: %v", path, err)
 	}
 }
+

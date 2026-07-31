@@ -2,7 +2,7 @@
 
 - Polish existing features before moving on to new ones.
 - [ ] Improve diagnostics
-  - [ ] keep track of every error and don't report them more than once.
+  - [x] keep track of every error and don't report them more than once.
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
     - [ ] *where* (in the file)
@@ -28,6 +28,7 @@
     content template's source/path, which can point at the wrong file.
   - [ ] try to make file paths clickable links.
   - [ ] centralize diagnostics to one place.
+  - [ ] consider logging the number of times an error occurred.
 - [ ] Load grammars dynamically
 - [ ] starred must be a param.
 - [ ] Documentation
