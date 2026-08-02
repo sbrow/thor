@@ -194,7 +194,8 @@ main :: proc () {
   - [x] basic poll loop
   - [ ] filesystem poll loop
   - [ ] event based
-- [ ] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
+- [x] Free cmark HTML output (`body_html`) — cmark allocates via C malloc, not the arena, so it leaks per iteration in watch mode
+- [ ] manually pass `site_allocator` to `load_page`
 - [ ] Mount content in VFS
 - [ ] commands
   - [ ] `build` alias of default

@@ -171,8 +171,9 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 		}
 
 		// Render definition through cmark for markdown support
-		def_html := cm.markdown_to_html_from_string(def_text, {.Unsafe})
-		def_html = strip_p_tags(def_html)
+		raw_html := cm.markdown_to_html_from_string(def_text, {.Unsafe})
+		defer cm.free_string(raw_html)
+		def_html := strip_p_tags(raw_html)
 
 		note: string
 		defer delete(note)
@@ -210,3 +211,4 @@ strip_p_tags :: proc(html: string) -> string {
 	}
 	return s
 }
+

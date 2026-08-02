@@ -16,14 +16,23 @@ Extension :: enum {
 
 DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts, .HeadingIDs}
 
-process :: proc(body: string, ext: bit_set[Extension], file_path: string) -> string {
+// Caller is responsible for freeing string
+process :: proc(
+	body: string,
+	ext: bit_set[Extension],
+	file_path: string,
+	allocator := context.allocator,
+) -> string {
 	side_notes := make(map[string]string)
 	margin_notes := make(map[string]string)
 	clean_body := body
 	if .Sidenotes in ext {
 		clean_body, side_notes, margin_notes = strip_definitions(body)
 	}
-	html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
+	original_html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
+	html := strings.clone(original_html, allocator)
+	cm.free_string(original_html)
+
 	if .Emoji in ext {
 		html = expand_emoji(html)
 	}
@@ -88,3 +97,4 @@ apply_extension_config :: proc(ext: ^bit_set[Extension], config: json.Object) {
 		}
 	}
 }
+

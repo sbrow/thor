@@ -3,9 +3,9 @@ package main
 import md "markdown"
 import ts "treesitter"
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:log"
-import "core:encoding/json"
 import "core:os"
 import "core:strings"
 import "core:time"
@@ -24,7 +24,7 @@ Page :: struct {
 	weight:      Maybe(int),
 	lastmod:     string,
 	menus:       map[string]Menu_Entry,
-	params: json.Value,
+	params:      json.Value,
 	content:     string,
 	og:          Open_Graph,
 	draft:       bool,
@@ -275,9 +275,9 @@ load_page :: proc(
 	page.og = fm.og
 
 	if strings.has_suffix(file_path, ".html") {
-		page.content = strings.clone(body)
+		page.content = strings.clone(body, context.allocator)
 	} else {
-		page.content = md.process(body, ext, file_path)
+		page.content = md.process(body, ext, file_path, context.allocator)
 	}
 
 	ok = true
@@ -295,3 +295,4 @@ strip_extension :: proc(name: string) -> string {
 	}
 	return name[:dot]
 }
+
