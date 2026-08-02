@@ -12,7 +12,7 @@ Frontmatter :: struct {
 	publishDate: string,
 	weight:      Maybe(int),
 	menus:       json.Value,
-	params: json.Value,
+	params:      json.Value,
 	layout:      string,
 	og:          Open_Graph,
 	draft:       bool,
@@ -37,7 +37,7 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	json_str := content[:end + 1]
 	body = strings.trim_left(content[end + 1:], " \t\r\n")
 
-	value, err := json.parse_string(json_str, spec = .JSON)
+	value, err := json.parse_string(json_str, spec = .JSON5)
 	if err != nil {
 		log.errorf("failed to parse frontmatter JSON: %v", err)
 		return
@@ -61,7 +61,7 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	}
 	fm.layout = json_get_string(obj, "layout")
 	fm.og = json_get_open_graph(obj, "og")
-	if v, ok := obj["params"]; ok { fm.params = v }
+	if v, ok := obj["params"]; ok {fm.params = v}
 
 	ok = true
 	return
@@ -117,3 +117,4 @@ json_get_open_graph :: proc(obj: json.Object, key: string) -> Open_Graph {
 	}
 	return og
 }
+

@@ -38,7 +38,7 @@
 - [ ] Don't show annoying log output in tests.
 - [ ] improve home link customization.
   - [ ] currently an accessibility issue.
-- [ ] support JSON5 in in frontmatter
+- [x] support JSON5 in in frontmatter
 - [ ] Create a json schema file for `thor.json`.
 - [ ] cleanup `#partial switch`es.
 - [ ] improve json diagnostics.
