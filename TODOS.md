@@ -39,7 +39,7 @@
   - [ ] currently an accessibility issue.
 - [x] support JSON5 in in frontmatter
 - [ ] Create a json schema file for `thor.json`.
-- [ ] cleanup `#partial switch`es.
+- [x] cleanup `#partial switch`es.
 - [ ] improve json diagnostics.
   - i.e. "Missing quotes around string", etc.
 - [ ] don't use bullshit "sub-tokens", add filters and pipes as proper tokens.
