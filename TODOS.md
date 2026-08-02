@@ -3,6 +3,8 @@
 - Polish existing features before moving on to new ones.
 - [ ] Improve diagnostics
   - [x] keep track of every error and don't report them more than once.
+  - [ ] make sure the frontmatter parser has good diagnostics.
+  - [ ] fix the diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml)
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
     - [ ] *where* (in the file)
@@ -14,9 +16,6 @@
   - [ ] better diagnostics for syntax errors in treesitter.
   - [ ] Ensure diagnostics for MAX_CONTEXT_DEPTH are good.
   - [ ] improve matching weights message.
-  - [ ] show a proper diagnostic for timezones
-    - currently "unable to load timezone 'America/New_Yorkskie'"
-    - want rust style diagnostic and better message, maybe "unknown timezone 'America/New_Yorkskie'"
   - [ ] Test menu diagnostics
   - [ ] Honestly, Test **all** diagnostics
   - [ ] Need to be careful about diagnostics across module boundaries.
@@ -157,7 +156,6 @@ main :: proc () {
   - sets `-minify`
 - [ ] Mustache diagnostics
   - [ ] Partial invocation stack in diagnostics: when an error fires inside a partial, show "invoked from" chain through `{{> name}}` calls. Currently warnings inside partials point at the partial (correct file) but don't show the invocation site.
-  - [ ] Could be better error message when missing a closing (or opening) brace
   - [x] Error message doesn't show position of faulty pipe name correctly.
   - [ ] `render_template` (`render.odin`) blanks the *entire page* to `""` on any
         mustache render error and only `log.errorf`s it — a single bad tag/pipe

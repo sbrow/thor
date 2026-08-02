@@ -1,0 +1,196 @@
+name: Missing 2nd closing brace
+input: |
+  <menu>
+    <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}</a>
+    {{#params.social}}
+    <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+    {{/params.social}}
+  </menu>
+  <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+
+expected: Somthing that points to the opening and lack of close.
+actual: |
+  [ERROR] --- [383:load_partials()] unexpected {{/params.social}}
+     --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:6:5
+    |
+  4 |     {{#params.social}}
+  5 |     <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+  6 |     {{/params.social}}
+    |     ^^^^^^^^^^^^^^^^^^
+  7 |   </menu>
+  8 |   <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+---
+name: Missing 2nd opening brace
+input: |
+  <menu>
+    <a class="goto-top opacity-0" href="#">{> icons/chevron_up}}</a>
+    {{#params.social}}
+    <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+    {{/params.social}}
+  </menu>
+  <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+expected: Somthing that shows the whole block, and points out the missing opening brace
+actual: Nothing. The page compiles with no warnings or errors
+---
+name: Invalid timezone
+input: |
+  {
+    "date": {
+      "timezone": "America/New_Yorkside"
+    }
+  }
+expected: "Did you mean 'America/New_York'? pointing to line+col no in the config"
+actual: |
+  [WARN ] --- [148:init_site()] unable to load timezone 'America/New_Yorkside'
+---
+name: Mismatched section tags
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.ocial}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      {{/params.social}}
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{now | format "2006" }} {{params.author.name}}</p>
+  </footer>
+expected: Mostly the same, but with rust style markers at the opening and close
+actual: |
+  [ERROR] --- [383:load_partials()] expected {{/params.ocial}}, got {{/params.social}}
+   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:6:5
+    |
+  4 |     {{#params.ocial}}
+  5 |     <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+  6 |     {{/params.social}}
+    |     ^^^^^^^^^^^^^^^^^^
+  7 |   </menu>
+  8 |   <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+---
+name: Missing closing section
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.social}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      <!-- {{/params.social}} -->
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{now | format "2006" }} {{params.author.name}}</p>
+  </footer>
+expected: "Missing closing tag '{{/params.social}}' ...opened <here> ... expected close <here>"
+actual: Nothing. The page compiles with no warnings or errors
+---
+name: empty tag
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.social}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      {{/params.social}}
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{}} {{params.author.name}}</p>
+  </footer>
+expected: "Found an empty tag at <line:col>"
+actual: |
+  [WARN ] --- [920:warn_unknown_key()] unknown key ''
+   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
+    |
+  1 | <footer>
+    | ^
+  2 |   <menu>
+  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+    |
+---
+name: Missing pipe arguement
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.social}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      {{/params.social}}
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{now | group_by }} {{params.author.name}}</p>
+  </footer>
+expected: "Missing filter argument <pointing to exact location>"
+actual: |
+  [ERROR] --- [152:render_template()] group_by expects 1 argument, got 0
+   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
+    |
+  1 | <footer>
+    | ^
+  2 |   <menu>
+  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+    |
+---
+name: Double dot access
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.social}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      {{/params.social}}
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{now | format "2006" }} {{params..name}}</p>
+  </footer>
+expected: Error "Invalid access key"
+actual: Nothing. The page compiles with no warnings or errors
+---
+name: Too many opening braces
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.social}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      {{/params.social}}
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{{{now | format "2006" }}} {{params.author.name}}</p>
+  </footer>
+expected: "Too many opening braces <point to location>"
+actual: |
+  [WARN ] --- [920:warn_unknown_key()] unknown key '{now'
+   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
+    |
+  1 | <footer>
+    | ^ did you mean 'now'?
+  2 |   <menu>
+  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+    |
+---
+name: Too many closing braces
+input: |
+  <footer>
+    <menu>
+      <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+      {{#params.social}}
+      <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+      {{/params.social}}
+    </menu>
+    <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+        href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+    </p>
+    <p><small>&copy;</small> {{now | format "2006" }}}} {{params.author.name}}</p>
+  </footer>
+expected: "Too many closing braces <Point to location>"
+actual: Nothing. The page compiles with no warnings or errors
