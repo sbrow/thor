@@ -1,7 +1,7 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
-- [ ] `{{>title}}` default partial? `{{site.title}} | {{ page.title }}`
+- [x] `{{>title}}` default partial? `{{site.title}} | {{ page.title }}`
 - [ ] implicit titles (Set when missing?)
 - [ ] create a default `head.html`.
 - [ ] html comments are rendered, except in minify mode.
@@ -107,7 +107,7 @@
 - [ ] Add overloads for every extension - accept ^strings.Builder.
 - [ ] Add conventional (Hugo style) footnotes option.
 - [ ] Add opt-in deflist support.
-- [ ] Decide if lambdas actually provide any value.
+- [x] Decide if lambdas actually provide any value.
 - [ ] add tables extension
 - [ ] Peruse [GitHub's](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
       docs for any juicy nuggets we may have missed.

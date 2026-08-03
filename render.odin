@@ -12,7 +12,6 @@ import "core:time/datetime"
 
 Template_Context :: struct {
 	now:         string,
-	title:       string,
 	date_format: string,
 	timezone:    ^datetime.TZ_Region,
 	og:          Open_Graph,
@@ -127,8 +126,8 @@ merge_params :: proc(site, page: json.Value) -> json.Value {
 	if !ok1 do return page
 	if !ok2 do return site
 	merged := make(json.Object, len(site_obj) + len(page_obj), context.temp_allocator)
-	for k, v in site_obj { merged[k] = v }
-	for k, v in page_obj { merged[k] = v }
+	for k, v in site_obj {merged[k] = v}
+	for k, v in page_obj {merged[k] = v}
 	return merged
 }
 
@@ -288,7 +287,6 @@ render_page_html :: proc(
 	seen: ^map[string]bool,
 ) -> string {
 	ctx := ctx
-	ctx.title = fmt.tprintf("%s | %s", page.title, site.title)
 	ctx.page = page
 	ctx.og = og_for_page(site.og, page)
 	ctx.params = merge_params(site.params, page.params)
@@ -312,7 +310,6 @@ render_home_html :: proc(
 	}
 
 	ctx := ctx
-	ctx.title = site.title
 	ctx.pages = list_pages
 	ctx.og = og_for_page(site.og, home)
 	ctx.params = merge_params(site.params, home.params)
@@ -342,14 +339,12 @@ render_section :: proc(
 	ctx := ctx
 	if has_index {
 		ctx.page = section_index
-		ctx.title = fmt.tprintf("%s | %s", section_index.title, site.title)
 		ctx.og = og_for_page(site.og, section_index)
 	} else {
 		title := to_title_case(section, alloc)
 		ctx.page = Page {
 			title = title,
 		}
-		ctx.title = fmt.tprintf("%s | %s", ctx.page.title, site.title)
 		ctx.og.title = title
 		ctx.og.description = ""
 		ctx.og.url = fmt.tprintf("%s/%s/", site.base_url, section)
