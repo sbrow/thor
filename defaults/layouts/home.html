@@ -5,8 +5,8 @@
     {{&content}}
   </header>
   <ul>
-    {{#pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date_iso}}<time
-          datetime="{{date_iso}}">{{date_display}}</time>{{/date_iso}}</span>
+    {{#pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date}}<time
+          datetime="{{date}}">{{date | format}}</time>{{/date}}</span>
     </li>
     {{/pages}}
   </ul>

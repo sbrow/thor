@@ -2,6 +2,18 @@
 
 Thor is a static site generator written in [Odin](https://odin-lang.org), replacing Hugo for the `sbrow.github.io` blog. It lives at `./thor/` as a git subtree with its own `flake.nix`.
 
+## 🚫 DO NOT EDIT THE DOCS — BY HUMANS, FOR HUMANS
+
+> **THE DOCUMENTATION UNDER `thor/site/` IS HANDWRITTEN, BY HUMANS, FOR HUMANS.**
+>
+> **NO AI, AGENT, BOT, ASSISTANT, OR OTHER NON-HUMAN MAY EDIT, REWRITE,
+> REPHRASE, REFORMAT, "IMPROVE," SUMMARIZE, OR GENERATE ANY FILE UNDER
+> `thor/site/` — EVER.**
+>
+> These are not machine artifacts. A human wrote every word. AI may be
+> consulted as a sanity check, but the prose stays human. If you are not a
+> human, do not touch these files. See `thor/site/content/ai.md`.
+
 ## Architecture
 
 ```

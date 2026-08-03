@@ -3,8 +3,8 @@
 <main>
   <article>
     <h1>{{page.title}}</h1>
-    {{#date_iso}} <time class="subtitle" datetime="{{date_iso}}">{{date_display}}</time>
-    {{/date_iso}} {{&content}}
+    {{#date}} <time class="subtitle" datetime="{{date}}">{{ date | format}}</time>
+    {{/date}} {{&content}}
   </article>
 </main>
 {{/main}}

@@ -194,3 +194,38 @@ input: |
   </footer>
 expected: "Too many closing braces <Point to location>"
 actual: Nothing. The page compiles with no warnings or errors
+---
+name: Frontmatter missing closing quote on key
+input: |
+  {
+    "title: Docs"
+  }
+
+  [TOC]
+
+  ## Introduction
+expected: 'TODO:'
+actual: |
+  [ERROR] --- [42:parse_frontmatter()] failed to parse frontmatter JSON: Expected_Colon_After_Key
+---
+name: Fronmatter missing opening quote on value
+input: |
+  {
+    "title": Docs"
+  }
+
+  [TOC]
+
+  ## Introduction
+expected: 'detailed diagnostic pointing to the point of failure and suggesting the addition of a quote'
+actual: Nothing. The page compiles with no warnings or errors
+---
+name: No error when missing index page.
+expected: 'Your site has no index page! Please create an index.md or index.html file in ./content/'
+actual: Nothing. The site compiles with no warnings or errors
+---
+name: format pipe with no date format set
+expected: |
+  Show where the error was triggered. Should also show the format that will be used
+actual: |
+  [ERROR] --- [333:apply_format()] format pipe used but no date format configured (set date.format in thor.json) Default will be used

@@ -1,11 +1,14 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
--
+- [ ] implicit titles (Set when missing?)
+- [ ] create a default `head.html`.
 - [ ] Improve diagnostics
   - [x] keep track of every error and don't report them more than once.
   - [ ] `*` make sure the frontmatter parser has good diagnostics.
   - [ ] fix the diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml)
+  - [ ] only report format errors once.
+  - [ ] only report missing partiall errors once.
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
     - [ ] *where* (in the file)
@@ -98,6 +101,7 @@
 - [ ] Add conventional (Hugo style) footnotes option.
 - [ ] Add opt-in deflist support.
 - [ ] Decide if lambdas actually provide any value.
+- [ ] add tables extension
 
 ## Dates
 - [ ] display an error when no part of the date appears in the output.
