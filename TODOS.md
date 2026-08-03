@@ -1,9 +1,10 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
+-
 - [ ] Improve diagnostics
   - [x] keep track of every error and don't report them more than once.
-  - [ ] make sure the frontmatter parser has good diagnostics.
+  - [ ] `*` make sure the frontmatter parser has good diagnostics.
   - [ ] fix the diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml)
   - [ ] All Diagnostics should show:
     - [ ] *What* went wrong
