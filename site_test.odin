@@ -3,6 +3,7 @@
 package main
 
 import "core:encoding/json"
+import "core:flags"
 import "core:fmt"
 import "core:log"
 import "core:os"
@@ -108,8 +109,9 @@ test_init_site_defaults_no_config :: proc(t: ^testing.T) {
 	context.logger = log.nil_logger()
 
 	site: Site
-	args := []string{"thor", "-config:./nonexistent.json"}
-	init_site(&site, args)
+	_flags: Flags
+	flags.parse_or_exit(&_flags, []string{"thor", "-config:./nonexistent.json"}, .Odin)
+	init_site(&site, _flags)
 	defer destroy_site(&site)
 
 	testing.expect_value(t, site.content_dir, "./content")
@@ -127,8 +129,9 @@ test_init_site_config_dir_relative :: proc(t: ^testing.T) {
 	context.logger = log.nil_logger()
 
 	site: Site
-	args := []string{"thor", "-config:./sub/nonexistent.json"}
-	init_site(&site, args)
+	_flags: Flags
+	flags.parse_or_exit(&_flags, []string{"thor", "-config:./sub/nonexistent.json"}, .Odin)
+	init_site(&site, _flags)
 	defer destroy_site(&site)
 
 	testing.expect_value(t, site.content_dir, "./sub/content")
@@ -142,8 +145,9 @@ test_init_site_flag_overrides_default :: proc(t: ^testing.T) {
 	context.logger = log.nil_logger()
 
 	site: Site
-	args := []string{"thor", "-config:./nonexistent.json", "-drafts", "-base-url:https://flag.com"}
-	init_site(&site, args)
+	_flags: Flags
+	flags.parse_or_exit(&_flags, []string{"thor", "-config:./nonexistent.json", "-drafts", "-base-url:https://flag.com"}, .Odin)
+	init_site(&site, _flags)
 	defer destroy_site(&site)
 
 	testing.expect(t, .Drafts in site.features)
@@ -161,8 +165,9 @@ test_init_site_full_pipeline :: proc(t: ^testing.T) {
 	defer os.remove(path)
 
 	site: Site
-	args := []string{"thor", fmt.tprintf("-config:%s", path), "-drafts"}
-	init_site(&site, args)
+	_flags: Flags
+	flags.parse_or_exit(&_flags, []string{"thor", fmt.tprintf("-config:%s", path), "-drafts"}, .Odin)
+	init_site(&site, _flags)
 	defer destroy_site(&site)
 
 	testing.expect_value(t, site.title, "Pipeline Test")
@@ -176,13 +181,14 @@ test_init_site_md_enable_disable :: proc(t: ^testing.T) {
 	context.logger = log.nil_logger()
 
 	site: Site
-	args := []string {
+	_flags: Flags
+	flags.parse_or_exit(&_flags, []string {
 		"thor",
 		"-config:./nonexistent.json",
 		"-ext:highlight,sections",
 		"-no-ext:emoji",
-	}
-	init_site(&site, args)
+	}, .Odin)
+	init_site(&site, _flags)
 	defer destroy_site(&site)
 
 	testing.expect(t, .Highlight in site.markdown_extensions)
@@ -207,8 +213,9 @@ test_init_site_config_paths :: proc(t: ^testing.T) {
 	defer os.remove(path)
 
 	site: Site
-	args := []string{"thor", fmt.tprintf("-config:%s", path)}
-	init_site(&site, args)
+	_flags: Flags
+	flags.parse_or_exit(&_flags, []string{"thor", fmt.tprintf("-config:%s", path)}, .Odin)
+	init_site(&site, _flags)
 	defer destroy_site(&site)
 
 	testing.expect_value(t, site.content_dir, "/custom/content")

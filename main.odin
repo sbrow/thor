@@ -1,6 +1,7 @@
 package main
 
 import "base:runtime"
+import "core:flags"
 import "core:log"
 import "core:mem"
 import "core:os"
@@ -44,19 +45,20 @@ main :: proc() {
 		defer spall.buffer_destroy(&spall_ctx, &spall_buffer)
 	}
 
+	cli_flags: Flags
+	flags.parse_or_exit(&cli_flags, os.args, .Odin)
+
+	level: log.Level
+	switch {
+	case cli_flags.quiet:
+		level = .Warning
+	case cli_flags.verbose:
+		level = .Debug
+	case:
+		level = .Info
+	}
 	logger_opts: log.Options =
 		(log.Default_Console_Logger_Opts - log.Full_Timestamp_Opts - {.Short_File_Path})
-	level := log.Level.Info
-	for arg in os.args {
-		switch (arg) {
-			case "-verbose":
-			level = .Debug;
-			break
-			case "-quiet":
-			level = .Warning;
-			break
-		}
-	}
 	console_logger := log.create_console_logger(level, logger_opts)
 	context.logger = console_logger
 	defer log.destroy_console_logger(console_logger)
@@ -75,7 +77,7 @@ main :: proc() {
 		)
 		tick := time.tick_now()
 		site: Site
-		init_site(&site, os.args)
+		init_site(&site, cli_flags)
 		defer destroy_site(&site)
 		// TODO: Make it so this isn't necessary
 		context.allocator = site_allocator(&site)

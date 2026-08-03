@@ -1,7 +1,6 @@
 package main
 
 import "core:encoding/json"
-import "core:flags"
 import "core:fmt"
 import "core:log"
 import "core:mem"
@@ -94,7 +93,7 @@ Flags :: struct {
 	md_disable:  string `args:"name=no-ext" usage:"Disable markdown extensions (comma-separated: emoji,sidenotes,alerts,highlight,sections)"`,
 }
 
-init_site :: proc(site: ^Site, args: []string) {
+init_site :: proc(site: ^Site, flags: Flags) {
 	mem.dynamic_arena_init(&site.arena)
 	alloc := site_allocator(site)
 
@@ -102,10 +101,7 @@ init_site :: proc(site: ^Site, args: []string) {
 	site.base_url = "http://localhost:8080"
 	site.markdown_extensions = md.DEFAULT_EXTENSIONS
 
-	_flags: Flags
-	flags.parse_or_exit(&_flags, args, .Odin, alloc)
-
-	path := _flags.config_path
+	path := flags.config_path
 	if path == "" {
 		found, ok := find_config("thor.json")
 		if ok {
@@ -130,7 +126,7 @@ init_site :: proc(site: ^Site, args: []string) {
 		site_apply_path_defaults(site, config_dir)
 	}
 
-	site_apply_cli_flags(site, _flags)
+	site_apply_cli_flags(site, flags)
 	site.config_path = path
 
 	site.og = og_for_site(site)
