@@ -88,6 +88,8 @@ Flags :: struct {
 	drafts:      bool `args:"name=drafts" usage:"Include draft pages in the build"`,
 	watch:       bool `usage:"Rebuild on file changes (polls every 5 seconds)"`,
 	minify:      bool `args:"name=minify" usage:"Minify HTML output and CSS assets"`,
+	verbose:     bool `usage:"Enable debug logging"`,
+	quiet:       bool `usage:"Suppress info logging (warnings and errors only)"`,
 	md_enable:   string `args:"name=ext" usage:"Enable markdown extensions (comma-separated: emoji,sidenotes,alerts,highlight,sections)"`,
 	md_disable:  string `args:"name=no-ext" usage:"Disable markdown extensions (comma-separated: emoji,sidenotes,alerts,highlight,sections)"`,
 }

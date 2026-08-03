@@ -46,7 +46,18 @@ main :: proc() {
 
 	logger_opts: log.Options =
 		(log.Default_Console_Logger_Opts - log.Full_Timestamp_Opts - {.Short_File_Path})
-	console_logger := log.create_console_logger(.Info, logger_opts)
+	level := log.Level.Info
+	for arg in os.args {
+		switch (arg) {
+			case "-verbose":
+			level = .Debug;
+			break
+			case "-quiet":
+			level = .Warning;
+			break
+		}
+	}
+	console_logger := log.create_console_logger(level, logger_opts)
 	context.logger = console_logger
 	defer log.destroy_console_logger(console_logger)
 

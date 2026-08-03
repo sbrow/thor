@@ -45,7 +45,7 @@
   - [ ] talk about the context stack (and its limit).
   - [ ] highlight the differences in the way menus are handled.
 - [ ] consider sites with date based urls.
-- [ ] Don't show annoying log output in tests.
+- [x] Don't show annoying log output in tests.
 - [ ] improve home link customization.
   - [ ] currently an accessibility issue.
 - [x] support JSON5 in in frontmatter
