@@ -1,6 +1,7 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
+- [ ] `{{>title}}` default partial? `{{site.title}} | {{ page.title }}`
 - [ ] implicit titles (Set when missing?)
 - [ ] create a default `head.html`.
 - [ ] html comments are rendered, except in minify mode.
