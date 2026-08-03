@@ -21,7 +21,9 @@ TODO: #### footnotes
 
 #### Minify
 
-If enabled, `minify` will perform simple whitespace removal on all your output `.html` files, and any `.css` files in your `assets` directories. Minifying JavaScript is not supported at this time.
+If enabled, `minify` will perform simple whitespace removal on all your output `.html` files, and any `.css` files in your `assets` directories. Minifying JavaScript is not supported (yet).
+
+TODO: Do we minify inline css?
 
 ### Opt-Out Features
 
@@ -29,6 +31,7 @@ If enabled, `minify` will perform simple whitespace removal on all your output `
 - sidenotes/marginnotes
 - syntax highlighting
 - heading ids
+- TODO: Table Of Contents Generation
 
 
 ## Directories
@@ -58,19 +61,64 @@ Currently, there is only one asset processor, and that is [the minifier](#minify
 
 ### Pages & Page Bundles
 
-Page content can either be defined in a single file (`contact.md`), or in a directory  (`contact/index.md`, `contact/our-team.jpg`). Single file pages are preferred to page bundles.[^1]
+Page content can either be defined in a single file (`contact.md`), or in a directory  (`contact/index.md` + `contact/our-team.jpg`). Single file pages are preferred to page bundles.[^1]
 
-[^1]: That's not you say you shouldn't use bundles, but if you have no additional resources on your page, there's no benefit to using a bundle. 
+[^1]: That's not you say you shouldn't use bundles, but if you have no additional resources on your page, there's no benefit to using a bundle.
 
 Thor currently supports 2 formats for page files: MarkDown (`.md`),  and HTML (`.html`). 
 
-## Templates
+## Templates[^tempmod]
 
-### Slots
+[^tempmod]: Template modification is an "advanced" feature, and shoud probably be discussed later in the page. (or possibly in the guide.)
 
-> [!NOTE] (to self) Template modification is an "advanced" feature, and shoud probably be discussed later in the page. (or possibly in the guide.)
+Sites are built using one or more template files written in an extended version of [mustache](https://mustache.github.io) templates. The [mustache manual](https://mustache.github.io/mustache.5.html) has great explainations and a lot of examples if you want to know more, but I'll summarize them for you here.
 
-When building your own templates, you are of course free to pick whatever names you  choose for your partials and content slots. However, sticking to conventions helps create consistency in the ecosystem, and prevents friction when relying on a built-in template.
+### Tags
+
+#### Variables
+
+In order do display a scalar (not-list) value in your template, simply wrap it in double curly braces. e.g. `{{ page.title }}`.
+
+This content will be HTML escaped (for safety), so if the value you're rendering contains html, you'll need to use the raw syntex instead `{{& page.title}}` which will output the value without stripping or re-writing content.
+
+`{{{ raw }}}` syntax is supported for raw html output, but `{{& raw }}` is preferred, as it's easy to accidentily insert too many braces.
+
+In most[^most] cases, invalid keys will be silently ignored (nothing between the braces will appear), in keeping with the official mustache spec.
+
+[^most]: TODO: in what cases won't it? spelllcheck + strict mode?
+
+Leading and trailing whitespace(s) are ignored by the parser, so the folllowing are all equivilent: `{{& title }}`, `{{&title}}`, `{{&  title}}`.
+
+#### Sections
+TODO: 
+
+#### Inverted Sections
+TODO: 
+
+#### Partials
+TODO: 
+
+TODO: Talk about MAX_CONTEXT_DEPTH (currently 16) and how it limits the total number of nested templates to 13. (3 for `[site, page, ctx]`)
+
+##### Dynamic Partials
+
+#### Blocks
+TODO:
+
+#### Parents
+TODO:
+
+#### Summary
+
+`{{page.title}}` for normal values
+`{{&page.title}}` for values that contain HTML.
+`<ul>{{#pages}}<li>{{title}}</li>{{/pages}}</ul>` for list values.
+`{{#params.is_starred}}<i class="fas fa-star"></i>{{/params.is_starred}}` for conditional content.
+`{{^pages}}No pages yet!{{/pages}}` to draw content when the value is empty.
+
+### Section Names
+
+When building your own templates, you are of course free to pick whatever names you choose for your partials and content slots. However, sticking to conventions helps create consistency in the ecosystem, and reduces friction when relying on a built-in template.
 
 `{{$main}}...{{/main}}`
 
@@ -90,8 +138,7 @@ When building your own templates, you are of course free to pick whatever names 
 
 ### Context
 
-TODO: Context can be a confusing name in Odin.
-
+When building your page(s), the following keys are accessible to your template files:
 
 `now`
 
@@ -110,15 +157,15 @@ TODO: Context can be a confusing name in Odin.
 
 `timezone`
 
-: The timezone to convert all `| format`ted dates to. Configured in `thor.json:date.timezone`. 
+: The timezone to convert dates to when using `{{ date | format }}`. Configured in `thor.json:date.timezone`. 
 
 `site`
 
-: The site parameters that are usable in templates, see [site](#site)
+: The site parameters that are usable in templates, see [site](#site).
 
 `pages`
 
-: Returns all regular pages, sorted by `?`. Regular pages exclude index pages like home and section roots::
+: Returns all regular pages, sorted by `?`. Regular pages exclude index pages like home and section roots.
 
 `og`
 
@@ -144,11 +191,54 @@ TODO: Write
 
 : The author of the current page or site. See [schema.org](https://schema.org/author) for the recommended format.
 
+
+#### The Context Stack 
+When building your page(s), each template is fed a Context[^ctx] stack that contains all the data should you need to build your page.
+
+[^ctx]: (for developers) `Template_Context` is not the same as Odin's implicit `context` parameter.
+
+The context stack is initialized[^init] as `[site, page, context]`, meaning if you use a key like `{{title}}` in your template, it will look up `context.title`, `page.title`, and then finally `site.title`, using the first available value it can find.
+
+[^init]: TODO: Don't use programmer speak.
+
+TODO: As you descend into sections/partials, new contexts are placed onto the stack, so they resolve first. (LIFO order)
+
+```mustache
+{{<base}}
+{{$main}}
+<main>
+  {{&page.content}}
+  <!-- Is the same as -->
+  {{&content}}
+  <!-- Or -->
+  {{$page}}{{&content}}{{/page}}
+  <!-- Or -->
+  {{$page.content}}{{&.}}{{/page.content}}
+</main>
+{{/main}}
+{{/base}}
+```
+
+
 ### Filters
+
+Because mustache is a logic-less language, (there are no `for` or `if` tags), Thor extends mustache to include a handful of data filters in the form of pipes. Bash users will feel right at home here.
 
 `group_by <field>`
 
-: Allows you to group pages by the given field.
+: Allows you to group pages by the given field. e.g.
+```mustache
+{{#pages | group_by year }}
+<section>
+<header>{{$key}} {{! The group's year}}</header>
+<ul>
+{{#items}}<li>
+{{title}} {{! The title of each of that year's pages }}
+{{/items}}</li>
+</ul>
+</section>
+{{/pages}}
+```
 
 `sort_by <field> <asc|desc>`
 
@@ -166,15 +256,32 @@ TODO: Write
 
 : Used to display a date in a particular format. See [DateTimes](#datetimes). If no format is given, the default will be used. 
 
+#### Chaining Pipes
+
+Thor allows you to chain two or more pipes, to allow complex data manipulation. However for performance and stylistic reasons, you are limited to no more than **8 pipes**[^pipes] for any given tag. If you believe you need more than 8 pipes, please [open an issue](../issues) with a **concrete example** of the problem you are facing.
+
+[^pipes]: TODO: THis number must be kept in-sync with `MAX_PIPES`.
+
+**Examples:**
+
+```mustache
+{{ pages | group_by year | first }} {{! All pages from the current year }}
+```
+
+```mustache
+{{ pages | sort_by date desc | first }} {{! The latest page }}
+```
+
+
 ### Partials
 
 Partials are templates that render a portion of a page. To include a partial, the standard [mustache syntax](https://mustache.github.io/mustache.5.html#Partials) is used. All partials are resolved relative to the root partials directory, so to include a partial at `layouts/partials/my_partial.html`, you would use `{{> my_partial}}`.
 
-Users can create as many partials as they want, and several are included for convienience:
+Users can create or override as many partials as they want; several are included for convienience:
 
 `{{> opengraph}}`
 
-: This partial willl render the Open Graph meta tags for your page. It should be placed inside the `<head>` tag. It See the [Open Graph](#open-graph) section for more details.
+: This partial willl render the Open Graph meta tags for your page. It should be placed inside the `<head>` tag. See the [Open Graph](#open-graph) section for more details.
 
 ### DateTimes
 

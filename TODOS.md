@@ -3,6 +3,11 @@
 - Polish existing features before moving on to new ones.
 - [ ] implicit titles (Set when missing?)
 - [ ] create a default `head.html`.
+- [ ] html comments are rendered, except in minify mode.
+- [ ] does it make sense for partials to be inside layouts?
+  - current: `layouts/partials`
+  - alt1: `layouts`, `partials`
+  - alt2: `templates/layouts`, `templates/partials`
 - [ ] [aliases](https://gohugo.io/methods/page/aliases/#redirects)?
 - [ ] Improve diagnostics
   - [x] keep track of every error and don't report them more than once.
@@ -103,6 +108,8 @@
 - [ ] Add opt-in deflist support.
 - [ ] Decide if lambdas actually provide any value.
 - [ ] add tables extension
+- [ ] Peruse [GitHub's](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
+      docs for any juicy nuggets we may have missed.
 
 ## Dates
 - [ ] display an error when no part of the date appears in the output.
