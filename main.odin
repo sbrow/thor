@@ -2,6 +2,7 @@ package main
 
 import "base:runtime"
 import "core:log"
+import "core:mem"
 import "core:os"
 import "core:prof/spall"
 import "core:sync"
@@ -57,12 +58,21 @@ main :: proc() {
 
 	for {
 		defer free_all(context.temp_allocator)
+		defer log.debugf(
+			"max_temp_allocator_size=%M",
+			(cast(^runtime.Default_Temp_Allocator)context.temp_allocator.data)^.arena.total_used,
+		)
 		tick := time.tick_now()
 		site: Site
 		init_site(&site, os.args)
 		defer destroy_site(&site)
 		// TODO: Make it so this isn't necessary
 		context.allocator = site_allocator(&site)
+		defer log.debugf(
+			"current_site_allocator_size=%M",
+			site.arena.block_size * (len(site.arena.used_blocks) + len(site.arena.unused_blocks)) -
+			site.arena.bytes_left,
+		)
 		build_vfs(&site)
 
 		treesitter.grammar_dir = site.grammars
@@ -70,7 +80,7 @@ main :: proc() {
 
 		site_load_content(&site)
 		render_site(&site)
-		log.infof("Built site in %s", time.tick_since(tick))
+		log.infof("Built site in %M", time.tick_since(tick))
 
 		(.Watch in site.features) or_break
 		time.sleep(5 * time.Second)
@@ -94,3 +104,4 @@ when SPALL {
 		spall._buffer_end(&spall_ctx, &spall_buffer)
 	}
 }
+
