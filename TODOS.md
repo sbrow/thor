@@ -121,6 +121,9 @@
   - [ ] configure opt-out of automatic sections being added to menu.
   - [ ] nested menus (i.e. `parent` support)
 - [ ] get rid of the global variables in the `treesitter` package.
+- [ ] enforce heading structure.
+  - [ ] Either frontmatter.title set, or 1 h1 tag at top, not both
+  - [ ] No skipping. 
 - [ ] Consider using `or_else` when applying default values to structs. i.e.
 ```odin
 package main

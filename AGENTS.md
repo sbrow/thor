@@ -416,7 +416,6 @@ Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the imp
 | `diagnostic.odin` | Rust-style error formatter: `format_error` (multi-line context, ANSI colors via `core:terminal/ansi`, `colorize` param), `format_render_error` (formats `Error`), `line_col`, `line_text`, `context_extent`, `count_lines`, `digit_count`, `should_colorize`. |
 | `suggest.odin` | Strict-warning helpers: `validate_key_path` (walks dotted path, crosses maps silently), `suggest_correction` (Levenshtein via `core:strings/levenshtein_distance`), `collect_struct_keys` (via reflection, recurses into `using`), `struct_has_field` (distinguishes missing field from nil value — needed for `Maybe(bool)`), `collect_partial_names`, `collect_block_names`. |
 | `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case. Uses `log.nil_logger()` to suppress expected warnings. |
-| `lambda_test.odin` | Spec lambda tests |
 | `pipes_test.odin` | Pipe filter tests (`group_by` + `format`) |
 | `diagnostic_test.odin` | Golden-output tests for `format_error` (multi-line context, edge cases, alignment, caret position, hint) + parser error message brace-escaping |
 | `suggest_test.odin` | Tests for `validate_key_path`, `suggest_correction`, `struct_has_field` with `Maybe(bool)` and `using`-promoted fields |
@@ -459,13 +458,6 @@ Rust-style error messages with multi-line source context, caret underlines, and 
 - Found fields whose value is nil/empty (e.g., nil `json.Value` union) — the field exists, looking up sub-keys is valid "not found" behavior
 
 **Block override source tracking**: `Block_Override.source: Template` ensures warnings inside block overrides point at the override's source file (e.g., `page.html`), not the parent template (`base.html`).
-
-### Lambdas
-
-Spec-compliant. Stored as `any` values in the data context.
-
-- **Interpolation lambdas**: `proc() -> string`, `proc() -> int`, `proc() -> bool` — called via `call_interp_lambda`, result stringified and escaped.
-- **Section lambdas**: `proc(string) -> string`, `proc(string) -> int`, `proc(string) -> bool` — called via `call_section_lambda` with the raw section text (`node.content`). String result is re-parsed as mustache and rendered against the current context stack.
 
 ### Pipes
 

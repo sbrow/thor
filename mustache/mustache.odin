@@ -625,30 +625,7 @@ render_nodes :: proc(
 				}
 				val = transformed
 			}
-			if result_str, ok := call_interp_lambda(val); ok {
-				sub_tpl, perr := parse(
-					result_str,
-					fmt.tprintf("<lambda output from '%s'>", node.key),
-					context.temp_allocator,
-					context.temp_allocator,
-				)
-				if perr == nil {
-					temp: strings.Builder
-					strings.builder_init(&temp, context.temp_allocator)
-					render_nodes(
-						sub_tpl,
-						sub_tpl.nodes[:],
-						ctx,
-						partials,
-						&temp,
-						blocks,
-						nil,
-					) or_return
-					write_value(b, strings.to_string(temp), escape = true)
-				}
-			} else {
-				write_value(b, val, escape = true)
-			}
+			write_value(b, val, escape = true)
 			i += 1
 
 		case .Unescaped:
@@ -667,30 +644,7 @@ render_nodes :: proc(
 				}
 				val = transformed
 			}
-			if result_str, ok := call_interp_lambda(val); ok {
-				sub_tpl, perr := parse(
-					result_str,
-					fmt.tprintf("<lambda output from '%s'>", node.key),
-					context.temp_allocator,
-					context.temp_allocator,
-				)
-				if perr == nil {
-					temp: strings.Builder
-					strings.builder_init(&temp, context.temp_allocator)
-					render_nodes(
-						sub_tpl,
-						sub_tpl.nodes[:],
-						ctx,
-						partials,
-						&temp,
-						blocks,
-						nil,
-					) or_return
-					write_value(b, strings.to_string(temp), escape = false)
-				}
-			} else {
-				write_value(b, val, escape = false)
-			}
+			write_value(b, val, escape = false)
 			i += 1
 
 		case .Section:
@@ -705,25 +659,7 @@ render_nodes :: proc(
 				}
 				val = transformed
 			}
-			if result_str, ok := call_section_lambda(val, node.content); ok {
-				sub_tpl, perr := parse(
-					result_str,
-					fmt.tprintf("<lambda output from '%s'>", node.key),
-					context.temp_allocator,
-					context.temp_allocator,
-				)
-				if perr == nil {
-					render_nodes(
-						sub_tpl,
-						sub_tpl.nodes[:],
-						ctx,
-						partials,
-						b,
-						blocks,
-						nil,
-					) or_return
-				}
-			} else if is_truthy(val) {
+			if is_truthy(val) {
 				children := node.children
 				elem_info, count, data := list_info(val)
 				if elem_info != nil {
