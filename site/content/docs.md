@@ -7,7 +7,7 @@
 
 ## Introduction
 
-This guide assumes you have either read [The Guide](./the-guide), or have built a [Hugo](https://gohugo.io) site before. It also assumes you have a basic knowledge of HTML and CSS.
+This guide assumes you have either read [The Guide](../guide), or have built a [Hugo](https://gohugo.io) site before. It also assumes you have a basic knowledge of HTML and CSS.
 
 ## Features
 

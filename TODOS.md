@@ -3,6 +3,7 @@
 - Polish existing features before moving on to new ones.
 - [ ] implicit titles (Set when missing?)
 - [ ] create a default `head.html`.
+- [ ] [aliases](https://gohugo.io/methods/page/aliases/#redirects)?
 - [ ] Improve diagnostics
   - [x] keep track of every error and don't report them more than once.
   - [ ] `*` make sure the frontmatter parser has good diagnostics.
