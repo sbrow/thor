@@ -304,8 +304,7 @@ Users can create or override as many partials as they want; several are included
 
 `{{> title }}`
 
-: The title of the current page. It should be placed inside the `<title>` tag. By default, it will appear as
-  `{{ page.title }} | {{ site.title }}`.
+: The title of the current page. It should be placed inside the `<title>` tag. By default, it will appear as `{{ page.title }} | {{ site.title }}`.
 
 `{{> nav }}`
 
