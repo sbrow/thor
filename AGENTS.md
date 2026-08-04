@@ -53,10 +53,10 @@ thor/
 
 | File | Responsibility |
 |---|---|
-| `main.odin` | Entry point. Sets `context.logger`, calls `init_site`, `build_vfs`, wires `treesitter.grammar_dir`/`query_dir` from config, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
-| `site.odin` | `Flags` (CLI), `Config_File` (thor.json), `Site_Context` (template-facing: `title`, `description`, `base_url`, `params`, `og`, `menus`), `Site` (runtime state + arena + VFS + pages + `og`). `Feature` enum. 5-step `init_site`. Config menu parsing in `site_apply_config`. |
-| `content.odin` | `Page` struct (includes `weight`, `menus: map[string]Menu_Entry`, `og`), `Pending_File` struct, `scan_content_files` (section-aware walk that handles leaf bundles), `collect_languages` (pre-scan for code fence languages), `load_page` (falls back to file mtime when no frontmatter date), `infer_layout`. Calls `md.process()` for the markdown pipeline. |
-| `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. `Template_Context` (unified render struct with `site: Site_Context`, `page: Page`, `menus`, `posts`, `pages`). 3-frame context stack via `[]any{ctx.site, ctx.page, ctx}`. `sort_pages` (weight primary, date secondary). `to_title_case` for section display names. VFS-based template loading with fallback chain (`get_template`). |
+| `main.odin` | Entry point. Parses CLI flags via `core:flags`, sets logger level from `-verbose`/`-quiet`, calls `init_site`, `build_vfs`, wires `treesitter.grammar_dir`/`query_dir` from config, `site_load_content`, `render_site`. Optional Spall profiling via `SPALL` config flag. |
+| `site.odin` | `Flags` (CLI, includes `-verbose`/`-quiet`), `Config_File` (thor.json), `Site_Context` (template-facing: `title`, `description`, `base_url`, `params`, `og`, `menus`), `Site` (runtime state + arena + VFS + pages + `og`). `Feature` enum. `init_site(site, flags)` — takes pre-parsed `Flags`. Config menu parsing in `site_apply_config`. |
+| `content.odin` | `Page` struct (includes `weight`, `menus`, `params: json.Value`, `toc: string`, `og`), `Pending_File` struct, `scan_content_files` (section-aware walk that handles leaf bundles), `collect_languages` (pre-scan for code fence languages), `load_page` (falls back to file mtime, generates TOC via `md.generate_toc` when frontmatter `"toc": true`), `infer_layout`. Calls `md.process()` for the markdown pipeline. |
+| `render.odin` | Template rendering: `render_site`, `render_page_html`, `render_home_html`, `render_section`. `Template_Context` (unified render struct with `site: Site_Context`, `page: Page`, `menus`, `params`, `posts`, `pages`). 3-frame context stack via `[]any{ctx.site, ctx.page, ctx}`. `merge_params(site, page)` — shallow merge of site + page params. Error deduplication via `seen: ^map[string]bool` passed through render chain. `sort_pages` (weight primary, date secondary). `to_title_case` for section display names. VFS-based template loading with fallback chain (`get_template`). |
 | `menus.odin` | Menu system: `Menu_Entry {name, url, weight: Maybe(int)}`, `DEFAULT_WEIGHT = 10`. `build_menus` (priority chain: config → auto + page frontmatter, then `warn_all_duplicate_weights`). `collect_auto_menus` (sections + root-level pages, skips pages with explicit `"menus": "main"` frontmatter). `merge_page_menus` (frontmatter entries with effective weight fallback via nil check). `parse_page_menus` (string/array/object forms). `parse_config_menus` (from thor.json). `sort_menu_entries` / `compare_menu_entries` (weight primary via `.? or_else DEFAULT_WEIGHT`, name secondary). `warn_duplicate_weights` / `warn_all_duplicate_weights` (log when two entries in same menu have same explicitly-set weight). |
 | `minify.odin` | HTML/CSS minification via tree-sitter. Imports `ts "treesitter"`. |
 | `feed.odin` | RSS feed + sitemap XML. Uses `page.url` for canonical URLs. |
@@ -64,7 +64,7 @@ thor/
 | `assets.odin` | `copy_assets_dir` — iterates VFS entries with `assets/` prefix, minifies CSS, copies verbatim or via `os.copy_file`. |
 | `html.odin` | `strip_html_tags`, `unescape_html`, `generate_summary` (word-count truncation, zero-alloc), `generate_description` (HTML→plain text: strip tags, decode entities, collapse whitespace). |
 | `opengraph.odin` | `Open_Graph` struct (fields ordered per OGP spec, `is_article: Maybe(bool)`). `og_for_site(site)` for site defaults (from config + derived), `og_for_page(site_og, page)` for page-specific (overlay page.og + derive from page data). Description falls back to `generate_description(generate_summary(body_html))`. |
-| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, `weight: Maybe(int)`, `menus`, and nested `og` object (via `json_get_open_graph`). Helpers: `json_get_string`, `json_get_bool`, `json_get_int` (returns `Maybe(int)`, nil for absent/invalid). |
+| `frontmatter.odin` | JSON frontmatter parser (`{ }` delimited). Supports `layout`, `lastmod`, `weight: Maybe(int)`, `menus`, `params: json.Value`, `toc: bool`, and nested `og` object (via `json_get_open_graph`). Helpers: `json_get_string`, `json_get_bool`, `json_get_int` (returns `Maybe(int)`, nil for absent/invalid). |
 | `defaults.odin` | `DEFAULTS_PATH` constant, resolved at compile time via `#directory` so bundled templates ship in the binary. |
 
 ### Subpackages
@@ -72,13 +72,14 @@ thor/
 | Package | Files | Responsibility |
 |---|---|---|
 | `treesitter/` | `treesitter.odin` | FFI types (`Parser`, `Node`, `Query`, etc.), `@(link_prefix="ts_")` foreign bindings, grammar management (`Grammar_Store` with persistent allocator, `load_language`/`compile_query` building blocks, `ensure_parser`/`load_grammar` lazy loading, `preload_grammar`/`preload_grammars` for parallel loading with `sync.Mutex` cache protection), statically-linked HTML/CSS grammars |
-| `markdown/` | `markdown.odin` | `Extension` enum, `DEFAULT_EXTENSIONS`, `process(body, ext, file_path)` — full pipeline, `parse_extension_list`, `apply_extension_config` |
-| | `footnotes.odin` | `strip_definitions` (pre-cmark), `inject_notes` (post-cmark) |
+| `markdown/` | `markdown.odin` | `Extension` enum, `DEFAULT_EXTENSIONS`, `process(body, ext, file_path, allocator)` — full pipeline (clones cmark output, frees original), `parse_extension_list`, `apply_extension_config` |
+| | `footnotes.odin` | `strip_definitions` (pre-cmark), `inject_notes` (post-cmark). cmark output freed via `defer cm.free_string(raw_html)` on separate variable. |
 | | `alerts.odin` | `inject_alerts` — GitHub alert blocks (`> [!NOTE]`) → styled blockquotes with semantic class names (`alert-note` etc.) |
 | | `emoji.odin` | `expand_emoji` — `:shortcode:` → unicode emoji |
 | | `sectionate.odin` | `wrap_sections` — splits HTML at `<h2>` into `<section>` wrappers |
 | | `highlight.odin` | Syntax highlighting via tree-sitter. Imports `../treesitter`. |
 | | `heading_ids.odin` | `inject_heading_ids` — adds `id` attributes to `<h1>`-`<h6>` from heading text. Slug-based, deduplicated. |
+| | `toc.odin` | `generate_toc(html, allocator)` — page-level feature (not a pipeline extension). Scans `<h1>`-`<h6>` for IDs (after `inject_heading_ids`), builds nested `<ul>` with `<a href="#id">` links. Called from `load_page` when frontmatter `"toc": true`. Depends on `.HeadingIDs` being enabled. |
 | `mustache/` | See [Mustache engine](#mustache-engine) below | Template engine |
 | `bench/` | `bench.odin` + `templates/` | Standalone template rendering benchmark. Generates 500 posts + 100 comments, renders with indented partials + inheritance + pipes. `--dump <path>` for output validation, positional arg for iteration count (default 250). |
 
@@ -113,12 +114,14 @@ Page :: struct {
     weight:      Maybe(int),  // page ordering (nil = unset, defaults to DEFAULT_WEIGHT at comparison time)
     lastmod:     string,
     menus:       map[string]Menu_Entry,  // frontmatter menu assignments
+    params:      json.Value,  // per-page params (merged with site params at render time)
     content:     string,      // rendered HTML body
     og:          Open_Graph,
     draft:       bool,
-    starred:     bool,
+    toc:         string,      // generated table of contents HTML (empty if not requested)
     _is_index:   bool `private`,
 }
+```
 ```
 
 No `Page_Type` enum — page type is inferred from section + `_is_index`. Layout is inferred via `infer_layout(section, is_index)`:
@@ -168,7 +171,7 @@ All weight fields use `Maybe(int)` — nil means "unset," `some(v)` means explic
 
 Config is split into three structs with a clear 5-step initialization flow:
 
-- **`Flags`** — CLI args only. Parsed by `core:flags`. Includes path overrides (`--content`, `--assets`, `--output`, `--layouts`), build-mode toggles (`-drafts`, `-watch`, `-minify`), and `-ext`/`-no-ext` for markdown extension overrides.
+- **`Flags`** — CLI args only. Parsed once in `main.odin` via `core:flags`, passed to `init_site`. Includes path overrides (`--content`, `--assets`, `--output`, `--layouts`), build-mode toggles (`-drafts`, `-watch`, `-minify`), log level (`-verbose` → Debug, `-quiet` → Warning), and `-ext`/`-no-ext` for markdown extension overrides.
 - **`Config_File`** — parsed from `thor.json` via `json.unmarshal_string`. Holds title, paths, `markdown_extensions` (JSON), `params` (JSON), `modules` (JSON array of relative paths), `og` (`Open_Graph` struct for site-level OG defaults).
 - **`Site`** — runtime state: arena, pages, modules, VFS, `features: bit_set[Feature]`, `markdown_extensions: bit_set[md.Extension]`, `og: Open_Graph` (resolved site-level OG).
 
@@ -289,17 +292,17 @@ Template_Context :: struct {
     site:        Site_Context,   // site-level data (title, description, base_url, params, og)
     menus:       map[string][]Menu_Entry,  // generated menu data (copied from site, resolves above Page.menus)
     now:         string,          // UTC ISO 8601 build timestamp
-    title:       string,          // computed browser title ("Page | Site")
     date_format: string,          // from site.date.format (thor.json)
     timezone:    ^datetime.TZ_Region,  // for format pipe
     og:          Open_Graph,      // computed per-page OG
+    params:      json.Value,      // merged site + page params (resolves above Page.params)
     page:        Page,            // current page
     pages:       [dynamic]Page,   // home page list
     posts:       [dynamic]Page,   // section post list
 }
 ```
 
-`Site_Context` is embedded in `Site` via `using site_context`. Fields like `site.title`, `site.menus`, `site.params` are accessed directly on `Site` through promotion. `Template_Context.menus` is copied from `site.menus` to resolve above `Page.menus` (frontmatter assignments) on the context stack.
+`Site_Context` is embedded in `Site` via `using site_context`. Fields like `site.title`, `site.menus`, `site.params` are accessed directly on `Site` through promotion. `Template_Context.menus` is copied from `site.menus` to resolve above `Page.menus` (frontmatter assignments) on the context stack. `Template_Context.params` is set per-page via `merge_params(site.params, page.params)` — site params overlaid with page params. Browser title is handled by the `{{> title}}` partial (not a computed field).
 
 `render_site` pre-parses all partials and the base layout once (via `mustache.parse`), then per-layout templates are cached in `get_template`. Year-based grouping on section index pages is done in the template via `{{#posts | group_by year}}` (see Pipes extension below).
 
@@ -412,7 +415,7 @@ Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the imp
 | `mustache.odin` | Public API (`parse`, `render`, `Template`), parser (`parse_section`), renderer (`render_nodes` with `Indent_State` for partial indentation), template inheritance (`merge_block_overrides`), `delete_template`/`delete_partials`. Pipe support in Variable/Unescaped/Section/Inverted tags. |
 | `tokenizer.odin` | Tokenizer (template string → `[]Token`), standalone whitespace detection |
 | `data.odin` | Reflection-based data model: `base_value` (peels union/any/nested-any layers), `lookup_in` (structs + maps, handles `Type_Info_Any` value kind in maps), `resolve_name`, `is_truthy`, `any_to_string`, `write_value`, `list_info`, `extract_list_element`, `collect_map_keys` |
-| `pipes.odin` | Pipes extension: `Pipe_Filter` AST, `parse_pipeline` (takes `pos`), `apply_pipeline`, `apply_filter` (switch dispatch: `group_by` + `format`), `apply_group_by`, `apply_format`. Stored on `Node.filters`; render-scoped results in temp allocator. |
+| `pipes.odin` | Pipes extension: `Pipe_Op` enum (`.Format`, `.Group_By`), `pipe_op_from_string`/`pipe_op_candidates` (reflection-based enum name lookup), `Pipe_Filter` AST (with `op_pos` for diagnostics), `parse_pipeline` (tracks byte offsets via `strings.index`), `apply_pipeline`, `apply_filter` (exhaustive enum switch), `apply_group_by`, `apply_format`. Misspelled pipe op suggestions via `suggest_correction`. Stored on `Node.filters`; render-scoped results in temp allocator. |
 | `diagnostic.odin` | Rust-style error formatter: `format_error` (multi-line context, ANSI colors via `core:terminal/ansi`, `colorize` param), `format_render_error` (formats `Error`), `line_col`, `line_text`, `context_extent`, `count_lines`, `digit_count`, `should_colorize`. |
 | `suggest.odin` | Strict-warning helpers: `validate_key_path` (walks dotted path, crosses maps silently), `suggest_correction` (Levenshtein via `core:strings/levenshtein_distance`), `collect_struct_keys` (via reflection, recurses into `using`), `struct_has_field` (distinguishes missing field from nil value — needed for `Maybe(bool)`), `collect_partial_names`, `collect_block_names`. |
 | `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case. Uses `log.nil_logger()` to suppress expected warnings. |
@@ -443,7 +446,11 @@ render(tmpl, data, partials) → render_nodes (walks flat node array against con
 
 Rust-style error messages with multi-line source context, caret underlines, and Levenshtein suggestions. ANSI colors via `core:terminal/ansi`, gated on `should_colorize()` (TTY detection on stderr).
 
-**Error types**: `Error_Body{msg, pos, kind}` where `kind` is `Error_Kind.Syntax` (parse-time) or `Error_Kind.Data` (render-time). `Error` is a single-variant union wrapping `Error_Body` (nilable for `!= nil` / `or_return`).
+**Error types**: `Error_Body{msg, pos, kind, source, path, span, hint}` where `kind` is `Error_Kind.Syntax` (parse-time) or `Error_Kind.Data` (render-time). `source`/`path` carry the template the error originated in (set by `tag_error` — enables correct file/line for errors inside partials). `span` controls caret underline width (used by pipe op diagnostics). `hint` carries "did you mean?" suggestions. `Error` is a single-variant union wrapping `Error_Body` (nilable for `!= nil` / `or_return`).
+
+**Error deduplication**: `render_template` takes `seen: ^map[string]bool`. Duplicate errors (same formatted diagnostic) are suppressed across page renders within a single build.
+
+**Partial source tracking**: `tag_error(err, current)` stamps render-time errors with `current.source`/`current.path` at the 4 `apply_pipeline` call sites in `render_nodes`. Ensures errors inside partials point at the partial file, not the top-level template.
 
 **Strict-by-default warnings** — `render_nodes` emits `log.warnf` diagnostics for:
 - Unknown keys in `{{k}}`, `{{{k}}}`, `{{#k}}`, `{{^k}}` (via `validate_key_path` + `suggest_correction`)
@@ -475,12 +482,13 @@ See `mustache/EXTENSIONS.md`.
 
 ## Known limitations
 
-- cmark allocates via C malloc, not the arena. HTML output leaks until process exit (problematic in watch mode — see `TODOS.md`).
 - CSS/JS cache busting uses manual `?v=N` query params instead of content hashing.
 - Tree-sitter grammar/query paths must be configured manually via `thor.json` (`grammars`, `queries`) — no auto-discovery. HTML/CSS are statically linked.
 - `map[string]any` only works through `lookup_in`'s special-case handling; thor otherwise uses structs.
 - `format_f64` in mustache brute-forces shortest float representation.
 - Content directory not mounted in VFS (modules can ship templates/assets but not content packs yet).
+- Per-page params rendering is incomplete — `merge_params` produces correct data, but `base_value` may return nil for `json.Value` fields accessed through the `[]any` context stack via reflection in some cases. Warning suppression masks this; actual rendering may not work for all param values.
+- Lambda support removed. Mustache lambdas (`proc() -> string` in data context) are not supported. Pipes cover data transformation.
 
 ## Design decisions
 
@@ -488,6 +496,8 @@ You may never, *ever* remove `TODO:` or `FIXME:` comments. Those are for humans,
 See `HUGO.md` for analysis of why thor doesn't need Hugo's shortcode context isolation.
 See `mustache/SPEC.md` for the original implementation specification.
 See `mustache/EXTENSIONS.md` for non-standard extensions (pipes).
+See `DIAGNOSTICS.md` for the two-tier diagnostic system design.
+See `mustache/TOKENIZERS.md` for tokenizer architecture comparison (Go, Liquid, Thor).
 
 ## Odin language facts
 
