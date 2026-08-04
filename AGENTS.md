@@ -73,7 +73,7 @@ thor/
 |---|---|---|
 | `treesitter/` | `treesitter.odin` | FFI types (`Parser`, `Node`, `Query`, etc.), `@(link_prefix="ts_")` foreign bindings, grammar management (`Grammar_Store` with persistent allocator, `load_language`/`compile_query` building blocks, `ensure_parser`/`load_grammar` lazy loading, `preload_grammar`/`preload_grammars` for parallel loading with `sync.Mutex` cache protection), statically-linked HTML/CSS grammars |
 | `markdown/` | `markdown.odin` | `Extension` enum, `DEFAULT_EXTENSIONS`, `process(body, ext, file_path, allocator)` — full pipeline (clones cmark output, frees original), `parse_extension_list`, `apply_extension_config` |
-| | `footnotes.odin` | `strip_definitions` (pre-cmark), `inject_notes` (post-cmark). cmark output freed via `defer cm.free_string(raw_html)` on separate variable. |
+| | `footnotes.odin` | `strip_definitions` (pre-cmark, shared by `.Sidenotes` + `.Footnotes`), `inject_notes` (post-cmark sidenote rendering), `inject_footnotes` (post-cmark standard footnote rendering — numbered `<sup>` links + `<section class="footnotes"><ol>` at bottom). `.Sidenotes` and `.Footnotes` are mutually exclusive; `resolve_extension_conflicts` in `markdown.odin` picks `.Footnotes` if both are set. |
 | | `alerts.odin` | `inject_alerts` — GitHub alert blocks (`> [!NOTE]`) → styled blockquotes with semantic class names (`alert-note` etc.) |
 | | `emoji.odin` | `expand_emoji` — `:shortcode:` → unicode emoji |
 | | `sectionate.odin` | `wrap_sections` — splits HTML at `<h2>` into `<section>` wrappers |
@@ -178,7 +178,7 @@ Config is split into three structs with a clear 5-step initialization flow:
 
 **`Feature` enum** — `Drafts`, `Minify`, `Watch`. Checked with `.Minify in site.features`.
 
-**`markdown.Extension` enum** (in the `markdown` package, not main) — `Emoji`, `Sidenotes`, `Alerts`, `Highlight`, `Sections`, `HeadingIDs`, `DefLists`. Default is `md.DEFAULT_EXTENSIONS` (currently `.Emoji, .Sidenotes, .Alerts, .HeadingIDs, .DefLists`). Configurable via:
+**`markdown.Extension` enum** (in the `markdown` package, not main) — `Emoji`, `Sidenotes`, `Alerts`, `Highlight`, `Sections`, `HeadingIDs`, `DefLists`, `Footnotes`. Default is `md.DEFAULT_EXTENSIONS` (currently `.Emoji, .Sidenotes, .Alerts, .HeadingIDs, .DefLists`). Configurable via:
 - `thor.json`: `"markdown_extensions": { "emoji": true, "highlight": false, ... }`
 - CLI: `-ext:highlight,sections` (enable) / `-no-ext:emoji` (disable). Comma-separated, case-insensitive.
 
@@ -258,11 +258,12 @@ Lives in the `markdown` package. Entry point: `md.process(body, ext, file_path)`
 
 ```
 raw markdown
-  → md.strip_definitions     (if .Sidenotes — pre-cmark)
+  → md.strip_definitions     (if .Sidenotes || .Footnotes — pre-cmark)
   → md.convert_deflists      (if .DefLists — pre-cmark)
   → cmark markdown_to_html   (Unsafe mode for HTML passthrough)
   → md.expand_emoji          (if .Emoji — post-cmark)
-  → md.inject_notes          (if .Sidenotes — post-cmark)
+  → md.inject_notes          (if .Sidenotes — post-cmark, sidenote rendering)
+  → md.inject_footnotes      (if .Footnotes — post-cmark, standard footnote rendering)
   → md.inject_alerts         (if .Alerts — post-cmark)
   → md.highlight_code        (if .Highlight — post-cmark)
   → md.inject_heading_ids    (if .HeadingIDs — post-cmark, pre-sections)
@@ -514,6 +515,7 @@ These are things that are easy to get wrong:
 - **`Maybe(T)` unwrap syntax:** `value.? or_else default`. Not `value or_else default` — `or_else` works on the `?T` returned by `.?`, not on `Maybe(T)` directly.
 - **`Maybe(T)` equality:** `a == b` works directly between two `Maybe(T)` values (nil == nil → true, some(5) == some(5) → true, nil == some(5) → false). Also `a == 5` works (int coerces to `Maybe(int)`).
 - **File logger in tests:** `log.create_file_logger(&f)` + `context.logger = logger` captures log output. Must be set inline in the test proc (not via a helper proc) for context propagation. Clean up with `log.destroy_file_logger(logger)` then `os.read_entire_file_from_path` to verify output.
+- **`fmt.sbprintf` writes directly to a `strings.Builder`.** Prefer `fmt.sbprintf(&sb, fmt, args...)` over `fmt.aprintf(fmt, args...)` + `defer delete` + `strings.write_string`. The `aprintf` pattern allocates an intermediate string, requires manual cleanup, and queues a `defer delete` per loop iteration. `sbprintf` avoids all of this.
 
 ## TODO
 

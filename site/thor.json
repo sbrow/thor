@@ -1,4 +1,7 @@
 {
+  "markdown_extensions": {
+    "footnotes": true
+  },
   "params": {
     "author": {
       "name": "Spencer Brower"

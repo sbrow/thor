@@ -119,3 +119,102 @@ test_inject_notes_missing_ref :: proc(t: ^testing.T) {
 	testing.expect(t, strings.contains(out, "[^missing]"))
 	testing.expect(t, strings.contains(out, "[*missing]"))
 }
+
+@(test)
+test_inject_footnotes_basic :: proc(t: ^testing.T) {
+	html := "Text[^a] end."
+	sn := map[string]string {
+		"a" = "a footnote",
+	}
+	defer delete_map(sn)
+	mn := make(map[string]string)
+	defer delete_map(mn)
+
+	out := inject_footnotes(html, sn, mn)
+
+	testing.expect(t, strings.contains(out, `<sup><a href="#fn-1" id="fnref-1">1</a></sup>`))
+	testing.expect(t, strings.contains(out, `<li id="fn-1">a footnote`))
+	testing.expect(t, strings.contains(out, `class="footnote-backref"`))
+	testing.expect(t, strings.contains(out, `<section class="footnotes">`))
+	testing.expect(t, strings.contains(out, "</section>"))
+}
+
+@(test)
+test_inject_footnotes_numbered_by_appearance :: proc(t: ^testing.T) {
+	html := "Second[^b] then first[^a]."
+	sn := map[string]string {
+		"a" = "def a",
+		"b" = "def b",
+	}
+	defer delete_map(sn)
+	mn := make(map[string]string)
+	defer delete_map(mn)
+
+	out := inject_footnotes(html, sn, mn)
+
+	// b appears first in the text → 1, a → 2
+	testing.expect(t, strings.contains(out, `id="fnref-1">1</a></sup>`))
+	testing.expect(t, strings.contains(out, `id="fnref-2">2</a></sup>`))
+	testing.expect(t, strings.contains(out, `<li id="fn-1">def b`))
+	testing.expect(t, strings.contains(out, `<li id="fn-2">def a`))
+}
+
+@(test)
+test_inject_footnotes_marginnote_treated_same :: proc(t: ^testing.T) {
+	html := "Sidenote[^a] and marginnote[*b]."
+	sn := map[string]string {
+		"a" = "sn def",
+	}
+	defer delete_map(sn)
+	mn := map[string]string {
+		"b" = "mn def",
+	}
+	defer delete_map(mn)
+
+	out := inject_footnotes(html, sn, mn)
+
+	// Both get numbered as regular footnotes
+	testing.expect(t, strings.contains(out, `id="fnref-1">1</a></sup>`))
+	testing.expect(t, strings.contains(out, `id="fnref-2">2</a></sup>`))
+	testing.expect(t, strings.contains(out, `<li id="fn-1">sn def`))
+	testing.expect(t, strings.contains(out, `<li id="fn-2">mn def`))
+}
+
+@(test)
+test_inject_footnotes_no_defs :: proc(t: ^testing.T) {
+	html := "No notes here."
+	sn := make(map[string]string)
+	mn := make(map[string]string)
+	testing.expect(t, inject_footnotes(html, sn, mn) == html)
+}
+
+@(test)
+test_inject_footnotes_missing_def :: proc(t: ^testing.T) {
+	html := "Ref[^missing] end."
+	sn := map[string]string {
+		"other" = "x",
+	}
+	defer delete_map(sn)
+	mn := make(map[string]string)
+	defer delete_map(mn)
+
+	out := inject_footnotes(html, sn, mn)
+
+	testing.expect(t, strings.contains(out, "[^missing]"))
+	testing.expect(t, !strings.contains(out, "<section"))
+}
+
+@(test)
+test_inject_footnotes_inline_markdown :: proc(t: ^testing.T) {
+	html := "Text[^a] end."
+	sn := map[string]string {
+		"a" = "see [link](http://example.com) here",
+	}
+	defer delete_map(sn)
+	mn := make(map[string]string)
+	defer delete_map(mn)
+
+	out := inject_footnotes(html, sn, mn)
+
+	testing.expect(t, strings.contains(out, `<a href="http://example.com">link</a>`))
+}

@@ -243,6 +243,7 @@ site_apply_cli_flags :: proc(site: ^Site, flags: Flags) {
 
 	site.markdown_extensions += md.parse_extension_list(flags.md_enable)
 	site.markdown_extensions -= md.parse_extension_list(flags.md_disable)
+	md.resolve_extension_conflicts(&site.markdown_extensions)
 }
 
 site_allocator :: proc(site: ^Site) -> mem.Allocator {

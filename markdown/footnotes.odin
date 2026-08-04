@@ -174,23 +174,119 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 		note: string
 		defer delete(note)
 		if is_margin {
-			note = fmt.aprintf(
+			fmt.sbprintf(
+				&parts,
 				`<label for="mn-%s" class="margin-toggle"></label><input type="checkbox" id="mn-%s" class="margin-toggle"><span class="marginnote">%s</span>`,
 				id,
 				id,
 				def_html,
 			)
 		} else {
-			note = fmt.aprintf(
+			fmt.sbprintf(
+				&parts,
 				`<label for="fn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="fn-%s" class="margin-toggle"><span class="sidenote">%s</span>`,
 				id,
 				id,
 				def_html,
 			)
 		}
-		strings.write_string(&parts, note)
 
 		remaining = remaining[ref_end:]
+	}
+
+	return strings.to_string(parts)
+}
+
+// inject_footnotes finds [^id] and [*id] references in rendered HTML, numbers
+// them sequentially by order of appearance, and replaces them with <sup> links.
+// Appends a <section class="footnotes"><ol> at the end with definitions.
+// Both sidenote ([^id]) and marginnote ([*id]) references are treated equally.
+inject_footnotes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> string {
+	if len(sn_defs) == 0 && len(mn_defs) == 0 {
+		return html
+	}
+
+	parts: strings.Builder
+	strings.builder_init_len(&parts, 0)
+	defer strings.builder_destroy(&parts)
+
+	number_of: map[string]int = make(map[string]int, allocator = context.temp_allocator)
+	ordered_ids: [dynamic]string = make([dynamic]string, 0, allocator = context.temp_allocator)
+	next_num := 1
+
+	remaining := html
+
+	for {
+		sn_pos := strings.index(remaining, "[^")
+		mn_pos := strings.index(remaining, "[*")
+
+		is_margin := mn_pos >= 0 && (sn_pos < 0 || mn_pos < sn_pos)
+		pos := sn_pos
+		if is_margin {
+			pos = mn_pos
+		}
+		if pos < 0 {
+			strings.write_string(&parts, remaining)
+			break
+		}
+
+		strings.write_string(&parts, remaining[:pos])
+
+		close := strings.index(remaining[pos + 2:], "]")
+		if close < 0 {
+			strings.write_string(&parts, remaining[pos:])
+			break
+		}
+
+		id := remaining[pos + 2:pos + 2 + close]
+		ref_end := pos + 2 + close + 1
+
+		defs := sn_defs
+		if is_margin {
+			defs = mn_defs
+		}
+		def_text, found := defs[id]
+		if !found {
+			strings.write_string(&parts, remaining[pos:ref_end])
+			remaining = remaining[ref_end:]
+			continue
+		}
+
+		num, seen := number_of[id]
+		if !seen {
+			num = next_num
+			number_of[id] = num
+			next_num += 1
+			append(&ordered_ids, id)
+		}
+
+		fmt.sbprintf(&parts, `<sup><a href="#fn-%d" id="fnref-%d">%d</a></sup>`, num, num, num)
+
+		remaining = remaining[ref_end:]
+	}
+
+	if len(ordered_ids) > 0 {
+		strings.write_string(&parts, "\n<section class=\"footnotes\">\n<hr>\n<ol>\n")
+		for id in ordered_ids {
+			def_text, ok := sn_defs[id]
+			if !ok {
+				def_text, ok = mn_defs[id]
+			}
+			if !ok do continue
+
+			def_html := render_inline_md(def_text)
+			num := number_of[id]
+
+			fmt.sbprintf(
+				&parts,
+				`<li id="fn-%d">%s <a href="#fnref-%d" class="footnote-backref">↩︎</a></li>` +
+				"\n",
+				num,
+				def_html,
+				num,
+			)
+		}
+		strings.write_string(&parts, "</ol>\n</section>")
 	}
 
 	return strings.to_string(parts)

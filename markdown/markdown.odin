@@ -3,6 +3,7 @@ package markdown
 import cm "vendor:commonmark"
 
 import "core:encoding/json"
+import "core:log"
 import "core:strings"
 
 Extension :: enum {
@@ -13,6 +14,7 @@ Extension :: enum {
 	Sections,
 	HeadingIDs,
 	DefLists,
+	Footnotes,
 }
 
 DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts, .HeadingIDs, .DefLists}
@@ -27,7 +29,7 @@ process :: proc(
 	side_notes := make(map[string]string)
 	margin_notes := make(map[string]string)
 	clean_body := body
-	if .Sidenotes in ext {
+	if .Sidenotes in ext || .Footnotes in ext {
 		clean_body, side_notes, margin_notes = strip_definitions(body)
 	}
 	if .DefLists in ext {
@@ -40,7 +42,9 @@ process :: proc(
 	if .Emoji in ext {
 		html = expand_emoji(html)
 	}
-	if .Sidenotes in ext {
+	if .Footnotes in ext {
+		html = inject_footnotes(html, side_notes, margin_notes)
+	} else if .Sidenotes in ext {
 		html = inject_notes(html, side_notes, margin_notes)
 	}
 	if .Alerts in ext {
@@ -63,8 +67,11 @@ parse_extension_list :: proc(s: string) -> (result: bit_set[Extension]) {
 	for part in strings.split(s, ",", allocator = context.temp_allocator) {
 		name := strings.to_lower(strings.trim_space(part), allocator = context.temp_allocator)
 		e, ok := extension_from_name(name)
-		if !ok && name != "" {
-			panic("!ok") // TODO: handle this
+		if !ok {
+			if name != "" {
+				log.warnf("unknown extension '%s'", name)
+			}
+			continue
 		}
 		result += {e}
 	}
@@ -103,10 +110,21 @@ extension_from_name :: proc(name: string) -> (e: Extension, ok: bool) {
 		e = .HeadingIDs
 	case "deflists":
 		e = .DefLists
+	case "footnotes":
+		e = .Footnotes
 	case:
 	// Do nothing
 	}
 
 	return e, ok || e != .Emoji
+}
+
+// resolve_extension_conflicts resolves mutually exclusive extensions.
+// Footnotes and Sidenotes share the same [^id] syntax but render differently;
+// if both are enabled (e.g. from defaults + CLI), Footnotes wins.
+resolve_extension_conflicts :: proc(ext: ^bit_set[Extension]) {
+	if .Footnotes in ext^ && .Sidenotes in ext^ {
+		ext^ -= {.Sidenotes}
+	}
 }
 
