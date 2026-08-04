@@ -1,7 +1,5 @@
 package markdown
 
-import cm "vendor:commonmark"
-
 import "core:fmt"
 import "core:strings"
 
@@ -171,9 +169,7 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 		}
 
 		// Render definition through cmark for markdown support
-		raw_html := cm.markdown_to_html_from_string(def_text, {.Unsafe})
-		defer cm.free_string(raw_html)
-		def_html := strip_p_tags(raw_html)
+		def_html := render_inline_md(def_text)
 
 		note: string
 		defer delete(note)
@@ -198,17 +194,5 @@ inject_notes :: proc(html: string, sn_defs, mn_defs: map[string]string) -> strin
 	}
 
 	return strings.to_string(parts)
-}
-
-// strip_p_tags removes surrounding <p></p> if the HTML is a single paragraph.
-strip_p_tags :: proc(html: string) -> string {
-	s := html
-	if len(s) > 0 && s[len(s) - 1] == '\n' {
-		s = s[:len(s) - 1]
-	}
-	if strings.has_prefix(s, "<p>") && strings.has_suffix(s, "</p>") {
-		return s[3:len(s) - 4]
-	}
-	return s
 }
 

@@ -79,6 +79,7 @@ thor/
 | | `sectionate.odin` | `wrap_sections` — splits HTML at `<h2>` into `<section>` wrappers |
 | | `highlight.odin` | Syntax highlighting via tree-sitter. Imports `../treesitter`. |
 | | `heading_ids.odin` | `inject_heading_ids` — adds `id` attributes to `<h1>`-`<h6>` from heading text. Slug-based, deduplicated. |
+| | `deflists.odin` | `convert_deflists` — pre-cmark pass. Scans for definition list patterns (`term\n\n: definition`) and converts to `<dl><dt><dd>` HTML blocks. Terms and definitions rendered through cmark individually for inline markdown. Consecutive pairs grouped into single `<dl>`. |
 | | `toc.odin` | `generate_toc(html, allocator)` — page-level feature (not a pipeline extension). Scans `<h1>`-`<h6>` for IDs (after `inject_heading_ids`), builds nested `<ul>` with `<a href="#id">` links. Called from `load_page` when frontmatter `"toc": true`. Depends on `.HeadingIDs` being enabled. |
 | `mustache/` | See [Mustache engine](#mustache-engine) below | Template engine |
 | `bench/` | `bench.odin` + `templates/` | Standalone template rendering benchmark. Generates 500 posts + 100 comments, renders with indented partials + inheritance + pipes. `--dump <path>` for output validation, positional arg for iteration count (default 250). |
@@ -177,7 +178,7 @@ Config is split into three structs with a clear 5-step initialization flow:
 
 **`Feature` enum** — `Drafts`, `Minify`, `Watch`. Checked with `.Minify in site.features`.
 
-**`markdown.Extension` enum** (in the `markdown` package, not main) — `Emoji`, `Sidenotes`, `Alerts`, `Highlight`, `Sections`, `HeadingIDs`. Default is `md.DEFAULT_EXTENSIONS` (currently `.Emoji, .Sidenotes, .Alerts, .HeadingIDs`). Configurable via:
+**`markdown.Extension` enum** (in the `markdown` package, not main) — `Emoji`, `Sidenotes`, `Alerts`, `Highlight`, `Sections`, `HeadingIDs`, `DefLists`. Default is `md.DEFAULT_EXTENSIONS` (currently `.Emoji, .Sidenotes, .Alerts, .HeadingIDs, .DefLists`). Configurable via:
 - `thor.json`: `"markdown_extensions": { "emoji": true, "highlight": false, ... }`
 - CLI: `-ext:highlight,sections` (enable) / `-no-ext:emoji` (disable). Comma-separated, case-insensitive.
 
@@ -258,6 +259,7 @@ Lives in the `markdown` package. Entry point: `md.process(body, ext, file_path)`
 ```
 raw markdown
   → md.strip_definitions     (if .Sidenotes — pre-cmark)
+  → md.convert_deflists      (if .DefLists — pre-cmark)
   → cmark markdown_to_html   (Unsafe mode for HTML passthrough)
   → md.expand_emoji          (if .Emoji — post-cmark)
   → md.inject_notes          (if .Sidenotes — post-cmark)

@@ -12,9 +12,10 @@ Extension :: enum {
 	Highlight,
 	Sections,
 	HeadingIDs,
+	DefLists,
 }
 
-DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts, .HeadingIDs}
+DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts, .HeadingIDs, .DefLists}
 
 // Caller is responsible for freeing string
 process :: proc(
@@ -28,6 +29,9 @@ process :: proc(
 	clean_body := body
 	if .Sidenotes in ext {
 		clean_body, side_notes, margin_notes = strip_definitions(body)
+	}
+	if .DefLists in ext {
+		clean_body = convert_deflists(clean_body, allocator)
 	}
 	original_html := cm.markdown_to_html_from_string(clean_body, {.Unsafe})
 	html := strings.clone(original_html, allocator)
@@ -71,6 +75,8 @@ parse_extension_list :: proc(s: string) -> (result: bit_set[Extension]) {
 			result += {.Sections}
 		case "heading_ids":
 			result += {.HeadingIDs}
+		case "deflists":
+			result += {.DefLists}
 		}
 	}
 	return result
@@ -94,6 +100,8 @@ apply_extension_config :: proc(ext: ^bit_set[Extension], config: json.Object) {
 			if enabled {ext^ += {.Sections}} else {ext^ -= {.Sections}}
 		case "heading_ids":
 			if enabled {ext^ += {.HeadingIDs}} else {ext^ -= {.HeadingIDs}}
+		case "deflists":
+			if enabled {ext^ += {.DefLists}} else {ext^ -= {.DefLists}}
 		}
 	}
 }

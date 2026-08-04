@@ -82,9 +82,7 @@ TODO: Describe
 
 TODO: Don't forget to highlight differences from Hugo.
 
-## Templates[^tempmod]
-
-[^tempmod]: Template modification is an "advanced" feature, and shoud probably be discussed later in the page. (or possibly in the guide.)
+## Templates
 
 Sites are built using one or more template files written in an extended version of [mustache](https://mustache.github.io) templates. The [mustache manual](https://mustache.github.io/mustache.5.html) has great explainations and a lot of examples if you want to know more, but I'll summarize them for you here.
 

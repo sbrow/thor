@@ -118,6 +118,7 @@
   - Checks all links on each page to make sure they are valid.
 - [ ] Peruse [GitHub's](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
       docs for any juicy nuggets we may have missed.
+- [ ] Avoid using `render_inline_md` if possible.
 
 ## Dates
 - [ ] display an error when no part of the date appears in the output.

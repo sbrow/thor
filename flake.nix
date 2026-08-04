@@ -158,6 +158,7 @@
               tree-sitter
 
               gdb
+              perf
 
               # IDE
               unstable.helix
