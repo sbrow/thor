@@ -62,22 +62,11 @@ process :: proc(
 parse_extension_list :: proc(s: string) -> (result: bit_set[Extension]) {
 	for part in strings.split(s, ",", allocator = context.temp_allocator) {
 		name := strings.to_lower(strings.trim_space(part), allocator = context.temp_allocator)
-		switch name {
-		case "emoji":
-			result += {.Emoji}
-		case "sidenotes":
-			result += {.Sidenotes}
-		case "alerts":
-			result += {.Alerts}
-		case "highlight":
-			result += {.Highlight}
-		case "sections":
-			result += {.Sections}
-		case "heading_ids":
-			result += {.HeadingIDs}
-		case "deflists":
-			result += {.DefLists}
+		e, ok := extension_from_name(name)
+		if !ok && name != "" {
+			panic("!ok") // TODO: handle this
 		}
+		result += {e}
 	}
 	return result
 }
@@ -87,22 +76,37 @@ apply_extension_config :: proc(ext: ^bit_set[Extension], config: json.Object) {
 	for name, val in config {
 		// TODO: Silently discards invalid values.
 		enabled := val.(json.Boolean) or_continue
-		switch name {
-		case "emoji":
-			if enabled {ext^ += {.Emoji}} else {ext^ -= {.Emoji}}
-		case "sidenotes":
-			if enabled {ext^ += {.Sidenotes}} else {ext^ -= {.Sidenotes}}
-		case "alerts":
-			if enabled {ext^ += {.Alerts}} else {ext^ -= {.Alerts}}
-		case "highlight":
-			if enabled {ext^ += {.Highlight}} else {ext^ -= {.Highlight}}
-		case "sections":
-			if enabled {ext^ += {.Sections}} else {ext^ -= {.Sections}}
-		case "heading_ids":
-			if enabled {ext^ += {.HeadingIDs}} else {ext^ -= {.HeadingIDs}}
-		case "deflists":
-			if enabled {ext^ += {.DefLists}} else {ext^ -= {.DefLists}}
+		e := extension_from_name(name) or_continue
+
+		if enabled {
+			ext^ += {e}
+		} else {
+			ext^ -= {e}
 		}
 	}
+}
+
+extension_from_name :: proc(name: string) -> (e: Extension, ok: bool) {
+	switch name {
+	case "emoji":
+		e = .Emoji
+		ok = true
+	case "sidenotes":
+		e = .Sidenotes
+	case "alerts":
+		e = .Alerts
+	case "highlight":
+		e = .Highlight
+	case "sections":
+		e = .Sections
+	case "heading_ids":
+		e = .HeadingIDs
+	case "deflists":
+		e = .DefLists
+	case:
+	// Do nothing
+	}
+
+	return e, ok || e != .Emoji
 }
 
