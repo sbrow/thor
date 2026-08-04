@@ -227,7 +227,7 @@ format_error :: proc(
 	}
 	strings.write_string(&sb, "--> ")
 	strings.write_string(&sb, reset)
-	strings.write_string(&sb, fmt.tprintf("%s:%d:%d\n", path, line, col))
+	fmt.sbprintf(&sb, "%s:%d:%d\n", path, line, col)
 
 	// Top gutter line.
 	write_gutter(&sb, width, faint, reset)

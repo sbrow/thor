@@ -7,10 +7,9 @@ import "core:time"
 generate_rss :: proc(site: ^Site) -> string {
 	sb := strings.builder_make()
 
-	strings.write_string(
+	fmt.sbprintf(
 		&sb,
-		fmt.aprintf(
-			`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+		`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 <title>%s</title>
@@ -18,11 +17,10 @@ generate_rss :: proc(site: ^Site) -> string {
 <description>%s</description>
 <language>en-us</language>
 <atom:link href="%s/index.xml" rel="self" type="application/rss+xml"/>`,
-			xml_escape(site.title),
-			site.base_url,
-			xml_escape(site.description),
-			site.base_url,
-		),
+		xml_escape(site.title),
+		site.base_url,
+		xml_escape(site.description),
+		site.base_url,
 	)
 
 	for page in site.pages {
@@ -35,10 +33,9 @@ generate_rss :: proc(site: ^Site) -> string {
 			pub_date = format_rfc822(page.date)
 		}
 
-		strings.write_string(
+		fmt.sbprintf(
 			&sb,
-			fmt.aprintf(
-				`<item>
+			`<item>
 <title>%s</title>
 <link>%s</link>
 <pubDate>%s</pubDate>
@@ -46,12 +43,11 @@ generate_rss :: proc(site: ^Site) -> string {
 <description>%s</description>
 </item>
 `,
-				xml_escape(page.title),
-				page.url,
-				pub_date,
-				page.url,
-				xml_escape(page.content),
-			),
+			xml_escape(page.title),
+			page.url,
+			pub_date,
+			page.url,
+			xml_escape(page.content),
 		)
 	}
 
@@ -70,11 +66,11 @@ generate_sitemap :: proc(site: ^Site) -> string {
 	)
 
 	for page in site.pages {
-		lastmod := ""
+		fmt.sbprintf(&sb, "<url><loc>%s</loc>", page.url)
 		if page.date != "" {
-			lastmod = fmt.aprintf("<lastmod>%s</lastmod>", page.date)
+			fmt.sbprintf(&sb, "<lastmod>%s</lastmod>", page.date)
 		}
-		strings.write_string(&sb, fmt.aprintf("<url><loc>%s</loc>%s</url>\n", page.url, lastmod))
+		fmt.sbprintf(&sb, "</url>\n")
 	}
 
 	// Section index pages (for sections without an index in content)
@@ -103,14 +99,11 @@ generate_sitemap :: proc(site: ^Site) -> string {
 				section_lastmod = page.date
 			}
 		}
-		lm := ""
+		fmt.sbprintf(&sb, "<url><loc>%s/%s/</loc>", site.base_url, section)
 		if section_lastmod != "" {
-			lm = fmt.aprintf("<lastmod>%s</lastmod>", section_lastmod)
+			fmt.sbprintf(&sb, "<lastmod>%s</lastmod>", section_lastmod)
 		}
-		strings.write_string(
-			&sb,
-			fmt.aprintf("<url><loc>%s/%s/</loc>%s</url>\n", site.base_url, section, lm),
-		)
+		fmt.sbprintf(&sb, "</url>\n")
 	}
 
 	strings.write_string(&sb, "</urlset>")
