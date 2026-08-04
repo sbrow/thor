@@ -3,8 +3,13 @@
 <main>
   <article>
     <h1>{{page.title}}</h1>
-    {{#date}} <time class="subtitle" datetime="{{date}}">{{ date | format}}</time>
-    {{/date}} {{&content}}
+    {{#date}}<time class="subtitle" datetime="{{date}}">{{ date | format}}</time>{{/date}}
+    {{#page.toc}}
+    <nav class="toc">
+    {{&page.toc}}
+    </nav>
+    {{/page.toc}}
+    {{&content}}
   </article>
 </main>
 {{/main}}

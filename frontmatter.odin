@@ -16,6 +16,7 @@ Frontmatter :: struct {
 	layout:      string,
 	og:          Open_Graph,
 	draft:       bool,
+	toc:         bool,
 }
 
 // parse_frontmatter splits raw file content into a Frontmatter struct and the
@@ -56,6 +57,7 @@ parse_frontmatter :: proc(content: string) -> (fm: Frontmatter, body: string, ok
 	fm.publishDate = json_get_string(obj, "publishDate")
 	fm.weight = json_get_int(obj, "weight")
 	fm.draft = json_get_bool(obj, "draft")
+	fm.toc = json_get_bool(obj, "toc")
 	if v, ok := obj["menus"]; ok {
 		fm.menus = v
 	}

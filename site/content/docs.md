@@ -1,9 +1,8 @@
 {
   "title": "Docs",
-  "date": "2026-07-22T08:54:00-04:00"
+  "date": "2026-07-22T08:54:00-04:00",
+  "toc": true
 }
-
-[TOC]
 
 ## Introduction
 
@@ -32,33 +31,37 @@ TODO: Do we minify inline css?
 - syntax highlighting
 - heading ids
 - TODO: Table Of Contents Generation
+- [GitHub style alerts](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
 
 
 ## Directories
-Like Hugo, a Thor project is a collection of specially named directories, plus a config file. 
+Like Hugo, a Thor project is a collection of specially named directories, plus an optional config file. All directories are optional, but it is recommended to at least have a `content` directory.
 
 content
 
-: `content` holds your pages and page bundles.
-
-layouts
-
-: `layouts` holds your templates and partials. 
+: `content` holds your pages and page bundles. See [Content](#content). If not found, thor will look for content files in the root of your current working directory.
 
  assets
  : `assets` contains any static files for your site (favicon.ico, etc.), as well as files you want to send through the asset pipeline (CSS or JS files). 
+ 
+layouts
+
+: `layouts` holds your templates and partials. See [Templates](#templates).
 
  public
  : `public` will contain your completed site.
 
-All of these names can be remapped in `thor.json`. 
+All of these names can be remapped in `thor.json`.[^remap] 
 
-> [!NOTE] While directories can be remapped at the site level, modules must (currently) adhere to the defaults.
+[^remap]: While directories can be remapped at the site level, modules must (currently) adhere to the defaults.
 
-### Asset pipeline
+### Assets
 
-Currently, there is only one asset processor, and that is [the minifier](#minify). 
+Currently, there is only one asset processor, and that is [the minifier](#minify), though more are planned (i.e. Image processing).
 
+TODO: Expand
+
+## Content
 ### Pages & Page Bundles
 
 Page content can either be defined in a single file (`contact.md`), or in a directory  (`contact/index.md` + `contact/our-team.jpg`). Single file pages are preferred to page bundles.[^1]
@@ -67,21 +70,39 @@ Page content can either be defined in a single file (`contact.md`), or in a dire
 
 Thor currently supports 2 formats for page files: MarkDown (`.md`),  and HTML (`.html`). 
 
+TODO: Content
+
+### Frontmatter
+
+TODO: Frontmatter
+
+## Menus
+
+TODO: Describe
+
+TODO: Don't forget to highlight differences from Hugo.
+
 ## Templates[^tempmod]
 
 [^tempmod]: Template modification is an "advanced" feature, and shoud probably be discussed later in the page. (or possibly in the guide.)
 
 Sites are built using one or more template files written in an extended version of [mustache](https://mustache.github.io) templates. The [mustache manual](https://mustache.github.io/mustache.5.html) has great explainations and a lot of examples if you want to know more, but I'll summarize them for you here.
 
+The beauty of Mustache is that there is very little syntax; there are just 10 symbols you need learn: `{{`, `{{&`, `{{^`, `{{>`, `{{<`, `{{#`, `/}}`, `{{$`, `{{!`, and `|`.
+
+TODO: ^^ Badly worded sentence ^^
+
+TODOS: Gotta describe base templates somewhere. (the same way we describe the partials)
+
 ### Tags
 
 #### Variables
 
-In order do display a scalar (not-list) value in your template, simply wrap it in double curly braces. e.g. `{{ page.title }}`.
+In order to display a scalar (not-list) value in your template, simply wrap it in double curly braces. e.g. `{{ page.title }}`.
 
-This content will be HTML escaped (for safety), so if the value you're rendering contains html, you'll need to use the raw syntex instead `{{& page.title}}` which will output the value without stripping or re-writing content.
+This content will be HTML escaped (for safety), so if the value you're rendering contains HTML, you'll need to use the raw syntex instead `{{& page.title}}`[^raw] which will output the value without stripping or re-writing content.
 
-`{{{ raw }}}` syntax is supported for raw html output, but `{{& raw }}` is preferred, as it's easy to accidentily insert too many braces.
+[^raw]: Official Triple brace syntax (`{{{ raw }}}`) is also supported, but `{{& raw }}` is preferred, as it's easy to accidentily insert too many braces.
 
 In most[^most] cases, invalid keys will be silently ignored (nothing between the braces will appear), in keeping with the official mustache spec.
 
@@ -118,7 +139,7 @@ TODO:
 
 ### Section Names
 
-When building your own templates, you are of course free to pick whatever names you choose for your partials and content slots. However, sticking to conventions helps create consistency in the ecosystem, and reduces friction when relying on a built-in template.
+When building your own templates, you are of course free to pick whatever names you choose for your partials and content slots. However, sticking to conventions helps create consistency in the ecosystem, and reduces friction when relying on built-in templates.
 
 `{{$main}}...{{/main}}`
 
@@ -144,13 +165,6 @@ When building your page(s), the following keys are accessible to your template f
 
 : The Current `DateTime`. see [DateTime](#datetimes)
 
-`title`
-
-: The title of the current page. Unless overridden, it will be expand to
-  `{{ page.title }} | {{ site.title }}`. [^title]
-
-  [^title]: Is there actually a way to overwrite this?
-
 `date_format`
 
 : The default format to use for dates. Configured in `thor.json:date.format`. 
@@ -167,10 +181,16 @@ When building your page(s), the following keys are accessible to your template f
 
 : Returns all regular pages, sorted by `?`. Regular pages exclude index pages like home and section roots.
 
+`posts`
+: TODO: Section groupings
+
 `og`
 
 : Contains the [Open Graph](https://ogp.me/) metadata for the current page.
 
+`menus`
+
+: The site's constructed menus. See [menus](#menus).
 #### Page
 
 `page.content`
@@ -191,6 +211,11 @@ TODO: Write
 
 : The author of the current page or site. See [schema.org](https://schema.org/author) for the recommended format.
 
+`stylesheets`
+
+:  A list of paths to css files the users wants to include globally. These are rendered by the `{{> styles }}` partial, and can be omitted on sites that use custom templates. 
+
+TODO: ^^ Bad sentence? ^^
 
 #### The Context Stack 
 When building your page(s), each template is fed a Context[^ctx] stack that contains all the data should you need to build your page.
@@ -260,7 +285,7 @@ Because mustache is a logic-less language, (there are no `for` or `if` tags), Th
 
 Thor allows you to chain two or more pipes, to allow complex data manipulation. However for performance and stylistic reasons, you are limited to no more than **8 pipes**[^pipes] for any given tag. If you believe you need more than 8 pipes, please [open an issue](../issues) with a **concrete example** of the problem you are facing.
 
-[^pipes]: TODO: THis number must be kept in-sync with `MAX_PIPES`.
+[^pipes]: TODO: This number must be kept in-sync with `MAX_PIPES`.
 
 **Examples:**
 
@@ -275,15 +300,52 @@ Thor allows you to chain two or more pipes, to allow complex data manipulation. 
 
 ### Partials
 
-Partials are templates that render a portion of a page. To include a partial, the standard [mustache syntax](https://mustache.github.io/mustache.5.html#Partials) is used. All partials are resolved relative to the root partials directory, so to include a partial at `layouts/partials/my_partial.html`, you would use `{{> my_partial}}`.
+Partials are templates that render a portion of a page. To include a partial, the standard [mustache syntax](https://mustache.github.io/mustache.5.html#Partials) is used. All partials are resolved relative to the root partial's directory, so to include a partial at `layouts/partials/my_partial.html`, you would use `{{> my_partial}}`.
 
 Users can create or override as many partials as they want; several are included for convienience:
 
-`{{> opengraph}}`
+`{{> title }}`
+
+: The title of the current page. It should be placed inside the `<title>` tag. By default, it will appear as
+  `{{ page.title }} | {{ site.title }}`.
+
+`{{> nav }}`
+
+: Nav renders the main menu for the site (`menus.main`). It should be placed inside the `<body>` tag, just before the `<main>` block.
+
+`{{> home-link }}`
+
+: This partial is rendered inside the home anchor in `{{> nav }}`. By default, it wil display the  name of the site, or `Home` if no name is set.
+
+`{{> styles }}`
+
+: This partial renders any stylesheets specified either by the user (via `params.stylesheets`) or by the theme author (specified directly in the template). `params.stylesheets` is intended as an escape hatch for users that want to add CSS to their site, but don't want to customize any templates. Styles should be placed inside the `<head>` tags.
+
+`{{> scripts }}`
+
+: This partial renders any script tags specified either by the user (via `params.scripts`) or by the theme author (specified directly in the template). `params.scripts` is intended as an escape hatch for users that want to add javascript to their site, but don't want to customize any templates. Scripts should be placed at the end of the `<head>` block.
+
+TODO: Scripts must currently be given in raw form, whereas styles are just paths/urs.
+
+`{{> opengraph }}`
 
 : This partial willl render the Open Graph meta tags for your page. It should be placed inside the `<head>` tag. See the [Open Graph](#open-graph) section for more details.
 
+`{{> footer }}`
+
+: This partial will render content on every page after the main page content. It should be placed at the end of the `<body>` tag. By default, it displays a simple copyright line with the current year and author's name (configured in `params.author.name`).
+
+TODO: `styles`/`css`?
+
+TODO: `comments`?
+
+TODO: `toc`?
+
+TODO: We keep referring to blocks and tags, should probably use consistent language.
+
 ### DateTimes
+
+TODO: Should this be a subsection of a "Data Types" section?
 
 Dates are strings in one of the following formats:
 
@@ -297,10 +359,6 @@ Dates are strings in one of the following formats:
 | `15 Oct 2023`               | Default is local system time |
 
 If you want to display a date in a different format, you can use the `| format` Filter. With no argument, it will default to formatting the date with `site.date_format`.
-
-## Menus
-
-TODO: Describe
 
 ## Open Graph
 

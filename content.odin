@@ -28,6 +28,7 @@ Page :: struct {
 	content:     string,
 	og:          Open_Graph,
 	draft:       bool,
+	toc:         string,
 	_is_index:   bool `private`,
 }
 
@@ -278,6 +279,10 @@ load_page :: proc(
 		page.content = strings.clone(body, context.allocator)
 	} else {
 		page.content = md.process(body, ext, file_path, context.allocator)
+	}
+
+	if fm.toc {
+		page.toc = md.generate_toc(page.content, context.allocator)
 	}
 
 	ok = true

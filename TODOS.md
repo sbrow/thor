@@ -110,6 +110,12 @@
 - [ ] Add opt-in deflist support.
 - [x] Decide if lambdas actually provide any value.
 - [ ] add tables extension
+- [x] Table of contents support.
+  - [ ] enable template level rendering of TOCs
+  - [ ] Write css for toc sidebar and figure out where to put it.
+  - [ ] Add [hugo style configuration](https://gohugo.io/configuration/markup/#table-of-contents)
+- [ ] Link checker?
+  - Checks all links on each page to make sure they are valid.
 - [ ] Peruse [GitHub's](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
       docs for any juicy nuggets we may have missed.
 
@@ -194,7 +200,6 @@ main :: proc () {
 - [ ] include-code shortcode (`{{< include-code ... >}}`) — i-ported-fd-to-odin
 - [ ] follow symlinks in `scan_content`?
 - [ ] ensure sidenote numbers render in display order and not in declaration order.
-- [ ] Table of contents support.
 - [ ] Nav items should be active when the current page is selected.
 - [ ] Theme selector for syntax highlighting.
   - use http://github.com/helix-editor/helix/tree/master/runtime/themes) as a
