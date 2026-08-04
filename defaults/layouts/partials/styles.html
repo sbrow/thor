@@ -1,1 +1,223 @@
+<style>
+/* Base layout */
+body {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* Sidenote layout — activates only when sidenote elements are present */
+body:has(.sidenote, .marginnote) {
+  counter-reset: sidenote-counter;
+  padding-left: 12.5%;
+  width: 87.5%;
+}
+
+body:has(.sidenote, .marginnote) main {
+  max-width: none;
+  width: 60%;
+  margin: 0;
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Superscript (footnote refs) */
+sup {
+  line-height: 0;
+}
+
+/* Code blocks */
+code,
+pre>code {
+  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 1.0rem;
+  line-height: 1.42;
+  -webkit-text-size-adjust: 100%;
+}
+
+pre>code {
+  font-size: 0.9rem;
+  overflow-x: auto;
+  display: block;
+}
+
+/* Alerts (GitHub-style) */
+.alert {
+  border-left: 4px solid;
+  border-radius: 0 4px 4px 0;
+  padding: 0.5rem 1rem;
+  margin-inline-start: 0;
+}
+
+.alert-title {
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.alert-note {
+  border-left-color: #3b82f6;
+}
+
+.alert-tip {
+  border-left-color: #22c55e;
+}
+
+.alert-important {
+  border-left-color: #a855f7;
+}
+
+.alert-warning {
+  border-left-color: #eab308;
+}
+
+.alert-caution {
+  border-left-color: #ef4444;
+}
+
+/* Definition lists */
+dl,
+ol,
+ul {
+  font-size: 1.4rem;
+  line-height: 2rem;
+}
+
+dt:not(:first-child) {
+  margin-top: 0.25rem;
+}
+
+dd {
+  margin-left: 0;
+}
+
+/* Sidenotes, margin notes */
+.sidenote,
+.marginnote {
+  float: right;
+  clear: right;
+  margin-right: -45%;
+  width: 40%;
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+  font-size: 0.85em;
+  line-height: 1.5;
+  vertical-align: baseline;
+  position: relative;
+}
+
+.sidenote-number {
+  counter-increment: sidenote-counter;
+}
+
+.sidenote-number:after,
+.sidenote:before {
+  position: relative;
+  vertical-align: baseline;
+  color: var(--color-accent, currentColor);
+}
+
+.sidenote-number:after {
+  content: counter(sidenote-counter);
+  font-size: 0.8rem;
+  top: -0.5rem;
+  left: 0.1rem;
+}
+
+.sidenote:before {
+  content: counter(sidenote-counter) " ";
+  font-size: 0.8rem;
+  top: -0.5rem;
+}
+
+blockquote .sidenote,
+blockquote .marginnote {
+  margin-right: -82%;
+  min-width: 59%;
+  text-align: left;
+}
+
+.marginnote>code,
+.sidenote>code {
+  font-size: 1rem;
+}
+
+input.margin-toggle {
+  display: none;
+}
+
+label.sidenote-number {
+  display: inline-block;
+  max-height: 2rem;
+}
+
+label.margin-toggle:not(.sidenote-number) {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  body {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  body:has(.sidenote, .marginnote) {
+    padding-left: 8%;
+    padding-right: 8%;
+    width: 84%;
+  }
+
+  body:has(.sidenote, .marginnote) main {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  pre>code {
+    width: 97%;
+  }
+
+  img {
+    width: 100%;
+  }
+
+  label.margin-toggle:not(.sidenote-number) {
+    display: inline;
+  }
+
+  label.margin-toggle:not(.sidenote-number)::after {
+    content: "\2295";
+  }
+
+  .sidenote,
+  .marginnote {
+    display: none;
+  }
+
+  .margin-toggle:checked+.sidenote,
+  .margin-toggle:checked+.marginnote {
+    display: block;
+    float: left;
+    left: 1rem;
+    clear: both;
+    width: 95%;
+    margin: 1rem 2.5%;
+    vertical-align: baseline;
+    position: relative;
+  }
+
+  label {
+    cursor: pointer;
+  }
+}
+</style>
 {{#params.stylesheets}}<link rel="stylesheet" href="{{.}}">{{/params.stylesheets}}
