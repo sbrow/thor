@@ -1,6 +1,7 @@
 ## High priority
 
 - Polish existing features before moving on to new ones.
+- [ ] Do mustache's whitespace rules actually suit us, or should we make our own? 
 - [x] `{{>title}}` default partial? `{{site.title}} | {{ page.title }}`
 - [ ] implicit titles (Set when missing?)
 - [ ] create a default `head.html`.
