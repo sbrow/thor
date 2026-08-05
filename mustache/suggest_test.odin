@@ -6,6 +6,8 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:testing"
 
+import diags "../diagnostics"
+
 Inner :: struct {
 	foo: string,
 	bar: int,
@@ -154,30 +156,6 @@ test_validate_map_path_silent :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_suggest_correction_exact :: proc(t: ^testing.T) {
-	available := []string{"title", "page.title", "body"}
-	testing.expect_value(t, suggest_correction(available, "page_titel"), "page.title")
-}
-
-@(test)
-test_suggest_correction_close :: proc(t: ^testing.T) {
-	available := []string{"title", "body", "now"}
-	testing.expect_value(t, suggest_correction(available, "titel"), "title")
-}
-
-@(test)
-test_suggest_correction_no_match :: proc(t: ^testing.T) {
-	available := []string{"completely_different", "unrelated"}
-	testing.expect_value(t, suggest_correction(available, "page_titel"), "")
-}
-
-@(test)
-test_suggest_correction_empty :: proc(t: ^testing.T) {
-	testing.expect_value(t, suggest_correction([]string{}, "anything"), "")
-	testing.expect_value(t, suggest_correction([]string{"a"}, ""), "")
-}
-
-@(test)
 test_warn_no_false_positive_for_valid_keys :: proc(t: ^testing.T) {
 	Data :: struct {
 		name: string,
@@ -244,7 +222,7 @@ test_validate_key_path_map_typo :: proc(t: ^testing.T) {
 	ok, missing, available := validate_key_path(ctx[:], "params.authr")
 	testing.expect(t, !ok, "typo of map key should not be ok")
 	testing.expect_value(t, missing, "authr")
-	suggestion := suggest_correction(available, "authr")
+	suggestion := diags.suggest_correction(available, "authr")
 	testing.expect_value(t, suggestion, "author")
 }
 

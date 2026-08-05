@@ -6,6 +6,8 @@ import "core:log"
 import "core:reflect"
 import "core:strings"
 import "core:time"
+
+import diags "../diagnostics"
 import "core:time/datetime"
 
 // MAX_PIPES was chosen arbitrarily. It holds no performance or logical
@@ -260,7 +262,7 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 	op, ok := pipe_op_from_string(filter.op)
 	if !ok {
 		hint := ""
-		suggestion := suggest_correction(pipe_op_candidates(), filter.op)
+		suggestion := diags.suggest_correction(pipe_op_candidates(), filter.op)
 		if suggestion != "" {
 			hint = fmt.tprintf("did you mean '%s'?", suggestion)
 		}

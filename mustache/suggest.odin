@@ -3,6 +3,8 @@ package mustache
 import "base:runtime"
 import "core:strings"
 
+import diags "../diagnostics"
+
 // collect_struct_keys enumerates the visible field names of a struct value,
 // including fields promoted via `using`-embedded structs.
 collect_struct_keys :: proc(val: any, allocator := context.temp_allocator) -> []string {
@@ -130,7 +132,7 @@ validate_key_path :: proc(
 				continue
 			}
 			available := collect_map_keys(current, allocator)
-			if suggest_correction(available, parts[i]) != "" {
+			if diags.suggest_correction(available, parts[i]) != "" {
 				return false, parts[i], available
 			}
 			return true, "", nil
@@ -153,30 +155,6 @@ validate_key_path :: proc(
 	}
 
 	return true, "", nil
-}
-
-// suggest_correction returns the closest match from `available` to `missing`
-// using Levenshtein distance, or "" if no good match exists. The threshold
-// scales with the length of the missing key.
-suggest_correction :: proc(available: []string, missing: string) -> string {
-	if len(available) == 0 || len(missing) == 0 {
-		return ""
-	}
-	threshold := max(2, len(missing) / 3)
-
-	best: string
-	best_dist := threshold + 1
-	for candidate in available {
-		if abs(len(candidate) - len(missing)) > threshold {
-			continue
-		}
-		d := strings.levenshtein_distance(missing, candidate)
-		if d <= threshold && d < best_dist {
-			best = candidate
-			best_dist = d
-		}
-	}
-	return best
 }
 
 // collect_partial_names enumerates the keys of the partials map.

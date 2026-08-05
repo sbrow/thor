@@ -32,6 +32,7 @@ thor/
 ├── treesitter/         # FFI types + grammar management (standalone package)
 ├── markdown/           # Content transformation pipeline (imports ../treesitter)
 ├── mustache/           # Template engine with lambdas + pipe filters + diagnostics
+├── diagnostics/        # Shared diagnostic utilities (suggest_correction)
 ├── content.odin        # Page struct, Pending_File, scan_content_files, collect_languages, load_page
 ├── render.odin         # Template rendering, Template_Context, sort_pages, RSS, sitemap
 ├── menus.odin          # Menu_Entry, DEFAULT_WEIGHT, build_menus, collect_auto_menus, merge_page_menus, parse_page_menus, parse_config_menus
@@ -82,6 +83,7 @@ thor/
 | | `deflists.odin` | `convert_deflists` — pre-cmark pass. Scans for definition list patterns (`term\n\n: definition`) and converts to `<dl><dt><dd>` HTML blocks. Terms and definitions rendered through cmark individually for inline markdown. Consecutive pairs grouped into single `<dl>`. |
 | | `toc.odin` | `generate_toc(html, allocator)` — page-level feature (not a pipeline extension). Scans `<h1>`-`<h6>` for IDs (after `inject_heading_ids`), builds nested `<ul>` with `<a href="#id">` links. Called from `load_page` when frontmatter `"toc": true`. Depends on `.HeadingIDs` being enabled. |
 | `mustache/` | See [Mustache engine](#mustache-engine) below | Template engine |
+| `diagnostics/` | `diagnostics.odin` | Shared diagnostic utilities: `suggest_correction` (Levenshtein "did you mean?"), `format_error` (rust-style multi-line error formatter with `caret_start`/`caret_end` params), `line_col`, `line_text`, `count_lines`, `digit_count`, `display_width`, `should_colorize`, `write_gutter`. Used by `mustache` (tag-aware errors via `format_tag_error` wrapper), `markdown` (extension name suggestions), and `render.odin` (parse/render error display). |
 | `bench/` | `bench.odin` + `templates/` | Standalone template rendering benchmark. Generates 500 posts + 100 comments, renders with indented partials + inheritance + pipes. `--dump <path>` for output validation, positional arg for iteration count (default 250). |
 
 Icon SVGs live as HTML partials in `layouts/partials/icons/` (home, github, rss, chevron_up, star).
@@ -419,7 +421,7 @@ Spec-compliant implementation at `mustache/`. See `mustache/SPEC.md` for the imp
 | `tokenizer.odin` | Tokenizer (template string → `[]Token`), standalone whitespace detection |
 | `data.odin` | Reflection-based data model: `base_value` (peels union/any/nested-any layers), `lookup_in` (structs + maps, handles `Type_Info_Any` value kind in maps), `resolve_name`, `is_truthy`, `any_to_string`, `write_value`, `list_info`, `extract_list_element`, `collect_map_keys` |
 | `pipes.odin` | Pipes extension: `Pipe_Op` enum (`.Format`, `.Group_By`), `pipe_op_from_string`/`pipe_op_candidates` (reflection-based enum name lookup), `Pipe_Filter` AST (with `op_pos` for diagnostics), `parse_pipeline` (tracks byte offsets via `strings.index`), `apply_pipeline`, `apply_filter` (exhaustive enum switch), `apply_group_by`, `apply_format`. Misspelled pipe op suggestions via `suggest_correction`. Stored on `Node.filters`; render-scoped results in temp allocator. |
-| `diagnostic.odin` | Rust-style error formatter: `format_error` (multi-line context, ANSI colors via `core:terminal/ansi`, `colorize` param), `format_render_error` (formats `Error`), `line_col`, `line_text`, `context_extent`, `count_lines`, `digit_count`, `should_colorize`. |
+| `diagnostic.odin` | Mustache-specific diagnostics: `context_extent` (scans `{{ }}` tags for caret underline), `format_tag_error` (wraps `diags.format_error` + `context_extent`), `format_render_error` (formats `Error` using `Template` source/path). Generic error formatting lives in `diagnostics/` package. |
 | `suggest.odin` | Strict-warning helpers: `validate_key_path` (walks dotted path, crosses maps silently), `suggest_correction` (Levenshtein via `core:strings/levenshtein_distance`), `collect_struct_keys` (via reflection, recurses into `using`), `struct_has_field` (distinguishes missing field from nil value — needed for `Maybe(bool)`), `collect_partial_names`, `collect_block_names`. |
 | `spec_test.odin` | JSON spec test runner — loads `spec/specs/*.json`, runs each test case. Uses `log.nil_logger()` to suppress expected warnings. |
 | `pipes_test.odin` | Pipe filter tests (`group_by` + `format`) |

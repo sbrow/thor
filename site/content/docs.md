@@ -346,14 +346,40 @@ TODO: Should this be a subsection of a "Data Types" section?
 
 Dates are strings in one of the following formats:
 
-| Format                      | Time zone                    |
-| --------------------------- | ---------------------------- |
-| `2023-10-15T13:18:50-07:00` | `America/Los_Angeles`        |
-| `2023-10-15T13:18:50-0700`  | `America/Los_Angeles`        |
-| `2023-10-15T13:18:50Z`      | `Etc/UTC`                    |
-| `2023-10-15T13:18:50`       | Default is local system time |
-| `2023-10-15`                | Default is local system time |
-| `15 Oct 2023`               | Default is local system time |
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Time zone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code class="inline-code">2023-10-15T13:18:50-07:00</code></td>
+<td><code class="inline-code">America/Los_Angeles</code></td>
+</tr>
+<tr>
+<td><code class="inline-code">2023-10-15T13:18:50-0700</code></td>
+<td><code class="inline-code">America/Los_Angeles</code></td>
+</tr>
+<tr>
+<td><code class="inline-code">2023-10-15T13:18:50Z</code></td>
+<td><code class="inline-code">Etc/UTC</code></td>
+</tr>
+<tr>
+<td><code class="inline-code">2023-10-15T13:18:50</code></td>
+<td>Default is&nbsp;local system time</td>
+</tr>
+<tr>
+<td><code class="inline-code">2023-10-15</code></td>
+<td>Default is&nbsp;local system time</td>
+</tr>
+<tr>
+<td><code class="inline-code">15 Oct 2023</code></td>
+<td>Default is&nbsp;local system time</td>
+</tr>
+</tbody>
+</table>
 
 If you want to display a date in a different format, you can use the `| format` Filter. With no argument, it will default to formatting the date with `site.date_format`.
 

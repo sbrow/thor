@@ -5,6 +5,8 @@ import "core:fmt"
 import "core:log"
 import "core:strings"
 
+import diags "../diagnostics"
+
 // A hypothetical maximum context depth. Trying to pass more than this many items
 // to render(tpl, data), or nesting templates further than this depth would be
 // an error.
@@ -842,7 +844,7 @@ warn_unknown_key :: proc(current: Template, ctx: []any, node: Node) {
 
 	hint := ""
 	if len(available) > 0 {
-		suggestion := suggest_correction(available, missing)
+		suggestion := diags.suggest_correction(available, missing)
 		if suggestion != "" {
 			hint = fmt.tprintf("did you mean '%s'?", suggestion)
 		}
@@ -852,7 +854,7 @@ warn_unknown_key :: proc(current: Template, ctx: []any, node: Node) {
 	if path == "" {
 		path = "<input>"
 	}
-	diag := format_error(path, current.source, node.pos, msg, hint, colorize = should_colorize())
+	diag := format_tag_error(path, current.source, node.pos, msg, hint, colorize = diags.should_colorize())
 	log.warnf("%s", diag)
 }
 
@@ -866,7 +868,7 @@ warn_missing_partial :: proc(
 ) {
 	hint := ""
 	available := collect_partial_names(partials)
-	suggestion := suggest_correction(available, name)
+	suggestion := diags.suggest_correction(available, name)
 	if suggestion != "" {
 		hint = fmt.tprintf("did you mean '%s'?", suggestion)
 	}
@@ -875,7 +877,7 @@ warn_missing_partial :: proc(
 	if path == "" {
 		path = "<input>"
 	}
-	diag := format_error(path, current.source, node.pos, msg, hint, colorize = should_colorize())
+	diag := format_tag_error(path, current.source, node.pos, msg, hint, colorize = diags.should_colorize())
 	log.warnf("%s", diag)
 }
 
@@ -911,7 +913,7 @@ warn_unmatched_block_overrides :: proc(
 		}
 
 		hint := ""
-		suggestion := suggest_correction(available, child.key)
+		suggestion := diags.suggest_correction(available, child.key)
 		if suggestion != "" {
 			hint = fmt.tprintf("did you mean '%s'?", suggestion)
 		}
@@ -924,13 +926,13 @@ warn_unmatched_block_overrides :: proc(
 		if path == "" {
 			path = "<input>"
 		}
-		diag := format_error(
+		diag := format_tag_error(
 			path,
 			current.source,
 			child.pos,
 			msg,
 			hint,
-			colorize = should_colorize(),
+			colorize = diags.should_colorize(),
 		)
 		log.warnf("%s", diag)
 	}
@@ -954,6 +956,6 @@ warn_context_depth :: proc(current: Template, node: Node) {
 	if path == "" {
 		path = "<input>"
 	}
-	diag := format_error(path, current.source, node.pos, msg, "", colorize = should_colorize())
+	diag := format_tag_error(path, current.source, node.pos, msg, "", colorize = diags.should_colorize())
 	log.warnf("%s", diag)
 }

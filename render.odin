@@ -2,6 +2,8 @@ package main
 
 import "mustache"
 
+import diags "diagnostics"
+
 import "core:encoding/json"
 import "core:fmt"
 import "core:log"
@@ -40,12 +42,12 @@ load_template :: proc(vfs: ^VFS, virtual_path: string) -> mustache.Template {
 		b := mustache.body(err)
 		log.errorf(
 			"%s",
-			mustache.format_error(
+			mustache.format_tag_error(
 				entry.fs_path,
 				source,
 				b.pos,
 				b.msg,
-				colorize = mustache.should_colorize(),
+				colorize = diags.should_colorize(),
 			),
 		)
 		os.exit(1)
@@ -142,7 +144,7 @@ render_template :: proc(
 		formatted := mustache.format_render_error(
 			err,
 			content_tpl,
-			colorize = mustache.should_colorize(),
+			colorize = diags.should_colorize(),
 		)
 		if formatted in reported_errors^ {
 			return ""
@@ -377,12 +379,12 @@ load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {
 			b := mustache.body(err)
 			log.errorf(
 				"%s",
-				mustache.format_error(
+				mustache.format_tag_error(
 					entry.fs_path,
 					source,
 					b.pos,
 					b.msg,
-					colorize = mustache.should_colorize(),
+					colorize = diags.should_colorize(),
 				),
 			)
 			os.exit(1)
