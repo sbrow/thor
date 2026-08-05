@@ -73,7 +73,7 @@ thor/
 | Package | Files | Responsibility |
 |---|---|---|
 | `treesitter/` | `treesitter.odin` | FFI types (`Parser`, `Node`, `Query`, etc.), `@(link_prefix="ts_")` foreign bindings, grammar management (`Grammar_Store` with persistent allocator, `load_language`/`compile_query` building blocks, `ensure_parser`/`load_grammar` lazy loading, `preload_grammar`/`preload_grammars` for parallel loading with `sync.Mutex` cache protection), statically-linked HTML/CSS grammars |
-| `markdown/` | `markdown.odin` | `Extension` enum, `DEFAULT_EXTENSIONS`, `process(body, ext, file_path, allocator)` — full pipeline (clones cmark output, frees original), `parse_extension_list`, `apply_extension_config` |
+| `markdown/` | `markdown.odin` | `Extension` enum, `DEFAULT_EXTENSIONS`, `EXTENSION_NAMES`, `process(body, ext, file_path, allocator)` — full pipeline (clones cmark output, frees original), `parse_extension_list` (with "did you mean?" hints via `diagnostics.suggest_correction`), `apply_extension_config` (same), `resolve_extension_conflicts` (Footnotes wins over Sidenotes) |
 | | `footnotes.odin` | `strip_definitions` (pre-cmark, shared by `.Sidenotes` + `.Footnotes`), `inject_notes` (post-cmark sidenote rendering), `inject_footnotes` (post-cmark standard footnote rendering — numbered `<sup>` links + `<section class="footnotes"><ol>` at bottom). `.Sidenotes` and `.Footnotes` are mutually exclusive; `resolve_extension_conflicts` in `markdown.odin` picks `.Footnotes` if both are set. |
 | | `alerts.odin` | `inject_alerts` — GitHub alert blocks (`> [!NOTE]`) → styled blockquotes with semantic class names (`alert-note` etc.) |
 | | `emoji.odin` | `expand_emoji` — `:shortcode:` → unicode emoji |

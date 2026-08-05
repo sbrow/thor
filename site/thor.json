@@ -1,6 +1,7 @@
 {
   "markdown_extensions": {
-    "footnotes": true
+    // "footnotes": true
+    "foonotes": true
   },
   "params": {
     "author": {

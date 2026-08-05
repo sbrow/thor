@@ -6,6 +6,8 @@ import "core:encoding/json"
 import "core:log"
 import "core:strings"
 
+import diags "../diagnostics"
+
 Extension :: enum {
 	Emoji,
 	Sidenotes,
@@ -18,6 +20,11 @@ Extension :: enum {
 }
 
 DEFAULT_EXTENSIONS :: bit_set[Extension]{.Emoji, .Sidenotes, .Alerts, .HeadingIDs, .DefLists}
+
+EXTENSION_NAMES :: []string{
+	"emoji", "sidenotes", "alerts", "highlight", "sections",
+	"heading_ids", "deflists", "footnotes",
+}
 
 // Caller is responsible for freeing string
 process :: proc(
@@ -69,7 +76,12 @@ parse_extension_list :: proc(s: string) -> (result: bit_set[Extension]) {
 		e, ok := extension_from_name(name)
 		if !ok {
 			if name != "" {
-				log.warnf("unknown extension '%s'", name)
+				suggestion := diags.suggest_correction(EXTENSION_NAMES, name)
+				if suggestion != "" {
+					log.warnf("unknown extension '%s' (did you mean '%s'?)", name, suggestion)
+				} else {
+					log.warnf("unknown extension '%s'", name)
+				}
 			}
 			continue
 		}
@@ -81,9 +93,19 @@ parse_extension_list :: proc(s: string) -> (result: bit_set[Extension]) {
 // Given a map[Extension]bool, apply it to ext.
 apply_extension_config :: proc(ext: ^bit_set[Extension], config: json.Object) {
 	for name, val in config {
-		// TODO: Silently discards invalid values.
 		enabled := val.(json.Boolean) or_continue
-		e := extension_from_name(name) or_continue
+
+		e, ok := extension_from_name(name)
+		if !ok {
+			lower := strings.to_lower(name, context.temp_allocator)
+			suggestion := diags.suggest_correction(EXTENSION_NAMES, lower)
+			if suggestion != "" {
+				log.warnf("unknown extension '%s' (did you mean '%s'?)", name, suggestion)
+			} else {
+				log.warnf("unknown extension '%s'", name)
+			}
+			continue
+		}
 
 		if enabled {
 			ext^ += {e}

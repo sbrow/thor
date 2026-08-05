@@ -13,8 +13,9 @@
 - [ ] [aliases](https://gohugo.io/methods/page/aliases/#redirects)?
 - [ ] Improve diagnostics
   - [x] keep track of every error and don't report them more than once.
-  - [ ] show parsed arg when -extension is unrecognized 
-    - [ ] also do typo detection?
+  - [x] show parsed arg when -extension is unrecognized 
+    - [x] also do typo detection?
+    - [ ] show where the typo occurred (config file path for `apply_extension_config`, full `-ext:value` for `parse_extension_list`)
   - [ ] `*` make sure the frontmatter parser has good diagnostics.
   - [ ] fix the diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml)
   - [ ] only report format errors once.
