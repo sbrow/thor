@@ -229,3 +229,39 @@ expected: |
   Show where the error was triggered. Should also show the format that will be used
 actual: |
   [ERROR] --- [333:apply_format()] format pipe used but no date format configured (set date.format in thor.json) Default will be used
+---
+name: first/last with zero argument
+input: |
+  <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
+expected: Error with source location — "argument must not be zero"
+actual: |
+  [ERROR] --- [render_template()] argument must not be zero
+   --> <file>:<line>:<col>
+    |
+  N | <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+---
+name: first/last with negative argument
+input: |
+  <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
+expected: Warning with source location — "first -3 is equivalent to last 3 — consider using the clearer form"
+actual: |
+  [WARN ] --- [take()] first -3 is equivalent to last 3
+   --> <file>:<line>:<col>
+    |
+  N | <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^ consider using the clearer form
+    |
+---
+name: first/last on string with no argument
+input: |
+  {{word | first}}
+expected: Warning with source location — "defaulting to n=1 for string; consider specifying n explicitly"
+actual: |
+  [WARN ] --- [take()] defaulting to n=1 for string
+   --> <file>:<line>:<col>
+    |
+  N | {{word | first}}
+    | ^^^^^^^^^^^^^^^ consider specifying n explicitly
+    |

@@ -220,13 +220,14 @@ apply_pipeline :: proc(
 	filters: []Pipe_Filter,
 	pos: int,
 	ctx: []any,
+	tmpl: Template,
 ) -> (
 	current: any,
 	err: Error,
 ) {
 	current = value
 	for &filter in filters {
-		current = apply_filter(current, &filter, pos, ctx) or_return
+		current = apply_filter(current, &filter, pos, ctx, tmpl) or_return
 		log.debugf("applied: filter=%v before=%s after=%s pos=%d", filter, value, current, pos)
 	}
 	return
@@ -256,7 +257,16 @@ resolve_format_string :: proc(name: string, ctx: []any, pos: int) -> (string, Er
 	return str, nil
 }
 
-apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> (any, Error) {
+apply_filter :: proc(
+	value: any,
+	filter: ^Pipe_Filter,
+	pos: int,
+	ctx: []any,
+	tmpl: Template,
+) -> (
+	any,
+	Error,
+) {
 	op, ok := pipe_op_from_string(filter.op)
 	if !ok {
 		hint := ""
@@ -315,9 +325,9 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 			return any{new_clone(str2, context.temp_allocator), typeid_of(string)}, nil
 		}
 	case .First:
-		return take(value, filter.args[:], pos, from_start = true)
+		return take(value, filter.args[:], true, tmpl, pos, filter.op_pos)
 	case .Last:
-		return take(value, filter.args[:], pos, from_start = false)
+		return take(value, filter.args[:], false, tmpl, pos, filter.op_pos)
 	}
 	return {}, nil
 }
@@ -414,7 +424,17 @@ apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, er
 	return groups, nil
 }
 
-take :: proc(value: any, args: []string, pos: int, from_start: bool) -> (any, Error) {
+take :: proc(
+	value: any,
+	args: []string,
+	from_start: bool,
+	tmpl: Template,
+	tag_pos: int,
+	op_pos: int,
+) -> (
+	any,
+	Error,
+) {
 	elem_info, count, data := list_info(value)
 	is_list := elem_info != nil
 	from_start := from_start
@@ -423,7 +443,13 @@ take :: proc(value: any, args: []string, pos: int, from_start: bool) -> (any, Er
 	if !is_list {
 		s, is_str := reflect.as_string(value)
 		if !is_str {
-			return nil, Error_Body{msg = "requires a list or string", pos = pos, kind = .Data}
+			return nil, Error_Body {
+				msg = "requires a list or string",
+				pos = tag_pos,
+				kind = .Data,
+				source = tmpl.source,
+				path = tmpl.path,
+			}
 		}
 		str = s
 		count = len(str)
@@ -431,23 +457,54 @@ take :: proc(value: any, args: []string, pos: int, from_start: bool) -> (any, Er
 
 	n := 1
 	if !is_list && len(args) == 0 {
-		return nil, Error_Body{msg = "requires an argument for strings", pos = pos, kind = .Data}
+		path := tmpl.path != "" ? tmpl.path : "<input>"
+		diag := format_tag_error(
+			path,
+			tmpl.source,
+			op_pos,
+			"defaulting to n=1 for string",
+			"consider specifying n explicitly",
+		)
+		log.warnf("%s", diag)
 	}
 	if len(args) > 0 {
 		parsed, ok := strconv.parse_int(args[0])
 		if !ok {
 			return nil, Error_Body {
 				msg = fmt.tprintf("invalid argument '%s'", args[0]),
-				pos = pos,
+				pos = tag_pos,
 				kind = .Data,
+				source = tmpl.source,
+				path = tmpl.path,
 			}
 		}
 		n = parsed
 	}
 
+	if n == 0 {
+		return nil, Error_Body {
+			msg = "argument must not be zero",
+			pos = tag_pos,
+			kind = .Data,
+			source = tmpl.source,
+			path = tmpl.path,
+		}
+	}
+
 	if n < 0 {
+		op_name := from_start ? "first" : "last"
+		alt_name := from_start ? "last" : "first"
+		path := tmpl.path != "" ? tmpl.path : "<input>"
+		diag := format_tag_error(
+			path,
+			tmpl.source,
+			op_pos,
+			fmt.tprintf("%s %d is equivalent to %s %d", op_name, n, alt_name, 0 - n),
+			"consider using the clearer form",
+		)
+		log.warnf("%s", diag)
 		from_start = !from_start
-		n = 0 - n // abs(n)
+		n = 0 - n
 	}
 
 	start: int

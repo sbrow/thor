@@ -621,7 +621,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -640,7 +640,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -655,7 +655,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -701,7 +701,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:])
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
 				if perr != nil {
 					return tag_error(perr, current)
 				}

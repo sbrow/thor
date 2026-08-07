@@ -17,12 +17,19 @@ Remember to polish existing features before moving on to new ones.
   - current: `layouts/partials`
   - alt1: `layouts`, `partials`
   - alt2: `templates/layouts`, `templates/partials`
+- [ ] add `sort_by` pipe
 - [ ] pipes
-  - [ ] first/last
-    - [ ] warn when using negative numbers
-    - [ ] warn when using default arg on string
-    - [ ] add the above warnings to DIAGNOSTIC_TODOS.md
-  - [ ] sort_by
+  - [x] first/last
+    - [ ] write test for error when n == 0
+    - [x] warn when using negative numbers
+    - [x] warn when using default arg on string
+    - [x] add the above warnings to DIAGNOSTIC_TODOS.md
+    - [ ] Instead of "clearer form", be exact: "last 5"
+    - [ ] write tests for `first 0` & `last 0`
+    - [ ] update tests to assert diagnostics when appropriate
+      - do we want to do this or just use DIAGNOSTIC_TODOS.md as the tests?
+      - [ ] also update to use file logger so they don't clog up the output
+    - [ ] narrow highlight in diagnostic to relevent part of line.
 
 ## Documentation
 

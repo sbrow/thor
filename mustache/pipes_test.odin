@@ -572,7 +572,7 @@ test_unknown_pipe_op_suggestion :: proc(t: ^testing.T) {
 		op     = "formats",
 		op_pos = 0,
 	}
-	_, err := apply_filter("2026-01-15", &filter, 0, nil)
+	_, err := apply_filter("2026-01-15", &filter, 0, nil, {})
 	testing.expect(t, err != nil, "should error on unknown op")
 	b := body(err)
 	testing.expect(t, strings.contains(b.hint, "format"), "hint should suggest 'format'")
@@ -585,7 +585,7 @@ test_unknown_pipe_op_no_suggestion :: proc(t: ^testing.T) {
 		op     = "xyz",
 		op_pos = 0,
 	}
-	_, err := apply_filter("2026-01-15", &filter, 0, nil)
+	_, err := apply_filter("2026-01-15", &filter, 0, nil, {})
 	testing.expect(t, err != nil, "should error on unknown op")
 	b := body(err)
 	testing.expect(t, b.hint == "", "no suggestion expected for 'xyz'")
