@@ -4,8 +4,8 @@ import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:reflect"
+import "core:strconv"
 import "core:strings"
-import "core:time"
 
 import diags "../diagnostics"
 import "core:time/datetime"
@@ -22,6 +22,8 @@ DEFAULT_DATE_FORMAT :: "2 Jan 2006"
 Pipe_Op :: enum {
 	Format,
 	Group_By,
+	First,
+	Last,
 }
 
 // Pipe op names are derived from the enum via reflection (lowercased).
@@ -133,11 +135,7 @@ parse_pipeline :: proc(
 	pipe_count := strings.count(content, "|")
 	if pipe_count > MAX_PIPES {
 		return "", Error_Body {
-			msg = fmt.tprintf(
-				"pipe expression has %d filters, max is %d",
-				pipe_count,
-				MAX_PIPES,
-			),
+			msg = fmt.tprintf("pipe expression has %d filters, max is %d", pipe_count, MAX_PIPES),
 			pos = pos,
 			kind = .Syntax,
 		}
@@ -267,8 +265,8 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 			hint = fmt.tprintf("did you mean '%s'?", suggestion)
 		}
 		return nil, Error_Body {
-			msg  = fmt.tprintf("unknown pipe op '%s'", filter.op),
-			pos  = filter.op_pos,
+			msg = fmt.tprintf("unknown pipe op '%s'", filter.op),
+			pos = filter.op_pos,
 			span = len(filter.op),
 			kind = .Data,
 			hint = hint,
@@ -316,6 +314,10 @@ apply_filter :: proc(value: any, filter: ^Pipe_Filter, pos: int, ctx: []any) -> 
 		} else {
 			return any{new_clone(str2, context.temp_allocator), typeid_of(string)}, nil
 		}
+	case .First:
+		return take(value, filter.args[:], pos, from_start = true)
+	case .Last:
+		return take(value, filter.args[:], pos, from_start = false)
 	}
 	return {}, nil
 }
@@ -411,3 +413,61 @@ apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, er
 
 	return groups, nil
 }
+
+take :: proc(value: any, args: []string, pos: int, from_start: bool) -> (any, Error) {
+	elem_info, count, data := list_info(value)
+	is_list := elem_info != nil
+	from_start := from_start
+
+	str: string
+	if !is_list {
+		s, is_str := reflect.as_string(value)
+		if !is_str {
+			return nil, Error_Body{msg = "requires a list or string", pos = pos, kind = .Data}
+		}
+		str = s
+		count = len(str)
+	}
+
+	n := 1
+	if !is_list && len(args) == 0 {
+		return nil, Error_Body{msg = "requires an argument for strings", pos = pos, kind = .Data}
+	}
+	if len(args) > 0 {
+		parsed, ok := strconv.parse_int(args[0])
+		if !ok {
+			return nil, Error_Body {
+				msg = fmt.tprintf("invalid argument '%s'", args[0]),
+				pos = pos,
+				kind = .Data,
+			}
+		}
+		n = parsed
+	}
+
+	if n < 0 {
+		from_start = !from_start
+		n = 0 - n // abs(n)
+	}
+
+	start: int
+	end: int
+	if from_start {
+		start = 0
+		end = min(count, n)
+	} else {
+		start = max(0, count - n)
+		end = count
+	}
+
+	if is_list {
+		result := make([dynamic]any, 0, max(0, end - start), context.temp_allocator)
+		for j in start ..< end {
+			append(&result, extract_list_element(elem_info, data, j))
+		}
+		return result, nil
+	} else {
+		return str[start:end], nil
+	}
+}
+

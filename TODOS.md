@@ -18,8 +18,10 @@ Remember to polish existing features before moving on to new ones.
   - alt1: `layouts`, `partials`
   - alt2: `templates/layouts`, `templates/partials`
 - [ ] pipes
-  - [ ] first
-  - [ ] last
+  - [ ] first/last
+    - [ ] warn when using negative numbers
+    - [ ] warn when using default arg on string
+    - [ ] add the above warnings to DIAGNOSTIC_TODOS.md
   - [ ] sort_by
 
 ## Documentation

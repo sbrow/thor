@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 #+test
 package mustache
 
@@ -567,7 +568,10 @@ test_format_mst_no_offset_no_timezone :: proc(t: ^testing.T) {
 
 @(test)
 test_unknown_pipe_op_suggestion :: proc(t: ^testing.T) {
-	filter := Pipe_Filter{op = "formats", op_pos = 0}
+	filter := Pipe_Filter {
+		op     = "formats",
+		op_pos = 0,
+	}
 	_, err := apply_filter("2026-01-15", &filter, 0, nil)
 	testing.expect(t, err != nil, "should error on unknown op")
 	b := body(err)
@@ -577,9 +581,146 @@ test_unknown_pipe_op_suggestion :: proc(t: ^testing.T) {
 
 @(test)
 test_unknown_pipe_op_no_suggestion :: proc(t: ^testing.T) {
-	filter := Pipe_Filter{op = "xyz", op_pos = 0}
+	filter := Pipe_Filter {
+		op     = "xyz",
+		op_pos = 0,
+	}
 	_, err := apply_filter("2026-01-15", &filter, 0, nil)
 	testing.expect(t, err != nil, "should error on unknown op")
 	b := body(err)
 	testing.expect(t, b.hint == "", "no suggestion expected for 'xyz'")
 }
+
+// Group 1: Lists
+
+First_Last_List_Data: map[string][5]string = {
+	"items" = [5]string{"foo", "bar", "bat", "qux", "quz"},
+}
+
+@(test)
+test_first_list_no_args_equals_first_one :: proc(t: ^testing.T) {
+	tpl_a, _ := parse(
+		"{{#items | first}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result_a, _ := render(tpl_a, First_Last_List_Data, {}, context.temp_allocator)
+
+	tpl_b, _ := parse(
+		"{{#items | first 1}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result_b, _ := render(tpl_b, First_Last_List_Data, {}, context.temp_allocator)
+
+	testing.expect_value(t, result_a, "<li>foo</li>")
+	testing.expect_value(t, result_a, result_b)
+}
+
+@(test)
+test_first_list_n :: proc(t: ^testing.T) {
+	data := First_Last_List_Data
+	tpl, _ := parse(
+		"{{#items | first 3}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "<li>foo</li><li>bar</li><li>bat</li>")
+}
+
+@(test)
+test_first_list_negative_equals_last :: proc(t: ^testing.T) {
+	data := First_Last_List_Data
+	tpl, _ := parse(
+		"{{#items | first -2}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "<li>qux</li><li>quz</li>")
+}
+
+@(test)
+test_last_list_no_args_equals_last_one :: proc(t: ^testing.T) {
+	data := First_Last_List_Data
+	tpl_a, _ := parse(
+		"{{#items | last}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result_a, _ := render(tpl_a, data, {}, context.temp_allocator)
+
+	tpl_b, _ := parse(
+		"{{#items | last 1}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result_b, _ := render(tpl_b, data, {}, context.temp_allocator)
+
+	testing.expect_value(t, result_a, "<li>quz</li>")
+	testing.expect_value(t, result_b, "<li>quz</li>")
+}
+
+@(test)
+test_last_list_n :: proc(t: ^testing.T) {
+	data := First_Last_List_Data
+	tpl, _ := parse(
+		"{{#items | last 3}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "<li>bat</li><li>qux</li><li>quz</li>")
+}
+
+@(test)
+test_last_list_negative_equals_first :: proc(t: ^testing.T) {
+	data := First_Last_List_Data
+	tpl, _ := parse(
+		"{{#items | last -2}}<li>{{.}}</li>{{/items}}",
+		"<test>",
+		allocator = context.temp_allocator,
+	)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "<li>foo</li><li>bar</li>")
+}
+
+// Group 2: Strings
+
+First_Last_String_Data := map[string]string {
+	"word" = "Hello, World!",
+}
+
+@(test)
+test_first_string_n :: proc(t: ^testing.T) {
+	data := First_Last_String_Data
+	tpl, _ := parse("{{word | first 5}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "Hello")
+}
+
+@(test)
+test_last_string_n :: proc(t: ^testing.T) {
+	data := First_Last_String_Data
+	tpl, _ := parse("{{word | last 6}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "World!")
+}
+
+@(test)
+test_first_string_negative_equals_last :: proc(t: ^testing.T) {
+	data := First_Last_String_Data
+	tpl, _ := parse("{{word | first -6}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "World!")
+}
+
+@(test)
+test_last_string_negative_equals_first :: proc(t: ^testing.T) {
+	data := First_Last_String_Data
+	tpl, _ := parse("{{word | last -5}}", "<test>", allocator = context.temp_allocator)
+	result, _ := render(tpl, data, {}, context.temp_allocator)
+	testing.expect_value(t, result, "Hello")
+}
+
