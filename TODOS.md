@@ -28,11 +28,11 @@ Remember to polish existing features before moving on to new ones.
     - [ ] write test for error when n == 0
     - [x] warn when using negative numbers
     - [x] warn when using default arg on string
-    - [x] add the above warnings to DIAGNOSTIC_TODOS.md
+    - [x] add the above warnings to DIAGNOSTIC_TESTS.md
     - [ ] Instead of "clearer form", be exact: "last 5"
     - [ ] write tests for `first 0` & `last 0`
     - [ ] update tests to assert diagnostics when appropriate
-      - do we want to do this or just use DIAGNOSTIC_TODOS.md as the tests?
+      - do we want to do this or just use DIAGNOSTIC_TESTS.md as the tests?
       - [ ] also update to use file logger so they don't clog up the output
     - [ ] narrow highlight in diagnostic to relevent part of line.
 
@@ -58,11 +58,11 @@ All diagnostics (errors) should show
 
 - [ ] try to make file paths clickable links.
 - [ ] make sure the frontmatter parser has good diagnostics.
-- [ ] add all known diagnostics to [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml).
-- [ ] fix the broken diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml)
+- [ ] add all known diagnostics to [DIAGNOSTIC TODOS](./DIAGNOSTIC_TESTS.yaml).
+- [ ] fix the broken diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TESTS.yaml)
 - [ ] show *stack trace* for template partials?
 - [ ] show where the typo occurred (config file path for `apply_extension_config`, full `-ext:value` for `parse_extension_list`)
-- [ ] **all** diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TODOS.yaml) must be tested.
+- [ ] **all** diagnostics in [DIAGNOSTIC TODOS](./DIAGNOSTIC_TESTS.yaml) must be tested.
 - [ ] only report format errors once.
 - [ ] only report missing partial errors once.
 - [ ] better diagnostics for syntax errors in treesitter.

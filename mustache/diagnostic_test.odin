@@ -480,10 +480,10 @@ test_parse_error_pipe_parse_in_inverted_keeps_double_braces :: proc(t: ^testing.
 }
 
 // ---------------------------------------------------------------------------
-// Data-driven diagnostic cases (from DIAGNOSTIC_TODOS.yaml)
+// Data-driven diagnostic cases (from DIAGNOSTIC_TESTS.yaml)
 //
 // write_diagnostic_tests generates diagnostic_test_cases_test.odin from the
-// enabled cases in DIAGNOSTIC_TODOS.yaml. On the first run (or when the YAML
+// enabled cases in DIAGNOSTIC_TESTS.yaml. On the first run (or when the YAML
 // changes), it regenerates the file and fails. On the second run, each case
 // runs as an individual test via run_diag_case.
 // ---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ diag_slug :: proc(name: string) -> string {
 }
 
 run_diag_case :: proc(t: ^testing.T, name: string) {
-	cases := load_diag_cases("../DIAGNOSTIC_TODOS.yaml")
+	cases := load_diag_cases("../DIAGNOSTIC_TESTS.yaml")
 	ctx := diag_ctx()
 	partials := diag_partials()
 
@@ -661,12 +661,12 @@ run_diag_case :: proc(t: ^testing.T, name: string) {
 		return
 	}
 
-	testing.expectf(t, false, "case '%s' not found in DIAGNOSTIC_TODOS.yaml", name)
+	testing.expectf(t, false, "case '%s' not found in DIAGNOSTIC_TESTS.yaml", name)
 }
 
 @(test)
 write_diagnostic_tests :: proc(t: ^testing.T) {
-	cases := load_diag_cases("../DIAGNOSTIC_TODOS.yaml")
+	cases := load_diag_cases("../DIAGNOSTIC_TESTS.yaml")
 	testing.expect(t, len(cases) > 0, "should load diagnostic cases")
 
 	sb: strings.Builder
