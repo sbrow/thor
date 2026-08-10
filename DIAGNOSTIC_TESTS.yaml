@@ -343,19 +343,21 @@ should: ok
 expected: "foo"
 ---
 # TODO: called First/last, but only tests first
+# TODO: Include | last 3 }} in the suggestion.
 name: "first/last in partial"
 enable: true
 input: "{{> footer }}"
-should: error
+should: warn
 expected: |
   first -3 is equivalent to last 3
-   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
-    |
-  1 | <footer>
-    | ^ consider using the clearer form
-  2 |   <menu>
-  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
-    |
+    --> /home/spencer/github.com/sbrow.github.io/thor/mustache/fixtures/layouts/partials/footer.html:11:78
+     |
+   9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  10 |   </p>
+  11 |   <p><small>&copy;</small> {{! now | format "2006" }} {{params.author.name | first -3 }}</p>
+     |                                                                              ^^^^^^^^ consider using the clearer form
+  12 | </footer>
+     |
 ---
 name: "Pipes are ignored in comments"
 enable: true

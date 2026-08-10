@@ -460,14 +460,15 @@ take :: proc(
 	any,
 	Error,
 ) {
-	elem_info, count, data := list_info(value)
+	unwrapped, _ := base_value(value)
+	elem_info, count, data := list_info(unwrapped)
 	is_list := elem_info != nil
 	from_start := from_start
 	warning: Error = nil
 
 	str: string
 	if !is_list {
-		s, is_str := reflect.as_string(value)
+		s, is_str := reflect.as_string(unwrapped)
 		if !is_str {
 			return nil, Error_Body {
 				msg = "requires a list or string",
