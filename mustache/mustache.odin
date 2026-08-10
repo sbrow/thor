@@ -23,9 +23,9 @@ Context_Stack :: [dynamic]any
 // ---------------------------------------------------------------------------
 
 Error_Kind :: enum {
-	Syntax,   // parse-time: malformed template
-	Data,     // render-time: template fine, data wrong (e.g. filter misuse)
-	Warning,  // non-fatal: operation succeeded but user should know
+	Syntax, // parse-time: malformed template
+	Data, // render-time: template fine, data wrong (e.g. filter misuse)
+	Warning, // non-fatal: operation succeeded but user should know
 }
 
 Error_Body :: struct {
@@ -60,13 +60,13 @@ tag_error :: proc(err: Error, tmpl: Template) -> Error {
 	if err == nil do return nil
 	b := body(err)
 	return Error_Body {
-		msg    = b.msg,
-		pos    = b.pos,
-		span   = b.span,
-		hint   = b.hint,
-		kind   = b.kind,
+		msg = b.msg,
+		pos = b.pos,
+		span = b.span,
+		hint = b.hint,
+		kind = b.kind,
 		source = tmpl.source,
-		path   = tmpl.path,
+		path = tmpl.path,
 	}
 }
 
@@ -156,18 +156,22 @@ parse :: proc(
 	tmpl: Template,
 	err: Error,
 ) {
+	tmpl.source = source
+	tmpl.path = path
+
 	tokens, terr := tokenize(source, tokens_allocator)
 	if terr != nil {
-		return {}, terr
+		return tmpl, terr
 	}
 
 	tmpl.nodes, err = parse_tokens(tokens[:], source, allocator)
 	if err != nil {
 		delete(tmpl.nodes)
-		return {}, err
+		e := body(err)
+		e.source = source
+		e.path = path
+		return {}, e
 	}
-	tmpl.source = source
-	tmpl.path = path
 	deindent_blocks(tmpl.nodes[:], allocator)
 	return tmpl, nil
 }
@@ -269,7 +273,12 @@ parse_section :: proc(
 		case .Variable:
 			idx := len(nodes)
 			append(nodes, Node{kind = .Variable})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
+			pipe_key, perr := parse_pipeline(
+				tok.value,
+				&nodes[idx].filters,
+				tok.pos,
+				tag_content_base(source, tok.pos),
+			)
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{%s}}}}': %v", tok.value, perr),
@@ -283,7 +292,12 @@ parse_section :: proc(
 		case .Unescaped:
 			idx := len(nodes)
 			append(nodes, Node{kind = .Unescaped})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
+			pipe_key, perr := parse_pipeline(
+				tok.value,
+				&nodes[idx].filters,
+				tok.pos,
+				tag_content_base(source, tok.pos),
+			)
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{&%s}}}}': %v", tok.value, perr),
@@ -303,7 +317,12 @@ parse_section :: proc(
 			content_start := 0
 			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
 			append(nodes, Node{kind = .Section, pos = tok.pos})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
+			pipe_key, perr := parse_pipeline(
+				tok.value,
+				&nodes[idx].filters,
+				tok.pos,
+				tag_content_base(source, tok.pos),
+			)
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{#%s}}}}': %v", tok.value, perr),
@@ -324,7 +343,12 @@ parse_section :: proc(
 			content_start := 0
 			if pos^ < len(tokens) {content_start = tokens[pos^].pos}
 			append(nodes, Node{kind = .Inverted, pos = tok.pos})
-			pipe_key, perr := parse_pipeline(tok.value, &nodes[idx].filters, tok.pos, tag_content_base(source, tok.pos))
+			pipe_key, perr := parse_pipeline(
+				tok.value,
+				&nodes[idx].filters,
+				tok.pos,
+				tag_content_base(source, tok.pos),
+			)
 			if perr != nil {
 				return Error_Body {
 					msg = fmt.tprintf("pipe parse error in '{{{{^%s}}}}': %v", tok.value, perr),
@@ -625,7 +649,14 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
+				transformed, perr := apply_pipeline(
+					val,
+					node.filters[:],
+					node.pos,
+					ctx[:],
+					current,
+					warnings,
+				)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -644,7 +675,14 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
+				transformed, perr := apply_pipeline(
+					val,
+					node.filters[:],
+					node.pos,
+					ctx[:],
+					current,
+					warnings,
+				)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -659,7 +697,14 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
+				transformed, perr := apply_pipeline(
+					val,
+					node.filters[:],
+					node.pos,
+					ctx[:],
+					current,
+					warnings,
+				)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -673,16 +718,16 @@ render_nodes :: proc(
 						elem := extract_list_element(elem_info, data, j)
 						context_push(ctx, elem, current, node)
 						defer pop(ctx)
-					render_nodes(
-						current,
-						children,
-						ctx,
-						partials,
-						b,
-						blocks,
-						indent_state,
-						warnings,
-					) or_return
+						render_nodes(
+							current,
+							children,
+							ctx,
+							partials,
+							b,
+							blocks,
+							indent_state,
+							warnings,
+						) or_return
 					}
 				} else {
 					context_push(ctx, val, current, node)
@@ -707,24 +752,31 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
+				transformed, perr := apply_pipeline(
+					val,
+					node.filters[:],
+					node.pos,
+					ctx[:],
+					current,
+					warnings,
+				)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
 				val = transformed
 			}
-		if !is_truthy(val) {
-			render_nodes(
-				current,
-				node.children,
-				ctx,
-				partials,
-				b,
-				blocks,
-				indent_state,
-				warnings,
-			) or_return
-		}
+			if !is_truthy(val) {
+				render_nodes(
+					current,
+					node.children,
+					ctx,
+					partials,
+					b,
+					blocks,
+					indent_state,
+					warnings,
+				) or_return
+			}
 			i += 1 + len(node.children)
 
 		case .Partial:
@@ -863,7 +915,14 @@ warn_unknown_key :: proc(current: Template, ctx: []any, node: Node) {
 	if path == "" {
 		path = "<input>"
 	}
-	diag := format_tag_error(path, current.source, node.pos, msg, hint, colorize = diags.should_colorize())
+	diag := format_tag_error(
+		path,
+		current.source,
+		node.pos,
+		msg,
+		hint,
+		colorize = diags.should_colorize(),
+	)
 	log.warnf("%s", diag)
 }
 
@@ -886,7 +945,14 @@ warn_missing_partial :: proc(
 	if path == "" {
 		path = "<input>"
 	}
-	diag := format_tag_error(path, current.source, node.pos, msg, hint, colorize = diags.should_colorize())
+	diag := format_tag_error(
+		path,
+		current.source,
+		node.pos,
+		msg,
+		hint,
+		colorize = diags.should_colorize(),
+	)
 	log.warnf("%s", diag)
 }
 
@@ -965,6 +1031,14 @@ warn_context_depth :: proc(current: Template, node: Node) {
 	if path == "" {
 		path = "<input>"
 	}
-	diag := format_tag_error(path, current.source, node.pos, msg, "", colorize = diags.should_colorize())
+	diag := format_tag_error(
+		path,
+		current.source,
+		node.pos,
+		msg,
+		"",
+		colorize = diags.should_colorize(),
+	)
 	log.warnf("%s", diag)
 }
+

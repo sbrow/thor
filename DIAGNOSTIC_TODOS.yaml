@@ -1,4 +1,8 @@
+# This file contains tests for all known mustache syntax errors and their 
+# desired error messages. Each one is converted into an Odin test.
 name: Missing 2nd closing brace
+enable: true
+should: error
 input: |
   <menu>
     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}</a>
@@ -7,20 +11,20 @@ input: |
     {{/params.social}}
   </menu>
   <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
-
-expected: Somthing that points to the opening and lack of close.
-actual: |
-  [ERROR] --- [383:load_partials()] unexpected {{/params.social}}
-     --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:6:5
+expected: |
+  Missing closing brace
+   --> <test>:1:1
+  1 | <menu>
+  2 | <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}</a>
+    |                                        ^^ opened           ^ never closed
+  3 | {{#params.social}}
+  4 |   <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+  5 | {{/params.social}}
     |
-  4 |     {{#params.social}}
-  5 |     <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
-  6 |     {{/params.social}}
-    |     ^^^^^^^^^^^^^^^^^^
-  7 |   </menu>
-  8 |   <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
 ---
 name: Missing 2nd opening brace
+enable: true
+should: error
 input: |
   <menu>
     <a class="goto-top opacity-0" href="#">{> icons/chevron_up}}</a>
@@ -29,10 +33,21 @@ input: |
     {{/params.social}}
   </menu>
   <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
-expected: Somthing that shows the whole block, and points out the missing opening brace
-actual: Nothing. The page compiles with no warnings or errors
+expected: |
+  Missing opening brace
+   --> <test>:1:1
+  1 | <menu>
+  2 | <a class="goto-top opacity-0" href="#">{> icons/chevron_up}}</a>
+    |                                         ^ opened          ^^ closed
+  3 | {{#params.social}}
+  4 |   <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+  5 | {{/params.social}}
+    |
 ---
+# TODO: make it work
 name: Invalid timezone
+enable: false
+should: warn
 input: |
   {
     "date": {
@@ -44,6 +59,8 @@ actual: |
   [WARN ] --- [148:init_site()] unable to load timezone 'America/New_Yorkside'
 ---
 name: Mismatched section tags
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -57,19 +74,20 @@ input: |
     </p>
     <p><small>&copy;</small> {{now | format "2006" }} {{params.author.name}}</p>
   </footer>
-expected: Mostly the same, but with rust style markers at the opening and close
-actual: |
-  [ERROR] --- [383:load_partials()] expected {{/params.ocial}}, got {{/params.social}}
-   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:6:5
+expected: |
+  Mismatched section: 'ocial' opened, 'social' closed
+   --> <test>:4:5
     |
   4 |     {{#params.ocial}}
+    |               ^^^^^ opened — did you mean 'social'?
   5 |     <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
   6 |     {{/params.social}}
-    |     ^^^^^^^^^^^^^^^^^^
-  7 |   </menu>
-  8 |   <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+    |               ^^^^^^ expected {{/params.ocial}}, got {{/params.social}}
+    |
 ---
 name: Missing closing section
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -83,10 +101,20 @@ input: |
     </p>
     <p><small>&copy;</small> {{now | format "2006" }} {{params.author.name}}</p>
   </footer>
-expected: "Missing closing tag '{{/params.social}}' ...opened <here> ... expected close <here>"
-actual: Nothing. The page compiles with no warnings or errors
+expected: |
+  Missing closing tag '{{/params.social}}'
+   --> <test>:4:5
+    |
+  4 |     {{#params.social}}
+    |     ^^^^^^^^^^^^^^^^^ opened
+  5 |     <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+  6 |     <!-- {{/params.social}} -->
+    |          ^^^^^^^^^^^^^^^^^^ closing tag is commented out
+    |
 ---
 name: empty tag
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -100,18 +128,20 @@ input: |
     </p>
     <p><small>&copy;</small> {{}} {{params.author.name}}</p>
   </footer>
-expected: "Found an empty tag at <line:col>"
-actual: |
-  [WARN ] --- [920:warn_unknown_key()] unknown key ''
-   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
-    |
-  1 | <footer>
-    | ^
-  2 |   <menu>
-  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
-    |
+expected: |
+  Empty tag
+   --> <test>:11:28
+     |
+   9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  10 |   </p>
+  11 |   <p><small>&copy;</small> {{}} {{params.author.name}}</p>
+     |                            ^^^^ tag must contain a key
+  12 | </footer>
+     |
 ---
 name: Missing pipe arguement
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -125,18 +155,20 @@ input: |
     </p>
     <p><small>&copy;</small> {{now | group_by }} {{params.author.name}}</p>
   </footer>
-expected: "Missing filter argument <pointing to exact location>"
-actual: |
-  [ERROR] --- [152:render_template()] group_by expects 1 argument, got 0
-   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
+expected: |
+  group_by expects 1 argument, got 0
+   --> <test>:11:36
     |
-  1 | <footer>
-    | ^
-  2 |   <menu>
-  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
-    |
+   9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  10 |   </p>
+  11 |   <p><small>&copy;</small> {{now | group_by }} {{params.author.name}}</p>
+     |                                    ^^^^^^^^^ missing argument
+  12 | </footer>
+     |
 ---
 name: Double dot access
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -150,10 +182,20 @@ input: |
     </p>
     <p><small>&copy;</small> {{now | format "2006" }} {{params..name}}</p>
   </footer>
-expected: Error "Invalid access key"
-actual: Nothing. The page compiles with no warnings or errors
+expected: |
+  Invalid key path: consecutive dots
+   --> <test>:11:60
+    |
+   9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  10 |   </p>
+  11 |   <p><small>&copy;</small> {{now | format "2006" }} {{params..name}}</p>
+     |                                                             ^^ missing path name
+  12 | </footer>
+     |
 ---
 name: Too many opening braces
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -167,18 +209,20 @@ input: |
     </p>
     <p><small>&copy;</small> {{{{now | format "2006" }}} {{params.author.name}}</p>
   </footer>
-expected: "Too many opening braces <point to location>"
-actual: |
-  [WARN ] --- [920:warn_unknown_key()] unknown key '{now'
-   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
-    |
-  1 | <footer>
-    | ^ did you mean 'now'?
-  2 |   <menu>
-  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
-    |
+expected: |
+  Too many opening braces
+   --> <test>:11:28
+     |
+   9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  10 |   </p>
+  11 |   <p><small>&copy;</small> {{{{now | format "2006" }}} {{params.author.name}}</p>
+     |                            ^^^^ expected {{{, got {{{{
+  12 | </footer>
+     |
 ---
 name: Too many closing braces
+enable: true
+should: error
 input: |
   <footer>
     <menu>
@@ -192,10 +236,21 @@ input: |
     </p>
     <p><small>&copy;</small> {{now | format "2006" }}}} {{params.author.name}}</p>
   </footer>
-expected: "Too many closing braces <Point to location>"
-actual: Nothing. The page compiles with no warnings or errors
+expected: |
+  Too many closing braces
+   --> <test>:11:50
+    |
+   9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  10 |   </p>
+  11 |   <p><small>&copy;</small> {{now | format "2006" }}}} {{params.author.name}}</p>
+     |                                                  ^^^^ expected }}, got }}}
+  12 | </footer>
+     |
 ---
+# TODO: Implement
 name: Frontmatter missing closing quote on key
+enable: false
+should: warn
 input: |
   {
     "title: Docs"
@@ -208,7 +263,10 @@ expected: 'TODO:'
 actual: |
   [ERROR] --- [42:parse_frontmatter()] failed to parse frontmatter JSON: Expected_Colon_After_Key
 ---
+# TODO: Implement
 name: Fronmatter missing opening quote on value
+should: warn
+enable: false
 input: |
   {
     "title": Docs"
@@ -220,48 +278,87 @@ input: |
 expected: 'detailed diagnostic pointing to the point of failure and suggesting the addition of a quote'
 actual: Nothing. The page compiles with no warnings or errors
 ---
-name: No error when missing index page.
+name: No error when missing index page
+enable: true
+should: error
 expected: 'Your site has no index page! Please create an index.md or index.html file in ./content/'
-actual: Nothing. The site compiles with no warnings or errors
 ---
+# FIXME: Doesn't  work properly
 name: format pipe with no date format set
+enable: true
+should: warn
+input: '{{ now | format }}'
 expected: |
-  Show where the error was triggered. Should also show the format that will be used
-actual: |
-  [ERROR] --- [333:apply_format()] format pipe used but no date format configured (set date.format in thor.json) Default will be used
+  no date format configured — set date.format in thor.json or specify a format, e.g. {{key | format "2 Jan 2006"}}
+   --> <test>:1:10
+    |
+  1 | {{now | format}}
+    |         ^^^^^^ defaulting to "2 Jan 2006"
 ---
+# TODO: called First/last, but only tests first
 name: first/last with zero argument
+enable: true
+should: error
 input: |
   <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
-expected: Error with source location — "argument must not be zero"
-actual: |
-  [ERROR] --- [render_template()] argument must not be zero
-   --> <file>:<line>:<col>
+expected: |
+  argument must not be zero
+   --> <test>:1:5
     |
-  N | <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  1 | <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
+    |                ^^^^^^^
     |
 ---
+# TODO: called First/last, but only tests first
 name: first/last with negative argument
+enable: true
+should: warn
 input: |
   <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
-expected: Warning with source location — "first -3 is equivalent to last 3 — consider using the clearer form"
-actual: |
-  [WARN ] --- [take()] first -3 is equivalent to last 3
-   --> <file>:<line>:<col>
+expected: |
+  first -3 is equivalent to last 3
+   --> <test>:1:5
     |
-  N | <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^ consider using the clearer form
+  1 | <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
+    |                ^^^^^^^^ consider using the clearer form
     |
 ---
+# TODO: called First/last, but only tests first
 name: first/last on string with no argument
-input: |
-  {{word | first}}
-expected: Warning with source location — "defaulting to n=1 for string; consider specifying n explicitly"
-actual: |
-  [WARN ] --- [take()] defaulting to n=1 for string
-   --> <file>:<line>:<col>
+# enable: true
+input: '{{word | first}}'
+should: warn
+expected: |
+  defaulting to n=1 for string
+   --> <test>:1:1
     |
-  N | {{word | first}}
-    | ^^^^^^^^^^^^^^^ consider specifying n explicitly
+  1 | {{word | first}}
+    |          ^^^^^ consider specifying n explicitly
     |
+---
+name: "first succeeds on params.author.name"
+enable: true
+input: '{{ params.author.name | first 3 }}'
+should: ok
+expected: "foo"
+---
+# TODO: called First/last, but only tests first
+name: "first/last in partial"
+enable: true
+input: "{{> footer }}"
+should: error
+expected: |
+  first -3 is equivalent to last 3
+   --> /home/spencer/github.com/sbrow.github.io/layouts/partials/footer.html:1:1
+    |
+  1 | <footer>
+    | ^ consider using the clearer form
+  2 |   <menu>
+  3 |     <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+    |
+---
+name: "Pipes are ignored in comments"
+enable: true
+should: ok
+input: 'Hello, {{! now | format "2006" }}'
+expected: 'Hello, '

@@ -37,6 +37,7 @@
 - [ ] merge `render_{section,home_html,page_html}` procs.
 - [ ] try to combine render_page_html and render_home_html?
 - [ ] make `parse` an overload of `parse_text/parse_inline` and `parse_file`, or something.
+- [ ] refactor `mustache.load_partials` to accept an iterator so we don't copy `main.load_partials`
 
 ### Menus
 

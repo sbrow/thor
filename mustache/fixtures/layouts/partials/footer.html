@@ -1,0 +1,12 @@
+<footer>
+  <menu>
+    <a class="goto-top opacity-0" href="#">{{> icons/chevron_up}}</a>
+    {{#params.social}}
+    <a href="{{url}}" target="_blank" rel="noopener noreferrer me" title="{{name}}">{{>* icon}}</a>
+    {{/params.social}}
+  </menu>
+  <p>Proudly built with <a href="https://github.com/sbrow/thor/">Thor</a> and <a
+      href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
+  </p>
+  <p><small>&copy;</small> {{! now | format "2006" }} {{params.author.name | first -3 }}</p>
+</footer>

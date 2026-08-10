@@ -1,7 +1,10 @@
 #+test
 package mustache
 
+import "core:encoding/json"
 import "core:fmt"
+import "core:os"
+import "core:path/filepath"
 import "core:strings"
 import "core:testing"
 
@@ -475,3 +478,243 @@ test_parse_error_pipe_parse_in_inverted_keeps_double_braces :: proc(t: ^testing.
 		fmt.tprintf("msg should contain literal '{{^', got %q", b.msg),
 	)
 }
+
+// ---------------------------------------------------------------------------
+// Data-driven diagnostic cases (from DIAGNOSTIC_TODOS.yaml)
+//
+// write_diagnostic_tests generates diagnostic_test_cases_test.odin from the
+// enabled cases in DIAGNOSTIC_TODOS.yaml. On the first run (or when the YAML
+// changes), it regenerates the file and fails. On the second run, each case
+// runs as an individual test via run_diag_case.
+// ---------------------------------------------------------------------------
+
+Diag_Context :: struct {
+	items:  [5]string,
+	word:   string,
+	params: json.Object,
+	now:    string,
+}
+
+diag_ctx :: proc() -> Diag_Context {
+	params_raw := `{ "author": { "name": "foo bar"}}`
+	params_val, err := json.parse(params_raw, allocator = context.temp_allocator)
+	assert(err == nil)
+	params, ok := params_val.(json.Object)
+	assert(ok)
+	return Diag_Context {
+		items = {"a", "b", "c", "d", "e"},
+		word = "Hello, World!",
+		params = params,
+		now = "2026-08-10T16:21:55-04:00",
+	}
+}
+
+diag_partials :: proc() -> map[string]Template {
+	dirs := [?]string{#directory, "fixtures/layouts/partials"}
+	partials_dir, _ := filepath.join(dirs[:], context.temp_allocator)
+	return load_partials(partials_dir, allocator = context.temp_allocator)
+}
+
+diag_slug :: proc(name: string) -> string {
+	sb: strings.Builder
+	strings.builder_init(&sb, context.temp_allocator)
+	prev_underscore := false
+	for r in name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			strings.write_rune(&sb, r)
+			prev_underscore = false
+		} else if r >= 'A' && r <= 'Z' {
+			strings.write_rune(&sb, r + 32)
+			prev_underscore = false
+		} else {
+			if !prev_underscore && strings.builder_len(sb) > 0 {
+				strings.write_rune(&sb, '_')
+				prev_underscore = true
+			}
+		}
+	}
+	s := strings.to_string(sb)
+	if len(s) > 0 && s[len(s) - 1] == '_' {
+		s = s[:len(s) - 1]
+	}
+	return s
+}
+
+run_diag_case :: proc(t: ^testing.T, name: string) {
+	cases := load_diag_cases("../DIAGNOSTIC_TODOS.yaml")
+	ctx := diag_ctx()
+	partials := diag_partials()
+
+	for c in cases {
+		if c.name != name do continue
+
+		switch c.should {
+		case "error":
+			tmpl, perr := parse(c.input, "<test>", allocator = context.temp_allocator)
+			if perr != nil {
+				formatted := format_render_error(perr, tmpl, colorize = false)
+				testing.expect_value(t, formatted, c.expected)
+				return
+			}
+
+			_, rerr := render(tmpl, ctx, partials, context.temp_allocator)
+			testing.expect(
+				t,
+				rerr != nil,
+				fmt.tprintf("[%s] should error but render succeeded", c.name),
+			)
+			if rerr == nil do return
+
+			formatted := format_render_error(rerr, tmpl, colorize = false)
+			testing.expect_value(t, formatted, c.expected)
+
+		case "pass":
+			tmpl, perr := parse(c.input, "<test>", allocator = context.temp_allocator)
+			testing.expect(
+				t,
+				perr == nil,
+				fmt.tprintf(
+					"[%s] should parse, got: %s",
+					c.name,
+					perr != nil ? format_render_error(perr, tmpl, colorize = false) : "",
+				),
+			)
+			if perr != nil do return
+
+			_, rerr := render(tmpl, ctx, partials, context.temp_allocator)
+			testing.expect(
+				t,
+				rerr == nil,
+				fmt.tprintf(
+					"[%s] should not error, got: %s",
+					c.name,
+					rerr != nil ? format_render_error(rerr, tmpl, colorize = false) : "",
+				),
+			)
+
+		case "ok":
+			tmpl, perr := parse(c.input, "<test>", allocator = context.temp_allocator)
+			testing.expect(
+				t,
+				perr == nil,
+				fmt.tprintf(
+					"[%s] should parse, got: %s",
+					c.name,
+					perr != nil ? format_render_error(perr, tmpl, colorize = false) : "",
+				),
+			)
+			if perr != nil do return
+
+			result, rerr := render(tmpl, ctx, partials, context.temp_allocator)
+			testing.expect(
+				t,
+				rerr == nil,
+				fmt.tprintf(
+					"[%s] should not error, got: %s",
+					c.name,
+					rerr != nil ? format_render_error(rerr, tmpl, colorize = false) : "",
+				),
+			)
+			if rerr != nil do return
+
+			testing.expect_value(t, result, c.expected)
+
+		case "warn":
+			tmpl, perr := parse(c.input, "<test>", allocator = context.temp_allocator)
+			testing.expect(
+				t,
+				perr == nil,
+				fmt.tprintf(
+					"[%s] should parse, got: %s",
+					c.name,
+					perr != nil ? format_render_error(perr, tmpl, colorize = false) : "",
+				),
+			)
+			if perr != nil do return
+
+			warnings := make([dynamic]Error, 0, 4, context.temp_allocator)
+			_, rerr := render(tmpl, ctx, partials, context.temp_allocator, &warnings)
+			testing.expect(
+				t,
+				rerr == nil,
+				fmt.tprintf(
+					"[%s] should not error, got: %s",
+					c.name,
+					rerr != nil ? format_render_error(rerr, tmpl, colorize = false) : "",
+				),
+			)
+			if rerr != nil do return
+
+			testing.expect(
+				t,
+				len(warnings) > 0,
+				fmt.tprintf("[%s] should produce a warning", c.name),
+			)
+			if len(warnings) == 0 do return
+
+			formatted := format_render_error(warnings[0], tmpl, colorize = false)
+			testing.expect_value(t, formatted, c.expected)
+
+		case:
+			testing.expectf(t, false, "[%s] unknown should value: '%s'", c.name, c.should)
+		}
+		return
+	}
+
+	testing.expectf(t, false, "case '%s' not found in DIAGNOSTIC_TODOS.yaml", name)
+}
+
+@(test)
+write_diagnostic_tests :: proc(t: ^testing.T) {
+	cases := load_diag_cases("../DIAGNOSTIC_TODOS.yaml")
+	testing.expect(t, len(cases) > 0, "should load diagnostic cases")
+
+	sb: strings.Builder
+	strings.builder_init(&sb, context.temp_allocator)
+	strings.write_string(&sb, "#+test\n")
+	strings.write_string(&sb, "package mustache\n\n")
+	strings.write_string(&sb, "import \"core:testing\"\n\n")
+
+	count := 0
+	for c in cases {
+		if !c.enable do continue
+		if c.should == "" {
+			testing.expectf(t, false, "[%s] has enable: true but no should value", c.name)
+			continue
+		}
+		count += 1
+		slug := diag_slug(c.name)
+		strings.write_string(&sb, "@(test)\n")
+		strings.write_string(&sb, "test_diag_")
+		strings.write_string(&sb, slug)
+		strings.write_string(&sb, " :: proc(t: ^testing.T) {\n")
+		strings.write_string(&sb, "\trun_diag_case(t, \"")
+		strings.write_string(&sb, c.name)
+		strings.write_string(&sb, "\")\n}\n\n")
+	}
+
+	testing.expect(t, count > 0, "at least one case should be enabled")
+
+	generated := strings.to_string(sb)
+
+	dirs := [?]string{#directory, "diagnostic_test_cases_test.odin"}
+	gen_path, _ := filepath.join(dirs[:], context.temp_allocator)
+
+	existing_data, _ := os.read_entire_file_from_path(gen_path, context.temp_allocator)
+	existing := string(existing_data)
+
+	if existing == generated do return
+
+	werr := os.write_entire_file(gen_path, transmute([]byte)generated)
+	if werr != nil {
+		testing.expectf(t, false, "failed to write %s: %v", gen_path, werr)
+		return
+	}
+	testing.expectf(
+		t,
+		false,
+		"diagnostic_test_cases_test.odin regenerated (%d cases), re-run tests to see results",
+		count,
+	)
+}
+
