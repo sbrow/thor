@@ -221,14 +221,26 @@ apply_pipeline :: proc(
 	pos: int,
 	ctx: []any,
 	tmpl: Template,
+	warnings: ^[dynamic]Error = nil,
 ) -> (
 	current: any,
 	err: Error,
 ) {
 	current = value
 	for &filter in filters {
-		current = apply_filter(current, &filter, pos, ctx, tmpl) or_return
-		log.debugf("applied: filter=%v before=%s after=%s pos=%d", filter, value, current, pos)
+		result, ferr := apply_filter(current, &filter, pos, ctx, tmpl)
+		if ferr != nil {
+			b := body(ferr)
+			if b.kind != .Warning {
+				return result, ferr
+			}
+			if warnings != nil {
+				append(warnings, ferr)
+			} else {
+				log.warnf("%s", format_render_error(ferr, tmpl))
+			}
+		}
+		current = result
 	}
 	return
 }
@@ -438,6 +450,7 @@ take :: proc(
 	elem_info, count, data := list_info(value)
 	is_list := elem_info != nil
 	from_start := from_start
+	warning: Error = nil
 
 	str: string
 	if !is_list {
@@ -457,15 +470,14 @@ take :: proc(
 
 	n := 1
 	if !is_list && len(args) == 0 {
-		path := tmpl.path != "" ? tmpl.path : "<input>"
-		diag := format_tag_error(
-			path,
-			tmpl.source,
-			op_pos,
-			"defaulting to n=1 for string",
-			"consider specifying n explicitly",
-		)
-		log.warnf("%s", diag)
+		warning = Error_Body {
+			msg = "defaulting to n=1 for string",
+			pos = tag_pos,
+			kind = .Warning,
+			source = tmpl.source,
+			path = tmpl.path,
+			hint = "consider specifying n explicitly",
+		}
 	}
 	if len(args) > 0 {
 		parsed, ok := strconv.parse_int(args[0])
@@ -494,15 +506,14 @@ take :: proc(
 	if n < 0 {
 		op_name := from_start ? "first" : "last"
 		alt_name := from_start ? "last" : "first"
-		path := tmpl.path != "" ? tmpl.path : "<input>"
-		diag := format_tag_error(
-			path,
-			tmpl.source,
-			op_pos,
-			fmt.tprintf("%s %d is equivalent to %s %d", op_name, n, alt_name, 0 - n),
-			"consider using the clearer form",
-		)
-		log.warnf("%s", diag)
+		warning = Error_Body {
+			msg = fmt.tprintf("%s %d is equivalent to %s %d", op_name, n, alt_name, 0 - n),
+			pos = tag_pos,
+			kind = .Warning,
+			source = tmpl.source,
+			path = tmpl.path,
+			hint = "consider using the clearer form",
+		}
 		from_start = !from_start
 		n = 0 - n
 	}
@@ -522,9 +533,9 @@ take :: proc(
 		for j in start ..< end {
 			append(&result, extract_list_element(elem_info, data, j))
 		}
-		return result, nil
+		return any{new_clone(result, context.temp_allocator), typeid_of([dynamic]any)}, warning
 	} else {
-		return str[start:end], nil
+		return any{new_clone(str[start:end], context.temp_allocator), typeid_of(string)}, warning
 	}
 }
 

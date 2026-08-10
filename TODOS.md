@@ -1,5 +1,10 @@
 # TODOs
 
+## Priority Unclear (Evaluate Later)
+
+- [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
+  - when limit reached, the template fails and stops rendering.
+
 ## General
 
 Remember to polish existing features before moving on to new ones.

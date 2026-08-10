@@ -23,8 +23,9 @@ Context_Stack :: [dynamic]any
 // ---------------------------------------------------------------------------
 
 Error_Kind :: enum {
-	Syntax, // parse-time: malformed template
-	Data, // render-time: template fine, data wrong (e.g. filter misuse)
+	Syntax,   // parse-time: malformed template
+	Data,     // render-time: template fine, data wrong (e.g. filter misuse)
+	Warning,  // non-fatal: operation succeeded but user should know
 }
 
 Error_Body :: struct {
@@ -176,6 +177,7 @@ render :: proc(
 	data: any,
 	partials: map[string]Template = nil,
 	allocator := context.allocator,
+	warnings: ^[dynamic]Error = nil,
 ) -> (
 	result: string,
 	err: Error,
@@ -201,7 +203,7 @@ render :: proc(
 	}
 
 	all_nodes := tmpl.nodes[:]
-	err = render_nodes(tmpl, all_nodes, &ctx, partials, &builder)
+	err = render_nodes(tmpl, all_nodes, &ctx, partials, &builder, warnings = warnings)
 	if err != nil {
 		return result, err
 	}
@@ -545,6 +547,7 @@ render_template :: proc(
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override,
 	indent: string,
+	warnings: ^[dynamic]Error = nil,
 ) -> Error {
 	if len(indent) > 0 {
 		state := Indent_State {
@@ -552,9 +555,9 @@ render_template :: proc(
 			at_line_start = false,
 		}
 		strings.write_string(b, indent) // first line always gets indent
-		return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, &state)
+		return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, &state, warnings)
 	}
-	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, nil)
+	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, nil, warnings)
 }
 
 write_indented :: proc(
@@ -598,6 +601,7 @@ render_nodes :: proc(
 	b: ^strings.Builder,
 	blocks: map[string]Block_Override = nil,
 	indent_state: ^Indent_State = nil,
+	warnings: ^[dynamic]Error = nil,
 ) -> Error {
 	i := 0
 	for i < len(nodes) {
@@ -621,7 +625,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -640,7 +644,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -655,7 +659,7 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
@@ -669,15 +673,16 @@ render_nodes :: proc(
 						elem := extract_list_element(elem_info, data, j)
 						context_push(ctx, elem, current, node)
 						defer pop(ctx)
-						render_nodes(
-							current,
-							children,
-							ctx,
-							partials,
-							b,
-							blocks,
-							indent_state,
-						) or_return
+					render_nodes(
+						current,
+						children,
+						ctx,
+						partials,
+						b,
+						blocks,
+						indent_state,
+						warnings,
+					) or_return
 					}
 				} else {
 					context_push(ctx, val, current, node)
@@ -690,6 +695,7 @@ render_nodes :: proc(
 						b,
 						blocks,
 						indent_state,
+						warnings,
 					) or_return
 				}
 			}
@@ -701,23 +707,24 @@ render_nodes :: proc(
 				warn_unknown_key(current, ctx[:], node)
 			}
 			if len(node.filters) > 0 {
-				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current)
+				transformed, perr := apply_pipeline(val, node.filters[:], node.pos, ctx[:], current, warnings)
 				if perr != nil {
 					return tag_error(perr, current)
 				}
 				val = transformed
 			}
-			if !is_truthy(val) {
-				render_nodes(
-					current,
-					node.children,
-					ctx,
-					partials,
-					b,
-					blocks,
-					indent_state,
-				) or_return
-			}
+		if !is_truthy(val) {
+			render_nodes(
+				current,
+				node.children,
+				ctx,
+				partials,
+				b,
+				blocks,
+				indent_state,
+				warnings,
+			) or_return
+		}
 			i += 1 + len(node.children)
 
 		case .Partial:
@@ -730,7 +737,7 @@ render_nodes :: proc(
 			if !found {
 				warn_missing_partial(current, partials, node, name)
 			} else {
-				render_template(pt, ctx, partials, b, nil, node.indent) or_return
+				render_template(pt, ctx, partials, b, nil, node.indent, warnings) or_return
 				if indent_state != nil {
 					indent_state.at_line_start = false
 				}
@@ -765,6 +772,7 @@ render_nodes :: proc(
 					&temp,
 					content_blocks,
 					nil,
+					warnings,
 				) or_return
 				at_ls := true
 				write_indented(b, node.indent, strings.to_string(temp), &at_ls)
@@ -777,6 +785,7 @@ render_nodes :: proc(
 					b,
 					content_blocks,
 					indent_state,
+					warnings,
 				) or_return
 			}
 			i += 1 + len(node.children)
@@ -789,7 +798,7 @@ render_nodes :: proc(
 				warn_missing_partial(current, partials, node, node.key)
 			} else {
 				warn_unmatched_block_overrides(current, pt, parent_children)
-				render_template(pt, ctx, partials, b, merged, node.indent) or_return
+				render_template(pt, ctx, partials, b, merged, node.indent, warnings) or_return
 				if indent_state != nil {
 					indent_state.at_line_start = false
 				}
