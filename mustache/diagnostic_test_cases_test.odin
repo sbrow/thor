@@ -29,6 +29,11 @@ test_diag_empty_tag :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_diag_empty_raw_tag :: proc(t: ^testing.T) {
+	run_diag_case(t, "empty raw tag")
+}
+
+@(test)
 test_diag_missing_pipe_arguement :: proc(t: ^testing.T) {
 	run_diag_case(t, "Missing pipe arguement")
 }

@@ -130,7 +130,7 @@ input: |
   </footer>
 expected: |
   Empty tag
-   --> <test>:11:28
+    --> <test>:11:28
      |
    9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
   10 |   </p>
@@ -138,6 +138,19 @@ expected: |
      |                            ^^^^ tag must contain a key
   12 | </footer>
      |
+---
+name: empty raw tag
+enable: true
+should: error
+input: |
+  Hello, {{&}}
+expected: |
+  Empty tag
+   --> <test>:1:8
+    |
+  1 | Hello, {{&}}
+    |        ^^^^^ tag must contain a key
+    |
 ---
 name: Missing pipe arguement
 enable: true

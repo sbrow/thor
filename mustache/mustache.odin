@@ -271,6 +271,14 @@ parse_section :: proc(
 			pos^ += 1
 
 		case .Variable:
+			if len(strings.trim_space(tok.value)) == 0 {
+				return Error_Body {
+					msg = "Empty tag",
+					pos = tok.pos,
+					kind = .Syntax,
+					hint = "tag must contain a key",
+				}
+			}
 			idx := len(nodes)
 			append(nodes, Node{kind = .Variable})
 			pipe_key, perr := parse_pipeline(
@@ -290,6 +298,14 @@ parse_section :: proc(
 			pos^ += 1
 
 		case .Unescaped:
+			if len(strings.trim_space(tok.value)) == 0 {
+				return Error_Body {
+					msg = "Empty tag",
+					pos = tok.pos,
+					kind = .Syntax,
+					hint = "tag must contain a key",
+				}
+			}
 			idx := len(nodes)
 			append(nodes, Node{kind = .Unescaped})
 			pipe_key, perr := parse_pipeline(
