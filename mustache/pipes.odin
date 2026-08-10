@@ -60,9 +60,10 @@ pipe_op_candidates :: proc(allocator := context.temp_allocator) -> []string {
 }
 
 Pipe_Filter :: struct {
-	op:     string,
-	args:   [dynamic; MAX_PIPE_ARGS]string,
-	op_pos: int,
+	op:       string,
+	args:     [dynamic; MAX_PIPE_ARGS]string,
+	op_pos:   int,
+	end_pos:  int,
 }
 
 Group :: struct {
@@ -197,8 +198,9 @@ parse_pipeline :: proc(
 		}
 
 		filter := Pipe_Filter {
-			op     = tokens[0],
-			op_pos = content_base + op_offset_in_content,
+			op      = tokens[0],
+			op_pos  = content_base + op_offset_in_content,
+			end_pos = content_base + op_offset_in_content + len(seg),
 		}
 		for j in 1 ..< len(tokens) {
 			append(&filter.args, tokens[j])
@@ -297,7 +299,8 @@ apply_filter :: proc(
 
 	switch op {
 	case .Group_By:
-		return apply_group_by(value, filter.args[:], pos)
+		span := filter.end_pos - filter.op_pos
+		return apply_group_by(value, filter.args[:], filter.op_pos, span)
 	case .Format:
 		str, ok := reflect.as_string(value)
 		if !ok {
@@ -337,9 +340,11 @@ apply_filter :: proc(
 			return any{new_clone(str2, context.temp_allocator), typeid_of(string)}, nil
 		}
 	case .First:
-		return take(value, filter.args[:], true, tmpl, pos, filter.op_pos)
+		span := filter.end_pos - filter.op_pos
+		return take(value, filter.args[:], true, tmpl, filter.op_pos, span)
 	case .Last:
-		return take(value, filter.args[:], false, tmpl, pos, filter.op_pos)
+		span := filter.end_pos - filter.op_pos
+		return take(value, filter.args[:], false, tmpl, filter.op_pos, span)
 	}
 	return {}, nil
 }
@@ -381,19 +386,27 @@ apply_format :: proc(
 }
 
 // Groups preserve first-appearance order from the input list.
-apply_group_by :: proc(value: any, args: []string, pos: int) -> (result: any, err: Error) {
+apply_group_by :: proc(value: any, args: []string, pos: int, span: int) -> (result: any, err: Error) {
 	if len(args) != 1 {
+		hint := ""
+		if len(args) == 0 {
+			hint = "missing argument"
+		} else {
+			hint = "too many arguments"
+		}
 		return nil, Error_Body {
 			msg = fmt.tprintf("group_by expects 1 argument, got %d", len(args)),
 			pos = pos,
+			span = span,
 			kind = .Data,
+			hint = hint,
 		}
 	}
 	field := args[0]
 
 	elem_info, count, data := list_info(value)
 	if elem_info == nil {
-		return nil, Error_Body{msg = "group_by expects a list", pos = pos, kind = .Data}
+		return nil, Error_Body{msg = "group_by expects a list", pos = pos, span = span, kind = .Data}
 	}
 
 	groups := make([dynamic]Group, 0, 8, context.temp_allocator)
@@ -441,8 +454,8 @@ take :: proc(
 	args: []string,
 	from_start: bool,
 	tmpl: Template,
-	tag_pos: int,
 	op_pos: int,
+	span: int,
 ) -> (
 	any,
 	Error,
@@ -458,7 +471,8 @@ take :: proc(
 		if !is_str {
 			return nil, Error_Body {
 				msg = "requires a list or string",
-				pos = tag_pos,
+				pos = op_pos,
+				span = span,
 				kind = .Data,
 				source = tmpl.source,
 				path = tmpl.path,
@@ -472,7 +486,8 @@ take :: proc(
 	if !is_list && len(args) == 0 {
 		warning = Error_Body {
 			msg = "defaulting to n=1 for string",
-			pos = tag_pos,
+			pos = op_pos,
+			span = span,
 			kind = .Warning,
 			source = tmpl.source,
 			path = tmpl.path,
@@ -484,7 +499,8 @@ take :: proc(
 		if !ok {
 			return nil, Error_Body {
 				msg = fmt.tprintf("invalid argument '%s'", args[0]),
-				pos = tag_pos,
+				pos = op_pos,
+				span = span,
 				kind = .Data,
 				source = tmpl.source,
 				path = tmpl.path,
@@ -496,7 +512,8 @@ take :: proc(
 	if n == 0 {
 		return nil, Error_Body {
 			msg = "argument must not be zero",
-			pos = tag_pos,
+			pos = op_pos,
+			span = span,
 			kind = .Data,
 			source = tmpl.source,
 			path = tmpl.path,
@@ -508,7 +525,8 @@ take :: proc(
 		alt_name := from_start ? "last" : "first"
 		warning = Error_Body {
 			msg = fmt.tprintf("%s %d is equivalent to %s %d", op_name, n, alt_name, 0 - n),
-			pos = tag_pos,
+			pos = op_pos,
+			span = span,
 			kind = .Warning,
 			source = tmpl.source,
 			path = tmpl.path,

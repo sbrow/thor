@@ -157,12 +157,12 @@ input: |
   </footer>
 expected: |
   group_by expects 1 argument, got 0
-   --> <test>:11:36
-    |
+    --> <test>:11:36
+     |
    9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
   10 |   </p>
   11 |   <p><small>&copy;</small> {{now | group_by }} {{params.author.name}}</p>
-     |                                    ^^^^^^^^^ missing argument
+     |                                    ^^^^^^^^ missing argument
   12 | </footer>
      |
 ---
@@ -303,7 +303,7 @@ input: |
   <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
 expected: |
   argument must not be zero
-   --> <test>:1:5
+   --> <test>:1:16
     |
   1 | <ul>{{#items | first 0}}<li>{{.}}</li>{{/items}}</ul>
     |                ^^^^^^^
@@ -317,7 +317,7 @@ input: |
   <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
 expected: |
   first -3 is equivalent to last 3
-   --> <test>:1:5
+   --> <test>:1:16
     |
   1 | <ul>{{#items | first -3}}<li>{{.}}</li>{{/items}}</ul>
     |                ^^^^^^^^ consider using the clearer form
