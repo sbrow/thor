@@ -154,7 +154,7 @@ test_context_depth_warns :: proc(t: ^testing.T) {
 		return
 	}
 
-	result, rerr := render(tmpl, data, allocator = context.temp_allocator)
+	result, rerr := render_silenced(tmpl, data, allocator = context.temp_allocator)
 	testing.expect(t, rerr == nil, "depth warning must be non-fatal")
 	testing.expect_value(t, result, "found")
 }

@@ -79,7 +79,7 @@ run_one_test :: proc(
 	}
 	defer delete(tmpl.nodes)
 
-	result, rerr := render(tmpl, test["data"], partials)
+	result, rerr := render_silenced(tmpl, test["data"], partials)
 	if rerr != nil {
 		testing.expectf(t, false, "[%s] render error", name)
 		return false

@@ -541,6 +541,20 @@ diag_slug :: proc(name: string) -> string {
 	return s
 }
 
+render_silenced :: proc(
+	tmpl: Template,
+	data: any,
+	partials: map[string]Template = nil,
+	allocator := context.allocator,
+	warnings: ^[dynamic]Error = nil,
+) -> (string, Error) {
+	saved := context.logger
+	context.logger = log.nil_logger()
+	result, err := render(tmpl, data, partials, allocator, warnings)
+	context.logger = saved
+	return result, err
+}
+
 run_diag_case :: proc(t: ^testing.T, name: string) {
 	cases := load_diag_cases("../DIAGNOSTIC_TESTS.yaml")
 	ctx := diag_ctx()
@@ -558,7 +572,7 @@ run_diag_case :: proc(t: ^testing.T, name: string) {
 				return
 			}
 
-			_, rerr := render(tmpl, ctx, partials, context.temp_allocator)
+			_, rerr := render_silenced(tmpl, ctx, partials, context.temp_allocator)
 			testing.expect(
 				t,
 				rerr != nil,
@@ -582,7 +596,7 @@ run_diag_case :: proc(t: ^testing.T, name: string) {
 			)
 			if perr != nil do return
 
-			_, rerr := render(tmpl, ctx, partials, context.temp_allocator)
+			_, rerr := render_silenced(tmpl, ctx, partials, context.temp_allocator)
 			testing.expect(
 				t,
 				rerr == nil,
@@ -606,7 +620,7 @@ run_diag_case :: proc(t: ^testing.T, name: string) {
 			)
 			if perr != nil do return
 
-			result, rerr := render(tmpl, ctx, partials, context.temp_allocator)
+			result, rerr := render_silenced(tmpl, ctx, partials, context.temp_allocator)
 			testing.expect(
 				t,
 				rerr == nil,
@@ -634,7 +648,7 @@ run_diag_case :: proc(t: ^testing.T, name: string) {
 			if perr != nil do return
 
 			warnings := make([dynamic]Error, 0, 4, context.temp_allocator)
-			_, rerr := render(tmpl, ctx, partials, context.temp_allocator, &warnings)
+			_, rerr := render_silenced(tmpl, ctx, partials, context.temp_allocator, &warnings)
 			testing.expect(
 				t,
 				rerr == nil,
