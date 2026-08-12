@@ -1,7 +1,10 @@
 {
+  "base_url": "https://sbrow.github.io/thor",
+  "date": {
+    "timezone": "America/New_York"
+  },
   "markdown_extensions": {
-    // "footnotes": true
-    "foonotes": true
+    "footnotes": true
   },
   "params": {
     "author": {

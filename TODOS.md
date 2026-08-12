@@ -87,5 +87,6 @@ Debug log stats:
 - [ ] etc
 
 ## sbrow.github.io
+- [ ] The home file was accidentally deleted in commit 9a9f731
 - [ ] Ideas is now in the wrong spot. Date is wrong, and it is showing date
       when it shouldn't be.

@@ -3,6 +3,19 @@
   "date": "2026-07-22T08:54:00-04:00",
   "toc": true
 }
+<!--
+This document serves as the primary reference material for building Thor sites.
+
+It should include reference and description of all
+
+- markdown extensions
+- site configuration options
+- commandline flags
+- frontmatter options
+etc.
+
+TODO: Use consistent spacing with mustache tags
+-->
 
 ## Introduction
 
@@ -10,13 +23,26 @@ This guide assumes you have either read [The Guide](../guide), or have built a [
 
 ## Features
 
-Thor has many features and content processors available. In an effort to provide the best out of the box experience, most of them are enabled by default. 
+Thor has many features and content processors available. In an effort to provide the best out of the box experience, most of them are enabled by default. Those that aren't are chosen because either: 
+
+1. Significant Performance loses.
+2. Unexpected behaviour (content mangling)
+
+If you feel that an extension is in the wrong category, let is know! [^issues]
+
+[^issues]: TODO: Add a link to issues from here.
 
 ### Opt-In Features
 
-TODO: #### deflist syntax
+#### Footnotes
 
-TODO: #### footnotes
+By default, Thor uses Tufte style margin notes instead of footnotes. However, if you prefer Hugo style footnotes, you can enable them in the [config](#configuration) file.
+
+TODO: Explain what tufte style is.
+
+#### Syntax Highlighting
+
+The highlight extension enables server-side syntax highlighting, powered by TreeSitter. This feature requires downloading a grammar file for each language you want to highlight, and will raise your build times from several milliseconds to over 250
 
 #### Minify
 
@@ -24,22 +50,28 @@ If enabled, `minify` will perform simple whitespace removal on all your output `
 
 TODO: Do we minify inline css?
 
+#### Sections
+
+The `sections` extension wraps each of your content sections in a `<section>` block. Sections are opened just before each heading, and closed before the next heading, or the end the document, whichever comes first. 
+
 ### Opt-Out Features
 
 - emoji
 - sidenotes/marginnotes
 - syntax highlighting
 - heading ids
-- TODO: Table Of Contents Generation
+- Table Of Contents Generation
 - [GitHub style alerts](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)
+- deflist syntax[^deflist]
 
+[^deflist]: This may become opt-in in the future.
 
 ## Directories
 Like Hugo, a Thor project is a collection of specially named directories, plus an optional config file. All directories are optional, but it is recommended to at least have a `content` directory.
 
 content
 
-: `content` holds your pages and page bundles. See [Content](#content). If not found, thor will look for content files in the root of your current working directory.
+: `content` holds your pages and page bundles. If not found, thor will look for content files in the root of your current working directory. See [Content](#content) for more details.
 
  assets
  : `assets` contains any static files for your site (favicon.ico, etc.), as well as files you want to send through the asset pipeline (CSS or JS files). 
@@ -53,7 +85,7 @@ layouts
 
 All of these names can be remapped in `thor.json`.[^remap] 
 
-[^remap]: While directories can be remapped at the site level, modules must (currently) adhere to the defaults.
+[^remap]: While directories can be remapped at the site level, [modules](#modules) must (currently) adhere to the defaults.
 
 ### Assets
 
@@ -84,40 +116,83 @@ TODO: Don't forget to highlight differences from Hugo.
 
 ## Templates
 
-Sites are built using one or more template files written in an extended version of [mustache](https://mustache.github.io) templates. The [mustache manual](https://mustache.github.io/mustache.5.html) has great explainations and a lot of examples if you want to know more, but I'll summarize them for you here.
-
-The beauty of Mustache is that there is very little syntax; there are just 10 symbols you need learn: `{{`, `{{&`, `{{^`, `{{>`, `{{<`, `{{#`, `/}}`, `{{$`, `{{!`, and `|`.
-
-TODO: ^^ Badly worded sentence ^^
+Sites are built using one or more template files written with an extended version of [mustache](https://mustache.github.io). The [mustache manual](https://mustache.github.io/mustache.5.html) has great explainations and a lot of examples, but this section should tell you everything you need to know. 
 
 TODOS: Gotta describe base templates somewhere. (the same way we describe the partials)
 
 ### Tags
 
+The beauty of Mustache is that there is very little syntax; there are just 10 symbols you need learn: `{{`, `{{&`, `{{^`, `{{>`, `{{<`, `{{#`, `/}}`, `{{$`, `{{!`, and `|`.
+
 #### Variables
 
-In order to display a scalar (not-list) value in your template, simply wrap it in double curly braces. e.g. `{{ page.title }}`.
+In order to display a scalar (non-list) value in your template, simply wrap it in double curly braces. e.g. `{{ page.title }}`.
 
-This content will be HTML escaped (for safety), so if the value you're rendering contains HTML, you'll need to use the raw syntex instead `{{& page.title}}`[^raw] which will output the value without stripping or re-writing content.
+This content will be HTML escaped (for safety), so if the value you're rendering contains HTML, you'll need to use the raw syntax instead `{{& page.title}}`[^raw] which will output the value without escaping your HTML. Do so at your own risk.[^risk] 
 
-[^raw]: Official Triple brace syntax (`{{{ raw }}}`) is also supported, but `{{& raw }}` is preferred, as it's easy to accidentily insert too many braces.
+[^risk]: Or don't, if you don't know why this is dangerous. 
+
+[^raw]: Mustache also supports raw output through triple brace syntax (`{{{ raw }}}`), but `{{& raw }}` is preferred, as it's easy to accidentily insert too many braces.
+
+Leading and trailing whitespace(s) are ignored by the parser, so the folllowing are all equivilent: `{{& title }}`, `{{&title}}`, `{{&  title}}`, `{{&title }}`.
 
 In most[^most] cases, invalid keys will be silently ignored (nothing between the braces will appear), in keeping with the official mustache spec.
 
-[^most]: TODO: in what cases won't it? spelllcheck + strict mode?
+[^most]: TODO: in what cases won't it? spelllcheck + strict mode? Also, people don't care about the spec, they care about how the app works. Also maybe mention strict mode here.
 
-Leading and trailing whitespace(s) are ignored by the parser, so the folllowing are all equivilent: `{{& title }}`, `{{&title}}`, `{{&  title}}`.
 
 #### Sections
-TODO: 
+> Sections render blocks of text zero or more times, depending on the value of the key in the current context.
+
+Sections allow you to render text conditionally, and also allow you to render lists[^iffor]. They are opened with `{{#key}}` and closed with `{{/key}}`.
+
+[^iffor]: These would be your `if` and `for` blocks in a logic-ful language.
+
+```mustache
+{{og.title}}
+Shown if OpenGraph title is set!
+{{/og.title}}
+
+<ul>
+{{#pages}}
+<li>{{name}}</li>
+{{/pages}}
+</ul>
+```
 
 #### Inverted Sections
-TODO: 
+All of the syntax we've described so far renders text when its value is *not* empty. Inverted sections render text when the value given to them *is* empty.[^unless] This allows you to display special conent when no values exist, for example.
+
+> [!NOTE]
+>  Empty values include `""` (an empty string), `[]` (an empty list), `false`
+
+Inverted sections are opened with `{{^key}}` and closed with `{{/key}}`.
+
+```mustache
+<ul>
+{{#pages}}<li>{{name}}</li>{{/pages}}
+</ul>
+{{^pages}}
+We don't have anything to show you right now, come back later!
+{{/pages}}
+```
+
+[^unless]: This would be your `if not` or `unless` keyword in a logic-ful template.
 
 #### Partials
-TODO: 
+Single file templates have limited functionality. Fortunately, mustache lets you break your documents up into multiple files through the use of partials.
 
-TODO: Talk about MAX_CONTEXT_DEPTH (currently 16) and how it limits the total number of nested templates to 13. (3 for `[site, page, ctx]`)
+To include a partial, you use the `{{>name}}` syntax, where `name` is the path to the partial, relative to the `{{layouts_dir}}/partials` of the module. For example, with the default theme, the `footer` template exists in `{{theme_dir}}/layouts/partials/footer.html`, so you'd include it by adding `{{>footer}}` to you template.
+
+See [Partials](#partials-2) for more information.
+
+<!--
+If you want to, your partials can include partials, creating a tree of files. But don't go crazy with it.
+
+> [!WARNING]
+> You are limited in the number of partials you can nest, to around 13.
+> Please see [context depth](#depth-limit) to learn more.
+-->
 
 ##### Dynamic Partials
 
@@ -127,6 +202,8 @@ TODO:
 #### Parents
 TODO:
 
+Parents can be used by theme developers to create complex templates with multiple content slots.
+
 #### Summary
 
 `{{page.title}}` for normal values
@@ -135,7 +212,7 @@ TODO:
 `{{#params.is_starred}}<i class="fas fa-star"></i>{{/params.is_starred}}` for conditional content.
 `{{^pages}}No pages yet!{{/pages}}` to draw content when the value is empty.
 
-### Section Names
+### Block Names
 
 When building your own templates, you are of course free to pick whatever names you choose for your partials and content slots. However, sticking to conventions helps create consistency in the ecosystem, and reduces friction when relying on built-in templates.
 
@@ -211,20 +288,24 @@ TODO: Write
 
 `stylesheets`
 
-:  A list of paths to css files the users wants to include globally. These are rendered by the `{{> styles }}` partial, and can be omitted on sites that use custom templates. 
+:  A list of paths to css files the users wants to include globally. These are rendered by the `{{> styles }}` partial. 
 
 TODO: ^^ Bad sentence? ^^
 
+`scripts`
+
+:  A list of `<script>` tags the users wants to include globally. These are rendered by the `{{> scripts }}` partial. 
+
 #### The Context Stack 
-When building your page(s), each template is fed a Context[^ctx] stack that contains all the data should you need to build your page.
+When building your page(s), each template is fed a Context[^ctx] stack that contains all the data you should need to build your page.
 
-[^ctx]: (for developers) `Template_Context` is not the same as Odin's implicit `context` parameter.
+[^ctx]: (for developers) `Template_Context` is distinct from Odin's implicit `context` parameter.
 
-The context stack is initialized[^init] as `[site, page, context]`, meaning if you use a key like `{{title}}` in your template, it will look up `context.title`, `page.title`, and then finally `site.title`, using the first available value it can find.
+The context stack is initialized[^init] as `[site, page, context]`, meaning if you use a key like `{{title}}` in your template, it will first attempt to look up `context.title`, then `page.title`, and finally `site.title`, using the first available value it can find.
 
 [^init]: TODO: Don't use programmer speak.
 
-TODO: As you descend into sections/partials, new contexts are placed onto the stack, so they resolve first. (LIFO order)
+As you descend into sections/partials, new contexts are placed onto the stack, so they resolve first. (LIFO order). 
 
 ```mustache
 {{<base}}
@@ -242,10 +323,16 @@ TODO: As you descend into sections/partials, new contexts are placed onto the st
 {{/base}}
 ```
 
+##### Depth Limit
 
+For technical reasons, the context depth is limited to 16. This shouldn't matter to most users, but if you're running into errors, please see the [FAQ](./FAQ) for more information.
+
+---
 ### Filters
 
-Because mustache is a logic-less language, (there are no `for` or `if` tags), Thor extends mustache to include a handful of data filters in the form of pipes. Bash users will feel right at home here.
+Because mustache is a logic-less language, (there are no `for` or `if` keywords), things like grouping, sorting, and filtering, are not possible using standard syntax.
+
+To get around this, Thor extends mustache to include a handful of data filters in the form of pipes. Bash users will feel right at home here.
 
 `group_by <field>`
 
@@ -263,25 +350,25 @@ Because mustache is a logic-less language, (there are no `for` or `if` tags), Th
 {{/pages}}
 ```
 
-`sort_by <field> <asc|desc>`
+`sort_by <field> [asc|desc]`
 
 : Allows you to sort pages by the given field.
 
-`first <n>`
+`first [n]`
 
 : Given a list, returns only the first `n` items. `n` defaults to 1. Given a string, returns the first `n` runes of the string. To help catch mistakes, `n` is required for strings. 
 
-`last <n>`
+`last [n]`
 
 : Given a list, returns only the last `n` items. `n` defaults to 1. Given a string, returns the first `n` runes of the string. To help catch mistakes, `n` is required for strings. 
 
-`format "<format string>"`
+`format ["format string"]`
 
 : Used to display a date in a particular format. See [DateTimes](#datetimes). If no format is given, the default will be used. 
 
 #### Chaining Pipes
 
-Thor allows you to chain two or more pipes, to allow complex data manipulation. However for performance and stylistic reasons, you are limited to no more than **8 pipes**[^pipes] for any given tag. If you believe you need more than 8 pipes, please [open an issue](../issues) with a **concrete example** of the problem you are facing.
+Thor allows you to chain two or more pipes, to allow complex data manipulation. However you are limited to no more than **8 pipes**[^pipes] for any given tag. If you believe you need more than 8 pipes, please [open an issue](../issues) with a **clear** and **concrete** example of the problem you are facing.
 
 [^pipes]: TODO: This number must be kept in-sync with `MAX_PIPES`.
 
@@ -345,6 +432,16 @@ TODO: We keep referring to blocks and tags, should probably use consistent langu
 TODO: Should this be a subsection of a "Data Types" section?
 
 Dates are strings in one of the following formats:
+<!--
+| Format                      | Time zone                    |
+| --------------------------- | ---------------------------- |
+| `2023-10-15T13:18:50-07:00` | `America/Los_Angeles`        |
+| `2023-10-15T13:18:50-0700`  | `America/Los_Angeles`        |
+| `2023-10-15T13:18:50Z`      | `Etc/UTC`                    |
+| `2023-10-15T13:18:50`       | Default is local system time |
+| `2023-10-15`                | Default is local system time |
+| `15 Oct 2023`               | Default is local system time |
+-->
 
 <table>
 <thead>
@@ -381,13 +478,118 @@ Dates are strings in one of the following formats:
 </tbody>
 </table>
 
+
 If you want to display a date in a different format, you can use the `| format` Filter. With no argument, it will default to formatting the date with `site.date_format`.
+
+## Configuration
+
+Thor can be configured through commandline flags, content [frontmatter](#frontmatter), and the configuration file. Settings take precedence in that order, so command line flags will always override configured values.
+
+You can run `thor -help` to list all the available flags.
+
+### Config File
+
+The `thor.json` file at the root of your project is the heart of your Thor site. Hopefully, you'll write your site specific metadata here once, and you'll never have to touch it again.
+
+`title`
+
+: The title of your site. Will be rendered inside the `{{> title}}` partial.
+
+`description`
+
+: A brief description of your site. Can be used by theme authors, or as the default [OpenGraph](#open-graph) description.
+
+`base_url`
+
+: The root URL prepended to all links on your site.
+
+`date.format`
+
+: The default format to display dates in. Write the date you'd like to see formatted as [the go format string]. TODO: Explain
+
+`date.timezone`
+
+: The time zone to localize all formatted dates to. Will attempt to use the local system's zone if left unset. 
+
+TODO: validate the default
+
+TODO: Explain format
+
+`markdown_extensions`
+
+: This setting lets you control which markdown extensions are enabled on your site. It should be a mapping of  extension names to either `true` or `false`.
+The following keys are available:
+- `emoji`
+- `sidenotes`
+- `alerts`
+- `highlight`
+- `sections`
+- `headingids`
+- `deflists`
+- `footnotes`
+
+
+`content_dir`, `assets_dir`, `output_dir`, `layouts_dir`
+
+: These allow you to change the directory structure of your app. See [Directories](#directories) for more info. 
+
+> [!Note] 
+> This will not affect the directory structure of any of your modules.
+
+`modules`
+
+: This setting lets you layer modules onto the Union File System. See [modules](#modules) for more info. 
+
+`params`
+
+: Site-wide user customizable data. See [params](#params) for more info.
+
+`og`
+
+: Site-wide Open Graph metadata. See [Open Graph](#open-graph) for more info.
+
+`menus`
+
+Menu configuration for the site. Note that (unlike Hugo) if your configuration contains this key, frontmatter `menus` will be ignored. See [menus](#menus) for more info. 
+
+
 
 ## Open Graph
 
-TODO: default Template support
+Thor supports [Open Graph](https://ogp.me/) tags, allowing you to customize how your site looks when linked to on social media or in apps like Discord. It is accessible through the `{{>opengraph}}` template, which should be automatically included in your header by your theme.
+
+```html
+TODO: {{>opengraph shorcode here}}
+```
+
+The options are sourced [using the context stack], first from your page frontmatter, and then from your site config. Thor will attempt to infer as much information as possible, to keep you from needing to set them explictly.
+
+The following keys are available:
+- `og.title`
+- `og.type`
+- `og.image`
+- `og.url`
+- `og.description`
+- `og.locale`
+- `og.site_name`
+- `og.is_article`*
+- `og.published_time`*
+- `og.modified_time`*
+- `og.section`
+
+Please read [the protocol docs](https://ogp.me/#metadata) for the meaning and use of these keys.
+
+TODO: * keys are not a 1:1 mapping
 TODO: Template override support
 TODO: how to overwrite defaults (in page frontmatter / thor.json)
+
+## Modules
+
+TODO: Modules
+
+## Themes
+
+TODO: Themes
 
 ## Zen
 
