@@ -3,7 +3,6 @@ package mustache
 
 import "core:encoding/json"
 import "core:fmt"
-import "core:log"
 import "core:os"
 import "core:path/filepath"
 import "core:testing"
@@ -55,10 +54,6 @@ run_one_test :: proc(
 	test: json.Object,
 	name, template_src, expected: string,
 ) -> bool {
-	// Spec tests deliberately exercise missing keys, missing partials, etc.
-	// Silence the warnings to keep test output readable.
-	context.logger = log.nil_logger()
-
 	partials := make_map(map[string]Template, context.temp_allocator)
 
 	if "partials" in test {

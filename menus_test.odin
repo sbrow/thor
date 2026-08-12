@@ -100,7 +100,6 @@ test_menus_nil_input :: proc(t: ^testing.T) {
 
 @(test)
 test_menus_invalid_type :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 	arena: mem.Dynamic_Arena
 	mem.dynamic_arena_init(&arena)
 	defer mem.dynamic_arena_destroy(&arena)
@@ -113,7 +112,6 @@ test_menus_invalid_type :: proc(t: ^testing.T) {
 
 @(test)
 test_menus_array_non_string :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 	arena: mem.Dynamic_Arena
 	mem.dynamic_arena_init(&arena)
 	defer mem.dynamic_arena_destroy(&arena)
@@ -130,7 +128,6 @@ test_menus_array_non_string :: proc(t: ^testing.T) {
 
 @(test)
 test_menus_object_non_object_value :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 	arena: mem.Dynamic_Arena
 	mem.dynamic_arena_init(&arena)
 	defer mem.dynamic_arena_destroy(&arena)
@@ -146,7 +143,6 @@ test_menus_object_non_object_value :: proc(t: ^testing.T) {
 
 @(test)
 test_menus_non_numeric_weight :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 	arena: mem.Dynamic_Arena
 	mem.dynamic_arena_init(&arena)
 	defer mem.dynamic_arena_destroy(&arena)
@@ -161,7 +157,6 @@ test_menus_non_numeric_weight :: proc(t: ^testing.T) {
 
 @(test)
 test_menus_empty_title :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 	arena: mem.Dynamic_Arena
 	mem.dynamic_arena_init(&arena)
 	defer mem.dynamic_arena_destroy(&arena)

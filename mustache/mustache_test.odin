@@ -1,7 +1,6 @@
 #+test
 package mustache
 
-import "core:log"
 import "core:mem"
 import "core:strings"
 import "core:testing"
@@ -130,8 +129,6 @@ leak_repeated_render :: proc(t: ^testing.T) {
 // The depth warning must be non-fatal: rendering still succeeds.
 @(test)
 test_context_depth_warns :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
-
 	AMT :: MAX_CONTEXT_DEPTH + 2
 
 	// Build AMT nested {x: {...}} levels; the innermost holds `leaf`.

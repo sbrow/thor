@@ -5,7 +5,6 @@ package main
 import "core:encoding/json"
 import "core:flags"
 import "core:fmt"
-import "core:log"
 import "core:os"
 import "core:testing"
 import "core:time/datetime"
@@ -84,7 +83,6 @@ test_load_config_file_invalid_json :: proc(t: ^testing.T) {
 	cfg: Config_File
 	ok := false
 	{
-		context.logger = log.nil_logger()
 		ok = load_config_file(&cfg, path, context.temp_allocator)
 	}
 	testing.expect(t, !ok)
@@ -106,7 +104,6 @@ test_load_config_file_partial :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_defaults_no_config :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 
 	site: Site
 	_flags: Flags
@@ -126,7 +123,6 @@ test_init_site_defaults_no_config :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_config_dir_relative :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 
 	site: Site
 	_flags: Flags
@@ -142,7 +138,6 @@ test_init_site_config_dir_relative :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_flag_overrides_default :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 
 	site: Site
 	_flags: Flags
@@ -156,7 +151,6 @@ test_init_site_flag_overrides_default :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_full_pipeline :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 
 	path := write_temp_config(
 		"pipeline",
@@ -178,7 +172,6 @@ test_init_site_full_pipeline :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_md_enable_disable :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 
 	site: Site
 	_flags: Flags
@@ -199,7 +192,6 @@ test_init_site_md_enable_disable :: proc(t: ^testing.T) {
 
 @(test)
 test_init_site_config_paths :: proc(t: ^testing.T) {
-	context.logger = log.nil_logger()
 
 	path := write_temp_config(
 		"paths",
