@@ -167,6 +167,8 @@
               gdb
               perf
 
+              bloaty # du for binaries?
+
               # IDE
               unstable.helix
               claude-code
