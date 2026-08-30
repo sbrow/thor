@@ -4,6 +4,7 @@
 
 - [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
   - when limit reached, the template fails and stops rendering.
+- [ ] Brainstorm plugin/tool/(postccs/less/tailwind/sass) support.
 
 ## General
 

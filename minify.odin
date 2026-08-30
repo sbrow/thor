@@ -38,13 +38,16 @@ minify_html :: proc(source: string) -> string {
 	defer delete(comments)
 	preserves: [dynamic]Range
 	defer delete(preserves)
+	styles: [dynamic]Range
+	defer delete(styles)
 
-	collect_html_ranges(root, source, &comments, &preserves)
+	collect_html_ranges(root, source, &comments, &preserves, &styles)
 
 	sb := strings.builder_make()
 
 	ci := 0
 	pi := 0
+	si := 0
 	i := 0
 	last_written: u8 = 0
 
@@ -58,6 +61,21 @@ minify_html :: proc(source: string) -> string {
 			}
 			i = int(p.end)
 			pi += 1
+			continue
+		}
+
+		if si < len(styles) && u32(i) >= styles[si].start {
+			s := styles[si]
+			// NOTE: minify_css may return either a fresh allocation or the
+			// input slice unchanged (on parser failure), so the result is not
+			// freed here — matching this package's one-shot allocation style.
+			minified := minify_css(source[i:s.end])
+			strings.write_string(&sb, minified)
+			if len(minified) > 0 {
+				last_written = minified[len(minified) - 1]
+			}
+			i = int(s.end)
+			si += 1
 			continue
 		}
 
@@ -101,6 +119,7 @@ collect_html_ranges :: proc(
 	source: string,
 	comments: ^[dynamic]Range,
 	preserves: ^[dynamic]Range,
+	styles: ^[dynamic]Range,
 ) {
 	child_count := ts.node_named_child_count(node)
 	for i in 0 ..< child_count {
@@ -112,7 +131,17 @@ collect_html_ranges :: proc(
 				comments,
 				Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
 			)
-		} else if type_str == "script_element" || type_str == "style_element" {
+		} else if type_str == "style_element" {
+			// Preserve the <style> tags but minify the CSS body (the raw_text
+			// child) via the CSS-aware pass.
+			raw, ok := style_raw_text(child)
+			if ok {
+				append(
+					styles,
+					Range{start = ts.node_start_byte(raw), end = ts.node_end_byte(raw)},
+				)
+			}
+		} else if type_str == "script_element" {
 			append(
 				preserves,
 				Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
@@ -125,12 +154,25 @@ collect_html_ranges :: proc(
 					Range{start = ts.node_start_byte(child), end = ts.node_end_byte(child)},
 				)
 			} else {
-				collect_html_ranges(child, source, comments, preserves)
+				collect_html_ranges(child, source, comments, preserves, styles)
 			}
 		} else {
-			collect_html_ranges(child, source, comments, preserves)
+			collect_html_ranges(child, source, comments, preserves, styles)
 		}
 	}
+}
+
+// style_raw_text returns the raw_text (CSS body) child of a style_element.
+// ok is false for an empty <style></style>, which has no raw_text child.
+style_raw_text :: proc(style_element: ts.Node) -> (raw: ts.Node, ok: bool) {
+	child_count := ts.node_named_child_count(style_element)
+	for i in 0 ..< child_count {
+		child := ts.node_named_child(style_element, u32(i))
+		if string(ts.node_type(child)) == "raw_text" {
+			return child, true
+		}
+	}
+	return {}, false
 }
 
 html_tag_name :: proc(element: ts.Node, source: string) -> string {
@@ -224,7 +266,12 @@ minify_css :: proc(source: string) -> string {
 				next = source[j]
 			}
 
-			if !is_css_delim(last_written) && !is_css_delim(next) {
+			// Emit a single separating space, but never a leading space
+			// (last_written == 0), a doubled space (last_written == ' ',
+			// which happens when a stripped comment sits between two
+			// whitespace runs), or one adjacent to a delimiter.
+			if last_written != 0 && last_written != ' ' &&
+			   !is_css_delim(last_written) && !is_css_delim(next) {
 				strings.write_byte(&sb, ' ')
 				last_written = ' '
 			}
