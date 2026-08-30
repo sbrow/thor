@@ -9,6 +9,14 @@
 
 Remember to polish existing features before moving on to new ones.
 
+- [ ] Bake the default `layouts` into the binary at compile time via
+      `#load_directory` so the binary is self-contained and doesn't read
+      `DEFAULTS_PATH` from disk at runtime.
+  - `#load_directory` is NOT recursive and its `name` is the base filename
+    only, so `defaults/layouts` and `defaults/layouts/partials` must be loaded
+    separately and mounted into the VFS with `data` set (not `fs_path`).
+  - Removes the runtime dependency on `THOR_DEFAULTS_PATH` / `#directory` and
+    the need to ship `defaults/` alongside the binary (see `flake.nix`).
 - [ ] `build` command alias of default
 - [ ] `new site` command to set up new project
 - [ ] Some render errors blank the entire page instead of scoping to the failing tag.

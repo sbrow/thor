@@ -141,13 +141,20 @@
 
             buildPhase = ''
               runHook preBuild
-              odin build . -o:speed -no-bounds-check -out:${pname}-keep
+              odin build . -o:speed -no-bounds-check \
+                -define:THOR_DEFAULTS_PATH=$out/share/thor/defaults \
+                -out:${pname}-keep
               runHook postBuild
             '';
 
             installPhase = ''
               runHook preInstall
               install -Dm755 ${pname}-keep $out/bin/${pname}
+              # Ship the built-in default layouts alongside the binary. The
+              # binary reads these at runtime from THOR_DEFAULTS_PATH (baked in
+              # above). Keep in sync with defaults.odin.
+              mkdir -p $out/share/thor
+              cp -r defaults $out/share/thor/defaults
               runHook postInstall
             '';
           };
