@@ -59,7 +59,7 @@ jobs:
 
       - name: Generate site
         working-directory: site
-        run: ../result/bin/thor -base-url=https://sbrow.github.io/thor -minify
+        run: ../result/bin/thor -base-url=https://oneidiotdeveloper.com/thor -minify
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
