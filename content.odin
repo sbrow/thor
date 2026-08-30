@@ -71,6 +71,9 @@ site_load_content :: proc(site: ^Site) {
 
 	for &page in site.pages {
 		page.url = fmt.tprintf("%s%s", site.base_url, page.permalink)
+		if site.base_path != "" {
+			page.content = rewrite_root_urls(page.content, site.base_path, site_allocator(site))
+		}
 	}
 
 	build_menus(site)
@@ -289,6 +292,57 @@ load_page :: proc(
 	return
 }
 
+// rewrite_root_urls prefixes root-relative href/src attribute values with
+// base_path so links authored in content (e.g. [x](/ideas)) resolve under a
+// subpath deployment. Only values beginning with a single '/' are rewritten;
+// absolute ("http://…"), protocol-relative ("//cdn…"), fragment ("#x"),
+// mailto:, and document-relative ("foo/bar", "./foo") values all fail that
+// test and pass through untouched. Assumes cmark's double-quoted output.
+rewrite_root_urls :: proc(html, base_path: string, allocator := context.allocator) -> string {
+	b := strings.builder_make(allocator)
+	strings.builder_grow(&b, len(html))
+
+	i := 0
+	for i < len(html) {
+		n := attr_opener_at(html, i) // ` href="` or ` src="`
+		if n == 0 {
+			strings.write_byte(&b, html[i])
+			i += 1
+			continue
+		}
+		strings.write_string(&b, html[i:i + n]) // copy the opener verbatim
+		i += n
+
+		end := strings.index_byte(html[i:], '"')
+		if end < 0 { 	// malformed; bail cleanly
+			strings.write_string(&b, html[i:])
+			break
+		}
+		value := html[i:i + end]
+		if url_is_root_relative(value) {
+			strings.write_string(&b, base_path)
+		}
+		strings.write_string(&b, value) // closing quote copied next loop
+		i += end
+	}
+	return strings.to_string(b)
+}
+
+// url_is_root_relative reports whether value is a site-root path ("/faq/") as
+// opposed to protocol-relative ("//cdn") or anything not starting with '/'.
+url_is_root_relative :: proc(value: string) -> bool {
+	return len(value) >= 1 && value[0] == '/' && !strings.has_prefix(value, "//")
+}
+
+// attr_opener_at returns the length of a ` href="` / ` src="` attribute opener
+// at s[i:], or 0. The leading space anchors the match to a real HTML attribute
+// so we don't rewrite the strings inside link text or code blocks.
+attr_opener_at :: proc(s: string, i: int) -> int {
+	if strings.has_prefix(s[i:], " href=\"") do return 7
+	if strings.has_prefix(s[i:], " src=\"") do return 6
+	return 0
+}
+
 is_content_file :: proc(name: string) -> bool {
 	return strings.has_suffix(name, ".md") || strings.has_suffix(name, ".html")
 }
@@ -300,4 +354,3 @@ strip_extension :: proc(name: string) -> string {
 	}
 	return name[:dot]
 }
-
