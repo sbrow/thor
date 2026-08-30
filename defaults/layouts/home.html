@@ -5,7 +5,7 @@
     {{&content}}
   </header>
   <ul>
-    {{#pages}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date}}<time
+    {{#pages}} <li><a href="{{permalink | rel_url}}">{{&title}}</a><span>{{#date}}<time
           datetime="{{date}}">{{date | format}}</time>{{/date}}</span>
     </li>
     {{/pages}}

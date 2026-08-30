@@ -17,6 +17,12 @@ Site_Context :: struct {
 	title:       string,
 	description: string,
 	base_url:    string,
+	// base_path is the path component of base_url, normalized to a leading slash
+	// with no trailing slash ("" for root-hosted sites). Templates prefix internal
+	// root-relative links with it (directly, or via the `rel_url` pipe) so that
+	// subpath deployments — e.g. project pages at https://user.github.io/proj —
+	// resolve correctly.
+	base_path:   string,
 	params:      json.Object,
 	og:          Open_Graph,
 	menus:       map[string][]Menu_Entry,
@@ -127,6 +133,7 @@ init_site :: proc(site: ^Site, flags: Flags) {
 	}
 
 	site_apply_cli_flags(site, flags)
+	site.base_path = site_base_path(site.base_url, site_allocator(site))
 	site.config_path = path
 
 	site.og = og_for_site(site)
@@ -211,6 +218,48 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 
 	site.grammars = expand_path(config.grammars, site_allocator(site))
 	site.queries = expand_path(config.queries, site_allocator(site))
+}
+
+// site_base_path extracts the path component of base_url, normalized to a
+// leading slash with no trailing slash. Returns "" for root-hosted sites.
+//
+//   "https://ex.com/thor/" → "/thor"
+//   "https://ex.com/a/b"   → "/a/b"
+//   "https://ex.com"       → ""
+//   "http://localhost:8080/" → ""
+site_base_path :: proc(base_url: string, allocator := context.allocator) -> string {
+	url := base_url
+
+	// Strip scheme so the first '/' we find is the start of the path, not the
+	// "//" separating scheme and host.
+	if idx := strings.index(url, "://"); idx >= 0 {
+		url = url[idx + 3:]
+	}
+
+	// The path begins at the first '/' after the host.
+	slash := strings.index_byte(url, '/')
+	if slash < 0 {
+		return ""
+	}
+	path := url[slash:]
+
+	// Drop any query or fragment.
+	if idx := strings.index_byte(path, '?'); idx >= 0 {
+		path = path[:idx]
+	}
+	if idx := strings.index_byte(path, '#'); idx >= 0 {
+		path = path[:idx]
+	}
+
+	// Trim trailing slashes; a bare "/" normalizes to "".
+	for len(path) > 0 && path[len(path) - 1] == '/' {
+		path = path[:len(path) - 1]
+	}
+	if path == "" {
+		return ""
+	}
+
+	return strings.clone(path, allocator)
 }
 
 // expand_path replaces a leading ~/ with $HOME/.

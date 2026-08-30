@@ -4,3 +4,4 @@
 - [ ] Simplify `trim_standalone_whitespace` — four temp arrays (`li_buf`, `ri_buf`, `left_done`, `right_done`) could potentially be reduced to two by merging the done-tracking into the index buffers using sentinel values (e.g. `-2` = already trimmed).
 - [ ] Adjacent standalone tags don't capture indent for the second tag (e.g. `  {{>a}}\n  {{>b}}` — `{{>b}}` gets `indent=""` because its left text was consumed by `{{>a}}`'s right-trim). Blocks recover via `deindent_blocks`, but partials/parents have no fallback.
 - [ ] lazy load partials ? (with mutex)
+- [ ] Support changing delimiters (Set Delimiter tag `{{=<% %>=}}`). Delimiters `{{`/`}}`/`{{{`/`}}}` are hardcoded in [tokenizer.odin](./tokenizer.odin); needs an `=` sigil case, mutable open/close delimiters threaded through `tokenize`, and wiring up `spec/specs/delimiters.json` in `spec_test.odin` (fixture present but not run).

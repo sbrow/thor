@@ -7,7 +7,7 @@
   <section>
     <h2>{{key}}</h2>
     <ul>
-      {{#items}} <li><a href="{{permalink}}">{{&title}}</a><span>{{#date}}<time
+      {{#items}} <li><a href="{{permalink | rel_url}}">{{&title}}</a><span>{{#date}}<time
             datetime="{{date}}">{{date | format}}</time>{{/date}}</span>
       </li>
       {{/items}}

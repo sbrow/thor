@@ -24,6 +24,7 @@ Pipe_Op :: enum {
 	Group_By,
 	First,
 	Last,
+	Rel_Url,
 }
 
 // Pipe op names are derived from the enum via reflection (lowercased).
@@ -60,10 +61,10 @@ pipe_op_candidates :: proc(allocator := context.temp_allocator) -> []string {
 }
 
 Pipe_Filter :: struct {
-	op:       string,
-	args:     [dynamic; MAX_PIPE_ARGS]string,
-	op_pos:   int,
-	end_pos:  int,
+	op:      string,
+	args:    [dynamic; MAX_PIPE_ARGS]string,
+	op_pos:  int,
+	end_pos: int,
 }
 
 Group :: struct {
@@ -345,8 +346,54 @@ apply_filter :: proc(
 	case .Last:
 		span := filter.end_pos - filter.op_pos
 		return take(value, filter.args[:], false, tmpl, filter.op_pos, span)
+	case .Rel_Url:
+		str, ok := reflect.as_string(value)
+		if !ok {
+			return value, Error_Body {
+				msg = "rel_url may only be used on strings",
+				pos = pos,
+				kind = .Data,
+			}
+		}
+		result := rel_url(str, ctx)
+		return any{new_clone(result, context.temp_allocator), typeid_of(string)}, nil
 	}
 	return {}, nil
+}
+
+// rel_url prefixes a root-relative path (e.g. "/faq/") with the site's
+// base_path so links resolve correctly under a subpath deployment. Values that
+// are already absolute — a scheme ("http://"), protocol-relative ("//"), an
+// in-page fragment ("#"), or a "mailto:" — are returned unchanged, which keeps
+// external menu and footer links intact. base_path is read from the context
+// stack the same way `format` reads date_format/timezone.
+rel_url :: proc(path: string, ctx: []any) -> string {
+	if path == "" {
+		return path
+	}
+	if strings.has_prefix(path, "http://") ||
+	   strings.has_prefix(path, "https://") ||
+	   strings.has_prefix(path, "//") ||
+	   strings.has_prefix(path, "#") ||
+	   strings.has_prefix(path, "mailto:") {
+		return path
+	}
+
+	base := ""
+	if raw := resolve_name("base_path", ctx); raw != nil {
+		if s, ok := reflect.as_string(raw); ok {
+			base = s
+		}
+	}
+	if base == "" {
+		return path
+	}
+
+	// Only prefix root-relative paths; leave document-relative ones alone.
+	if path[0] == '/' {
+		return fmt.tprintf("%s%s", base, path)
+	}
+	return path
 }
 
 apply_format :: proc(
@@ -386,7 +433,15 @@ apply_format :: proc(
 }
 
 // Groups preserve first-appearance order from the input list.
-apply_group_by :: proc(value: any, args: []string, pos: int, span: int) -> (result: any, err: Error) {
+apply_group_by :: proc(
+	value: any,
+	args: []string,
+	pos: int,
+	span: int,
+) -> (
+	result: any,
+	err: Error,
+) {
 	if len(args) != 1 {
 		hint := ""
 		if len(args) == 0 {
@@ -406,7 +461,12 @@ apply_group_by :: proc(value: any, args: []string, pos: int, span: int) -> (resu
 
 	elem_info, count, data := list_info(value)
 	if elem_info == nil {
-		return nil, Error_Body{msg = "group_by expects a list", pos = pos, span = span, kind = .Data}
+		return nil, Error_Body {
+			msg = "group_by expects a list",
+			pos = pos,
+			span = span,
+			kind = .Data,
+		}
 	}
 
 	groups := make([dynamic]Group, 0, 8, context.temp_allocator)
@@ -486,13 +546,13 @@ take :: proc(
 	n := 1
 	if !is_list && len(args) == 0 {
 		warning = Error_Body {
-			msg = "defaulting to n=1 for string",
-			pos = op_pos,
-			span = span,
-			kind = .Warning,
+			msg    = "defaulting to n=1 for string",
+			pos    = op_pos,
+			span   = span,
+			kind   = .Warning,
 			source = tmpl.source,
-			path = tmpl.path,
-			hint = "consider specifying n explicitly",
+			path   = tmpl.path,
+			hint   = "consider specifying n explicitly",
 		}
 	}
 	if len(args) > 0 {
@@ -525,13 +585,13 @@ take :: proc(
 		op_name := from_start ? "first" : "last"
 		alt_name := from_start ? "last" : "first"
 		warning = Error_Body {
-			msg = fmt.tprintf("%s %d is equivalent to %s %d", op_name, n, alt_name, 0 - n),
-			pos = op_pos,
-			span = span,
-			kind = .Warning,
+			msg    = fmt.tprintf("%s %d is equivalent to %s %d", op_name, n, alt_name, 0 - n),
+			pos    = op_pos,
+			span   = span,
+			kind   = .Warning,
 			source = tmpl.source,
-			path = tmpl.path,
-			hint = "consider using the clearer form",
+			path   = tmpl.path,
+			hint   = "consider using the clearer form",
 		}
 		from_start = !from_start
 		n = 0 - n
@@ -557,4 +617,3 @@ take :: proc(
 		return any{new_clone(str[start:end], context.temp_allocator), typeid_of(string)}, warning
 	}
 }
-

@@ -1,6 +1,7 @@
 {
   "date": {
-    "timezone": "America/New_York"
+    "timezone": "America/New_York",
+    "format": "January 2, 2006"
   },
   "markdown_extensions": {
     "footnotes": true

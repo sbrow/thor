@@ -87,6 +87,7 @@
 - [ ] don't use bullshit "sub-tokens", add filters and pipes as proper tokens.
 - [ ] Create a Location struct that somewhat matches Odin's [Source_Code_Location](https://pkg.odin-lang.org/base/runtime/#Source_Code_Location)?
   - Note that odin's version doesn't contain the stack trace.
+- [ ] Link checker / linter that warns if links don't resolve. ("please use {{whatever | rel_url }}").
 
 ### Memory Management
 

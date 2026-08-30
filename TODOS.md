@@ -43,6 +43,9 @@ Remember to polish existing features before moving on to new ones.
       - do we want to do this or just use DIAGNOSTIC_TESTS.md as the tests?
       - [ ] also update to use file logger so they don't clog up the output
     - [ ] narrow highlight in diagnostic to relevent part of line.
+- [ ] page.url and page.permalink are confusing names. Switch to url + page_url
+  - There is confusion over how to do this and whethor or not `| rel_url` should be needed to render these.
+    Requires **careful thought**.
 
 ## Documentation
 
