@@ -2,6 +2,13 @@
 
 ## Priority Unclear (Evaluate Later)
 
+- [ ] Decide whether the grammar cache should support multi-threaded parsing.
+  - For now it stays a single global cache used single-threaded; the plan is to
+    guard the non-thread-safe parser/cursor use with a mutex when tests (or any
+    future parallel caller) need it. A `TSParser`/`TSQueryCursor` is one-per-thread.
+  - Alternative later: give each thread its own parser+cursor for real parallelism.
+  - Also pin `init_persistent` to the heap allocator (lifetime bug, independent).
+  - Full write-up: `GRAMMAR_CACHE_THREADING.md`.
 - [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
   - when limit reached, the template fails and stops rendering.
 - [ ] Brainstorm plugin/tool/(postccs/less/tailwind/sass) support.

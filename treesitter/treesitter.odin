@@ -120,6 +120,12 @@ foreign css_grammar {
 	tree_sitter_css :: proc() -> Language ---
 }
 
+// THREAD-SAFETY: a Grammar_Cache bundles shareable tree-sitter objects
+// (`language`, `query` — immutable, safe to read from many threads) with
+// per-thread ones (`parser`, `cursor` — a TSParser mutates its internal
+// subtree pool during a parse, and a TSQueryCursor is likewise stateful).
+// A cached Grammar_Cache is therefore SINGLE-THREADED-USE: exactly one thread
+// may drive `parser`/`cursor` at a time. See GRAMMAR_CACHE_THREADING.md.
 Grammar_Cache :: struct {
 	language:     Language,
 	parser:       Parser,
@@ -133,6 +139,12 @@ Get_Language_Proc :: #type proc() -> Language
 SPALL :: #config(SPALL, false)
 
 grammar_store: Grammar_Store
+
+// cache_mutex guards writes to grammar_store.cache. NOTE: today it is only
+// taken on the parallel preload path (grammar_worker), NOT in ensure_parser /
+// load_grammar. Those lazy paths are intentionally unlocked because production
+// only ever calls them single-threaded. See GRAMMAR_CACHE_THREADING.md before
+// relying on this cache from multiple threads.
 cache_mutex: sync.Mutex
 
 Grammar_Store :: struct {
@@ -140,6 +152,14 @@ Grammar_Store :: struct {
 	allocator: mem.Allocator,
 }
 
+// KNOWN ISSUE (allocator lifetime): grammar_store is a process-lifetime global,
+// but this captures whatever `context.allocator` is live at call time. In main
+// that is deliberately the heap (init_persistent runs before the site arena is
+// installed), so it works. But it is fragile: called from any other context
+// (e.g. a per-test tracking allocator, or lazily once the site arena is active)
+// it would bind the cache to a transient allocator and leave it dangling once
+// that allocator is torn down. The intended fix is to pin the heap allocator
+// explicitly (runtime.heap_allocator()). See GRAMMAR_CACHE_THREADING.md.
 init_persistent :: proc() {
 	grammar_store.allocator = context.allocator
 	grammar_store.cache = make(map[string]^Grammar_Cache, grammar_store.allocator)
@@ -219,6 +239,12 @@ load_language :: proc(lang: string) -> (language: Language, ok: bool) {
 	return
 }
 
+// THREAD-SAFETY: ensure_parser is NOT safe to call concurrently. It reads and
+// writes grammar_store.cache without taking cache_mutex, and it returns a shared
+// per-language Grammar_Cache whose `parser` is not reentrant. It is written for
+// single-threaded lazy use (minify, syntax highlighting). Callers that need
+// parsing on multiple threads must serialize with a lock or give each thread
+// its own parser. See GRAMMAR_CACHE_THREADING.md.
 ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
 	if cached, ok := grammar_store.cache[lang]; ok {
 		return cached
