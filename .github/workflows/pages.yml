@@ -1,0 +1,66 @@
+name: Deploy site to GitHub Pages
+
+# Custom Pages build: compiles Thor from source via the Nix flake, uses it to
+# generate thor/site/, and publishes the result. Replaces the default Jekyll build.
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when something that affects the output changes.
+    paths:
+      - "site/**"
+      - "**/*.odin"
+      - "defaults/**"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Least-privilege permissions required to deploy to GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      # Optional but recommended: caches the Nix store across runs so Thor
+      # (and its tree-sitter grammars) aren't rebuilt from scratch every time.
+      - name: Cache Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build Thor
+        run: nix build .#default --print-build-logs
+
+      - name: Generate site
+        working-directory: site
+        run: ../result/bin/thor --base-url "https://sbrow.github.io/thor" --minify
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
