@@ -162,6 +162,7 @@
 
               # IDE
               unstable.helix
+              claude-code
               typescript-language-server
               vscode-langservers-extracted
             ]);

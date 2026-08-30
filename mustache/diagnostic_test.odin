@@ -513,7 +513,18 @@ diag_ctx :: proc() -> Diag_Context {
 diag_partials :: proc() -> map[string]Template {
 	dirs := [?]string{#directory, "fixtures/layouts/partials"}
 	partials_dir, _ := filepath.join(dirs[:], context.temp_allocator)
-	return load_partials(partials_dir, allocator = context.temp_allocator)
+	partials := load_partials(partials_dir, allocator = context.temp_allocator)
+	// #directory expands to an absolute, build-environment-specific path (e.g.
+	// /build/... inside the nix sandbox vs a local checkout). Strip it so
+	// partial diagnostics reference a stable path across environments, keeping
+	// the golden expected output deterministic.
+	for key, tmpl in partials {
+		t := tmpl
+		rel := strings.trim_prefix(t.path, #directory)
+		t.path = strings.trim_left(rel, "/")
+		partials[key] = t
+	}
+	return partials
 }
 
 diag_slug :: proc(name: string) -> string {

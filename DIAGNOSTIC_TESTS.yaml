@@ -363,7 +363,7 @@ input: "{{> footer }}"
 should: warn
 expected: |
   first -3 is equivalent to last 3
-    --> /home/spencer/github.com/sbrow.github.io/thor/mustache/fixtures/layouts/partials/footer.html:11:78
+    --> fixtures/layouts/partials/footer.html:11:78
      |
    9 |       href="https://edwardtufte.github.io/tufte-css/">Tufte CSS</a>
   10 |   </p>
