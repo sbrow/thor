@@ -1,7 +1,6 @@
-name: Deploy site to GitHub Pages
-
 # Custom Pages build: compiles Thor from source via the Nix flake, uses it to
 # generate thor/site/, and publishes the result. Replaces the default Jekyll build.
+name: Deploy site to GitHub Pages
 
 on:
   push:
@@ -16,7 +15,6 @@ on:
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
-# Least-privilege permissions required to deploy to GitHub Pages.
 permissions:
   contents: read
   pages: write
@@ -35,19 +33,33 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-      # Optional but recommended: caches the Nix store across runs so Thor
-      # (and its tree-sitter grammars) aren't rebuilt from scratch every time.
-      - name: Cache Nix store
-        uses: DeterminateSystems/magic-nix-cache-action@main
+      # Free cache: snapshots /nix/store into GitHub's Actions cache. The key is
+      # hashed over the inputs that change Thor's output, so a site-content-only
+      # change is a full hit (Thor not recompiled), while an Odin source change
+      # restores the nearest store and rebuilds just the delta.
+      - name: Cache /nix/store
+        uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix', '**/*.odin') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 2G
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 604800 # drop entries older than 7 days
 
+      # First run compiles Thor + the tree-sitter grammar libs; later runs
+      # restore them from the cache above and skip the compile.
       - name: Build Thor
         run: nix build .#default --print-build-logs
 
       - name: Generate site
         working-directory: site
-        run: ../result/bin/thor --base-url "https://sbrow.github.io/thor" --minify
+        run: ../result/bin/thor -base-url=https://sbrow.github.io/thor -minify
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
