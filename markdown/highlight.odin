@@ -90,9 +90,12 @@ write_escaped :: proc(b: ^strings.Builder, s: string) {
 	}
 }
 
+// unescape_html returns a caller-owned string (free it with delete). When the
+// input has no entities it returns a clone; otherwise it returns the builder's
+// buffer. It must NOT destroy the builder — to_string aliases that buffer, so the
+// returned string owns it.
 unescape_html :: proc(s: string) -> string {
 	sb := strings.builder_make()
-	defer strings.builder_destroy(&sb)
 
 	start := 0
 	for i in 0 ..< len(s) {
@@ -119,7 +122,7 @@ unescape_html :: proc(s: string) -> string {
 		strings.write_string(&sb, replacement)
 		start = i + semi + 1
 	}
-	if start == 0 do return s
+	if start == 0 do return strings.clone(s)
 	if start < len(s) do strings.write_string(&sb, s[start:])
 	return strings.to_string(sb)
 }
@@ -136,6 +139,7 @@ highlight_block :: proc(code: string, lang: string, file_path: string) -> string
 	defer ts.parser_delete(parser)
 
 	raw_code := unescape_html(code)
+	defer delete(raw_code)
 	raw_c := strings.clone_to_cstring(raw_code)
 	defer delete(raw_c)
 

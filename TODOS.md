@@ -12,6 +12,26 @@
     parsers via a pool or per-thread storage, plugged in behind `open_parser`
     without touching call sites. A `TSParser`/`TSQueryCursor` is one-per-thread.
   - Full write-up: `GRAMMAR_CACHE_THREADING.md`.
+- [ ] Restore parallel grammar preload (BEHAVIOUR CHANGE in `edb2e64`).
+      `preload_grammars` used to `dlopen`+compile each grammar on its own thread;
+      it is now serial (`grammar()` per lang on the calling thread). The startup
+      dlopen cost is no longer overlapped.
+  - Why serial for now: `grammar()` holds `registry.mu` across the whole
+    dlopen+compile, so naively fanning out `grammar()` calls just queues every
+    worker on that one lock — zero real parallelism.
+  - To bring it back: move `build_grammar` (dlopen + `compile_query`, no shared
+    mutable state) OUTSIDE the lock; take `mu` only to (1) init the registry +
+    snapshot which langs are missing, and (2) briefly publish each finished
+    `^Grammar`. Restore the `thread`-based worker fan-out + `SPALL`
+    init/cleanup hooks that `edb2e64` deleted. Safe because glibc `dlopen`, the
+    heap allocator, and each thread's own temp allocator are all thread-safe.
+  - An `RW_Mutex` does NOT help the parallel-load side (writers stay exclusive);
+    it only helps a future multi-threaded *read* path (concurrent cache-hit
+    `grammar()` lookups during a parallel render). Consider it only if/when
+    render itself goes multi-threaded — then pair rlock hits with off-lock build
+    + a double-check-and-discard on the miss race (needs a `free_grammar`).
+  - Assumption to preserve: preload completes before any concurrent `grammar()`
+    use (render is single-threaded and runs after preload).
 - [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
   - when limit reached, the template fails and stops rendering.
 - [ ] Brainstorm plugin/tool/(postccs/less/tailwind/sass) support.

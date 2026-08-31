@@ -81,3 +81,23 @@ test_highlight_code_wraps_css_block :: proc(t: ^testing.T) {
 		"block body should be highlighted",
 	)
 }
+
+// unescape_html must return a caller-owned allocation the caller frees exactly
+// once. The buggy version frees its builder internally (defer builder_destroy)
+// and returns the freed alias, so the caller's delete becomes a double-free that
+// the test runner's tracking allocator flags.
+@(test)
+test_unescape_html_entities_owned :: proc(t: ^testing.T) {
+	got := unescape_html("&lt;a&gt;")
+	defer delete(got)
+	testing.expect_value(t, got, "<a>")
+}
+
+// Same contract on the no-entity path: the buggy version returns the borrowed
+// input, so freeing it is a bad free (pointer not from the allocator).
+@(test)
+test_unescape_html_passthrough_owned :: proc(t: ^testing.T) {
+	got := unescape_html("plain text")
+	defer delete(got)
+	testing.expect_value(t, got, "plain text")
+}
