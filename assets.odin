@@ -5,7 +5,20 @@ import "core:log"
 import "core:os"
 import "core:strings"
 
+import ts "treesitter"
+
 copy_assets_dir :: proc(vfs: ^VFS, output_dir: string, features: bit_set[Feature]) {
+	// One CSS parser, reused for every .css asset (single-threaded). Owned here.
+	css_parser: ts.Parser
+	if .Minify in features {
+		if g, ok := ts.grammar("css"); ok {
+			css_parser = ts.open_parser(g)
+		}
+	}
+	defer if css_parser != nil {
+		ts.parser_delete(css_parser)
+	}
+
 	for virtual_path, entry in vfs.files {
 		if !strings.has_prefix(virtual_path, "assets/") {
 			continue
@@ -24,7 +37,11 @@ copy_assets_dir :: proc(vfs: ^VFS, output_dir: string, features: bit_set[Feature
 		if .Minify in features && strings.has_suffix(rel, ".css") {
 			data, ok := vfs_get(vfs, virtual_path)
 			if ok {
-				write_file(dest, minify_css(string(data)))
+				if m, mok := minify_css(css_parser, string(data)); mok {
+					write_file(dest, m)
+				} else {
+					write_file(dest, string(data))
+				}
 			}
 		} else if entry.data != nil {
 			if err := os.write_entire_file(dest, entry.data); err != nil {

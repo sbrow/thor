@@ -12,18 +12,31 @@ Range :: struct {
 	end:   u32,
 }
 
-minify_html :: proc(source: string) -> string {
-	gc := ts.ensure_parser("html")
-	if gc == nil {
-		return source
+// minify_html collapses insignificant whitespace, strips comments, and minifies
+// inline <style> bodies (via minify_css). The caller owns html_parser and
+// css_parser and passes them in; both may be reused across calls. On success it
+// returns (owned string, true) and the caller must free the string. On failure
+// (nil html_parser, parse failure, or syntax errors) it returns ("", false) and
+// the caller should keep the original source unchanged.
+minify_html :: proc(
+	html_parser: ts.Parser,
+	css_parser: ts.Parser,
+	source: string,
+) -> (
+	minified: string,
+	ok: bool,
+) {
+	if html_parser == nil {
+		return minified, ok
 	}
 
 	source_c := strings.clone_to_cstring(source)
 	defer delete(source_c)
 
-	tree := ts.parser_parse_string(gc.parser, nil, source_c, u32(len(source)))
+	tree := ts.parser_parse_string(html_parser, nil, source_c, u32(len(source)))
 	if tree == nil {
-		return source
+		ok = false
+		return minified, ok
 	}
 	defer ts.tree_delete(tree)
 
@@ -31,7 +44,8 @@ minify_html :: proc(source: string) -> string {
 
 	if ts.node_has_error(root) {
 		log.warnf("minify: HTML parse errors, skipping minification")
-		return source
+		ok = false
+		return minified, ok
 	}
 
 	comments: [dynamic]Range
@@ -66,13 +80,19 @@ minify_html :: proc(source: string) -> string {
 
 		if si < len(styles) && u32(i) >= styles[si].start {
 			s := styles[si]
-			// NOTE: minify_css may return either a fresh allocation or the
-			// input slice unchanged (on parser failure), so the result is not
-			// freed here — matching this package's one-shot allocation style.
-			minified := minify_css(source[i:s.end])
-			strings.write_string(&sb, minified)
-			if len(minified) > 0 {
-				last_written = minified[len(minified) - 1]
+			seg := source[i:s.end]
+			if minified, mok := minify_css(css_parser, seg); mok {
+				strings.write_string(&sb, minified)
+				if len(minified) > 0 {
+					last_written = minified[len(minified) - 1]
+				}
+				delete(minified)
+			} else {
+				// CSS minify skipped/failed: keep the style body verbatim.
+				strings.write_string(&sb, seg)
+				if len(seg) > 0 {
+					last_written = seg[len(seg) - 1]
+				}
 			}
 			i = int(s.end)
 			si += 1
@@ -111,7 +131,10 @@ minify_html :: proc(source: string) -> string {
 		}
 	}
 
-	return strings.to_string(sb)
+
+	minified, ok = strings.to_string(sb), true
+
+	return minified, ok
 }
 
 collect_html_ranges :: proc(
@@ -136,10 +159,7 @@ collect_html_ranges :: proc(
 			// child) via the CSS-aware pass.
 			raw, ok := style_raw_text(child)
 			if ok {
-				append(
-					styles,
-					Range{start = ts.node_start_byte(raw), end = ts.node_end_byte(raw)},
-				)
+				append(styles, Range{start = ts.node_start_byte(raw), end = ts.node_end_byte(raw)})
 			}
 		} else if type_str == "script_element" {
 			append(
@@ -210,18 +230,23 @@ is_css_delim :: proc(c: u8) -> bool {
 	return false
 }
 
-minify_css :: proc(source: string) -> string {
-	gc := ts.ensure_parser("css")
-	if gc == nil {
-		return source
+// minify_css collapses insignificant whitespace and strips comments. The caller
+// owns `parser` and passes it in; it may be reused across calls. On success it
+// returns (owned string, true) and the caller must free the string. On failure
+// (nil parser, parse failure, or syntax errors) it returns ("", false) and the
+// caller should keep the original source unchanged.
+minify_css :: proc(parser: ts.Parser, source: string) -> (minified: string, ok: bool) {
+	if parser == nil {
+		return minified, ok
 	}
 
 	source_c := strings.clone_to_cstring(source)
 	defer delete(source_c)
 
-	tree := ts.parser_parse_string(gc.parser, nil, source_c, u32(len(source)))
+	tree := ts.parser_parse_string(parser, nil, source_c, u32(len(source)))
 	if tree == nil {
-		return source
+		ok = false
+		return minified, ok
 	}
 	defer ts.tree_delete(tree)
 
@@ -229,7 +254,8 @@ minify_css :: proc(source: string) -> string {
 
 	if ts.node_has_error(root) {
 		log.warnf("minify: CSS parse errors, skipping minification")
-		return source
+		ok = false
+		return minified, ok
 	}
 
 	comments: [dynamic]Range
@@ -270,8 +296,10 @@ minify_css :: proc(source: string) -> string {
 			// (last_written == 0), a doubled space (last_written == ' ',
 			// which happens when a stripped comment sits between two
 			// whitespace runs), or one adjacent to a delimiter.
-			if last_written != 0 && last_written != ' ' &&
-			   !is_css_delim(last_written) && !is_css_delim(next) {
+			if last_written != 0 &&
+			   last_written != ' ' &&
+			   !is_css_delim(last_written) &&
+			   !is_css_delim(next) {
 				strings.write_byte(&sb, ' ')
 				last_written = ' '
 			}
@@ -283,7 +311,8 @@ minify_css :: proc(source: string) -> string {
 		}
 	}
 
-	return strings.to_string(sb)
+	minified, ok = strings.to_string(sb), true
+	return minified, ok
 }
 
 collect_css_comments :: proc(node: ts.Node, comments: ^[dynamic]Range) {

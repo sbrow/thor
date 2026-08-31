@@ -1,9 +1,32 @@
 # Grammar cache thread-safety & allocator lifetime
 
-Status: **investigation complete, fix deferred.** This document records what we
-found and the direction we chose, so the next person doesn't have to rediscover
-it. No behavior has been changed yet — only documentation comments were added to
-`treesitter/treesitter.odin`.
+Status: **resolved.** All three issues below are fixed. The cache was redesigned
+so the library caches only the immutable, shareable objects and callers own the
+per-thread ones. The rest of this document is kept as the rationale.
+
+## Resolution (what shipped)
+
+The `Grammar_Cache` (which mixed shareable `language`/`query` with per-thread
+`parser`/`cursor`) was split:
+
+- **`Grammar`** holds only the immutable `language` + `query`. It lives in a
+  process-lifetime **`registry`** (`map[string]^Grammar`) guarded by one mutex.
+- **`grammar(lang)`** is the thread-safe, self-initializing, lazy loader — fixes
+  **#1a** (all map access under the lock) and lets tests run with no setup.
+- The registry allocator is pinned with `os.heap_allocator()` — fixes **#2**; the
+  cache no longer captures a transient `context.allocator`.
+- Parsers/cursors are **caller-owned**: `open_parser(g)` mints one, the caller
+  `defer`s `parser_delete` / `query_cursor_delete`. No parser is shared, so
+  **#1b** is gone. `open_parser` is the seam where a future pool / thread-local
+  strategy plugs in without touching call sites.
+- Deleted: `ensure_parser`, `load_grammar`, `preload_grammar`, `grammar_worker`,
+  `cache_mutex`; `preload_grammars` is now a serial registry warm-up. The minify
+  tests dropped their `parse_mu` serialization and preload scaffolding entirely.
+
+The **later** decision — pool vs per-thread parser reuse for genuine parallel
+parsing — is still open, but intentionally so: it only matters once we parse in
+parallel, and it now changes only `open_parser`, not the rest of the library.
+The original investigation follows.
 
 ## How we got here
 

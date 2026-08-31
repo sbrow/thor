@@ -125,16 +125,21 @@ unescape_html :: proc(s: string) -> string {
 }
 
 highlight_block :: proc(code: string, lang: string, file_path: string) -> string {
-	gc := ts.load_grammar(lang)
-	if gc == nil {
+	g, ok := ts.grammar(lang)
+	if !ok {
 		return code
 	}
+	parser := ts.open_parser(g)
+	if parser == nil {
+		return code
+	}
+	defer ts.parser_delete(parser)
 
 	raw_code := unescape_html(code)
 	raw_c := strings.clone_to_cstring(raw_code)
 	defer delete(raw_c)
 
-	tree := ts.parser_parse_string(gc.parser, nil, raw_c, u32(len(raw_code)))
+	tree := ts.parser_parse_string(parser, nil, raw_c, u32(len(raw_code)))
 	if tree == nil {
 		return code
 	}
@@ -156,12 +161,13 @@ highlight_block :: proc(code: string, lang: string, file_path: string) -> string
 		}
 	}
 
-	cursor := gc.cursor
-	if cursor == nil {
+	if g.query == nil {
 		return code
 	}
+	cursor := ts.query_cursor_new()
+	defer ts.query_cursor_delete(cursor)
 
-	ts.query_cursor_exec(cursor, gc.query, root)
+	ts.query_cursor_exec(cursor, g.query, root)
 
 	captures := make([dynamic]Capture, 0, 64, context.temp_allocator)
 	defer delete(captures)
@@ -174,7 +180,7 @@ highlight_block :: proc(code: string, lang: string, file_path: string) -> string
 		}
 		cap := match.captures[capture_idx]
 		name_len: u32
-		name_c := ts.query_capture_name_for_id(gc.query, cap.index, &name_len)
+		name_c := ts.query_capture_name_for_id(g.query, cap.index, &name_len)
 		if name_c == nil {
 			continue
 		}

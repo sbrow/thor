@@ -7,7 +7,6 @@ import "core:mem"
 import "core:os"
 import "core:strings"
 import "core:sync"
-import "core:thread"
 
 grammar_dir: string
 query_dir: string
@@ -120,17 +119,15 @@ foreign css_grammar {
 	tree_sitter_css :: proc() -> Language ---
 }
 
-// THREAD-SAFETY: a Grammar_Cache bundles shareable tree-sitter objects
-// (`language`, `query` — immutable, safe to read from many threads) with
-// per-thread ones (`parser`, `cursor` — a TSParser mutates its internal
-// subtree pool during a parse, and a TSQueryCursor is likewise stateful).
-// A cached Grammar_Cache is therefore SINGLE-THREADED-USE: exactly one thread
-// may drive `parser`/`cursor` at a time. See GRAMMAR_CACHE_THREADING.md.
-Grammar_Cache :: struct {
+// A Grammar bundles only the immutable, shareable tree-sitter objects for a
+// language: `language` (from tree_sitter_x() or a dlopen'd .so) and `query` (the
+// compiled highlight query). Both are immutable after construction and safe to
+// read from any number of threads. The stateful, single-thread-use objects —
+// parser and query cursor — are deliberately NOT stored here; the caller creates
+// and owns those (see `open_parser`). See GRAMMAR_CACHE_THREADING.md.
+Grammar :: struct {
 	language:     Language,
-	parser:       Parser,
 	query:        Query,
-	cursor:       Query_Cursor,
 	query_failed: bool,
 }
 
@@ -138,31 +135,94 @@ Get_Language_Proc :: #type proc() -> Language
 
 SPALL :: #config(SPALL, false)
 
-grammar_store: Grammar_Store
-
-// cache_mutex guards writes to grammar_store.cache. NOTE: today it is only
-// taken on the parallel preload path (grammar_worker), NOT in ensure_parser /
-// load_grammar. Those lazy paths are intentionally unlocked because production
-// only ever calls them single-threaded. See GRAMMAR_CACHE_THREADING.md before
-// relying on this cache from multiple threads.
-cache_mutex: sync.Mutex
-
-Grammar_Store :: struct {
-	cache:     map[string]^Grammar_Cache,
+// registry is the process-lifetime cache of immutable Grammars, keyed by language
+// name. It is the library's ONLY shared mutable state; `mu` serializes all access.
+// A nil value memoizes "tried and unavailable" so misses don't re-dlopen. Parsers
+// live in the caller, so the registry holds nothing single-thread-use.
+Grammar_Registry :: struct {
+	mu:        sync.Mutex,
+	grammars:  map[string]^Grammar,
 	allocator: mem.Allocator,
 }
 
-// KNOWN ISSUE (allocator lifetime): grammar_store is a process-lifetime global,
-// but this captures whatever `context.allocator` is live at call time. In main
-// that is deliberately the heap (init_persistent runs before the site arena is
-// installed), so it works. But it is fragile: called from any other context
-// (e.g. a per-test tracking allocator, or lazily once the site arena is active)
-// it would bind the cache to a transient allocator and leave it dangling once
-// that allocator is torn down. The intended fix is to pin the heap allocator
-// explicitly (runtime.heap_allocator()). See GRAMMAR_CACHE_THREADING.md.
+registry: Grammar_Registry
+
+// init_persistent is optional — grammar() lazily initializes the registry on first
+// use — but callers (main) may call it to bind the cache early. The allocator is
+// pinned to the OS heap, NOT context.allocator, so the cache survives any transient
+// allocator (per-build arena, per-test tracking) that happens to be live.
 init_persistent :: proc() {
-	grammar_store.allocator = context.allocator
-	grammar_store.cache = make(map[string]^Grammar_Cache, grammar_store.allocator)
+	sync.mutex_lock(&registry.mu)
+	defer sync.mutex_unlock(&registry.mu)
+	ensure_registry()
+}
+
+// ensure_registry binds the registry to the heap on first use. Caller must hold mu.
+@(private)
+ensure_registry :: proc() {
+	if registry.grammars == nil {
+		registry.allocator = os.heap_allocator()
+		registry.grammars = make(map[string]^Grammar, registry.allocator)
+	}
+}
+
+// grammar returns the immutable Grammar for `lang`, loading it on first use.
+// Thread-safe: concurrent callers serialize on `mu`. Returns (nil, false) when the
+// grammar cannot be loaded. The returned pointer is immutable — callers may cache
+// and read it (its `language`/`query`) without any further locking.
+grammar :: proc(lang: string) -> (^Grammar, bool) {
+	sync.mutex_lock(&registry.mu)
+	defer sync.mutex_unlock(&registry.mu)
+	ensure_registry()
+	if g, seen := registry.grammars[lang]; seen {
+		return g, g != nil
+	}
+	g := build_grammar(lang)
+	registry.grammars[lang] = g
+	return g, g != nil
+}
+
+// build_grammar loads a language and compiles its highlight query. Caller must
+// hold mu. Returns nil if the language itself cannot be loaded; a grammar whose
+// query is absent/failed is still returned (parsing works, highlighting does not).
+@(private)
+build_grammar :: proc(lang: string) -> ^Grammar {
+	language, ok := load_language(lang)
+	if !ok {
+		return nil
+	}
+	g := new(Grammar, registry.allocator)
+	g.language = language
+	if query, qok := compile_query(lang, language); qok {
+		g.query = query
+	} else {
+		g.query_failed = true
+	}
+	return g
+}
+
+// open_parser creates a fresh parser bound to the grammar's language. The CALLER
+// owns the returned parser and must free it with parser_delete. This is the seam
+// for parser lifetime: today callers open one and reuse it across a batch of
+// parses on a single thread (render opens an html+css pair per render_site;
+// assets opens one per copy_assets_dir), which is safe because nothing is shared.
+// A future pooling or thread-local strategy can be dropped in here without
+// touching any call site. Returns nil on failure.
+open_parser :: proc(g: ^Grammar) -> Parser {
+	if g == nil {
+		return nil
+	}
+	parser := parser_new()
+	if parser == nil {
+		log.errorf("treesitter: cannot create parser")
+		return nil
+	}
+	if !parser_set_language(parser, g.language) {
+		log.errorf("treesitter: ABI mismatch setting parser language")
+		parser_delete(parser)
+		return nil
+	}
+	return parser
 }
 
 when SPALL {
@@ -190,7 +250,7 @@ builtin_language :: proc(lang: string) -> (language: Language, ok: bool) {
 // load_query returns the highlight query source for a language. Builtin
 // languages (html/css) are baked into the binary via `#load`; all others are
 // read from the runtime `query_dir`. `path` is the on-disk location for
-// diagnostics ("(builtin)" for embedded queries). Mirrors `ensure_parser`.
+// diagnostics ("(builtin)" for embedded queries). Mirrors `load_language`.
 load_query :: proc(lang: string) -> (src: string, path: string, ok: bool) {
 	switch lang {
 	case "html":
@@ -239,50 +299,7 @@ load_language :: proc(lang: string) -> (language: Language, ok: bool) {
 	return
 }
 
-// THREAD-SAFETY: ensure_parser is NOT safe to call concurrently. It reads and
-// writes grammar_store.cache without taking cache_mutex, and it returns a shared
-// per-language Grammar_Cache whose `parser` is not reentrant. It is written for
-// single-threaded lazy use (minify, syntax highlighting). Callers that need
-// parsing on multiple threads must serialize with a lock or give each thread
-// its own parser. See GRAMMAR_CACHE_THREADING.md.
-ensure_parser :: proc(lang: string) -> ^Grammar_Cache {
-	if cached, ok := grammar_store.cache[lang]; ok {
-		return cached
-	}
-
-	grammar_store.cache[lang] = nil
-
-	language, ok := load_language(lang)
-	if !ok {
-		return nil
-	}
-
-	parser := parser_new()
-	if parser == nil {
-		log.errorf("treesitter: cannot create parser for %s", lang)
-		return nil
-	}
-	if !parser_set_language(parser, language) {
-		log.errorf("treesitter: ABI mismatch for %s grammar", lang)
-		parser_delete(parser)
-		return nil
-	}
-
-	gc := new(Grammar_Cache, grammar_store.allocator)
-	gc.language = language
-	gc.parser = parser
-	grammar_store.cache[lang] = gc
-	return gc
-}
-
-compile_query :: proc(
-	lang: string,
-	language: Language,
-) -> (
-	query: Query,
-	cursor: Query_Cursor,
-	ok: bool,
-) {
+compile_query :: proc(lang: string, language: Language) -> (query: Query, ok: bool) {
 	query_src, query_path, qok := load_query(lang)
 	if !qok {
 		return
@@ -344,112 +361,20 @@ compile_query :: proc(
 		return
 	}
 
-	cursor = query_cursor_new()
 	ok = true
 	return
 }
 
-load_grammar :: proc(lang: string) -> ^Grammar_Cache {
-	gc := ensure_parser(lang)
-	if gc == nil {
-		return nil
-	}
-	if gc.query != nil {
-		return gc
-	}
-	if gc.query_failed {
-		return nil
-	}
-
-	query, cursor, ok := compile_query(lang, gc.language)
-	if !ok {
-		gc.query_failed = true
-		return nil
-	}
-
-	gc.query = query
-	gc.cursor = cursor
-	return gc
-}
-
-preload_grammar :: proc(lang: string) -> ^Grammar_Cache {
-	language, ok := load_language(lang)
-	if !ok {
-		return nil
-	}
-
-	parser := parser_new()
-	if parser == nil {
-		log.errorf("treesitter: cannot create parser for %s", lang)
-		return nil
-	}
-	if !parser_set_language(parser, language) {
-		log.errorf("treesitter: ABI mismatch for %s grammar", lang)
-		parser_delete(parser)
-		return nil
-	}
-
-	gc := new(Grammar_Cache, grammar_store.allocator)
-	gc.language = language
-	gc.parser = parser
-
-	query, cursor, qok := compile_query(lang, language)
-	if !qok {
-		gc.query_failed = true
-		return gc
-	}
-
-	gc.query = query
-	gc.cursor = cursor
-	return gc
-}
-
+// preload_grammars warms the registry for the given languages ahead of the render
+// loop, so the first page that needs one doesn't pay the load cost inline. Builtins
+// are always available lazily and are skipped. Runs on the calling thread; grammar()
+// is itself thread-safe if a caller ever wants to fan this out.
 preload_grammars :: proc(languages: []string) {
-	if len(languages) == 0 {
-		return
-	}
-
-	// Filter out already-loaded languages (watch mode reuse)
-	to_load := make([dynamic]string, 0, len(languages), context.temp_allocator)
 	for lang in languages {
-		if cached, ok := grammar_store.cache[lang]; ok && cached != nil {
-			continue
-		}
 		if _, bok := builtin_language(lang); bok {
 			continue
 		}
-		append(&to_load, lang)
-	}
-
-	if len(to_load) == 0 {
-		return
-	}
-
-	threads := make([]^thread.Thread, len(to_load), context.temp_allocator)
-	for i in 0 ..< len(to_load) {
-		threads[i] = thread.create_and_start_with_poly_data(to_load[i], grammar_worker)
-	}
-	for t in threads {
-		thread.join(t)
-		thread.destroy(t)
-	}
-}
-
-grammar_worker :: proc(lang: string) {
-	when SPALL {
-		if _thread_init != nil {
-			_thread_init()
-		}
-		defer if _thread_cleanup != nil {
-			_thread_cleanup()
-		}
-	}
-
-	gc := preload_grammar(lang)
-	if gc != nil {
-		sync.mutex_lock(&cache_mutex)
-		grammar_store.cache[lang] = gc
-		sync.mutex_unlock(&cache_mutex)
+		grammar(lang)
 	}
 }
 

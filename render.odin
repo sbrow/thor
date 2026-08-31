@@ -3,6 +3,7 @@ package main
 import "mustache"
 
 import diags "diagnostics"
+import ts "treesitter"
 
 import "core:encoding/json"
 import "core:fmt"
@@ -205,6 +206,24 @@ render_site :: proc(site: ^Site) {
 		}
 	}
 
+	// Parsers for minification, created once and reused across every page
+	// (render is single-threaded). Owned here; freed when render_site returns.
+	html_parser, css_parser: ts.Parser
+	if .Minify in site.features {
+		if g, gok := ts.grammar("html"); gok {
+			html_parser = ts.open_parser(g)
+		}
+		if g, gok := ts.grammar("css"); gok {
+			css_parser = ts.open_parser(g)
+		}
+	}
+	defer if html_parser != nil {
+		ts.parser_delete(html_parser)
+	}
+	defer if css_parser != nil {
+		ts.parser_delete(css_parser)
+	}
+
 	// Render individual content pages (skip all index pages)
 	for page in pages {
 		if page._is_index {
@@ -213,7 +232,9 @@ render_site :: proc(site: ^Site) {
 		tpl := get_template(&site.vfs, page.layout, &template_cache)
 		html := render_page_html(page, site, tpl, partials, ctx, &errors)
 		if .Minify in site.features {
-			html = minify_html(html)
+			if m, mok := minify_html(html_parser, css_parser, html); mok {
+				html = m
+			}
 		}
 		write_page(site.output_dir, page.permalink, html)
 	}
@@ -243,7 +264,9 @@ render_site :: proc(site: ^Site) {
 			&errors,
 		)
 		if .Minify in site.features {
-			html = minify_html(html)
+			if m, mok := minify_html(html_parser, css_parser, html); mok {
+				html = m
+			}
 		}
 		write_page(site.output_dir, fmt.aprintf("/%s/", section), html)
 	}
@@ -253,7 +276,9 @@ render_site :: proc(site: ^Site) {
 		home_tpl := get_template(&site.vfs, "home", &template_cache)
 		home_html := render_home_html(home, site, home_tpl, partials, ctx, &errors)
 		if .Minify in site.features {
-			home_html = minify_html(home_html)
+			if m, mok := minify_html(html_parser, css_parser, home_html); mok {
+				home_html = m
+			}
 		}
 		write_file(fmt.tprintf("%s/index.html", site.output_dir), home_html)
 	}
@@ -445,4 +470,3 @@ write_file :: proc(path: string, html: string) {
 		log.errorf("cannot write %s: %v", path, err)
 	}
 }
-

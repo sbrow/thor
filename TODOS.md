@@ -2,12 +2,15 @@
 
 ## Priority Unclear (Evaluate Later)
 
-- [ ] Decide whether the grammar cache should support multi-threaded parsing.
-  - For now it stays a single global cache used single-threaded; the plan is to
-    guard the non-thread-safe parser/cursor use with a mutex when tests (or any
-    future parallel caller) need it. A `TSParser`/`TSQueryCursor` is one-per-thread.
-  - Alternative later: give each thread its own parser+cursor for real parallelism.
-  - Also pin `init_persistent` to the heap allocator (lifetime bug, independent).
+- [ ] Decide the parallel-parsing strategy for the grammar cache (pool vs
+      thread-local parsers) — deferred until the parallel usage shape is clear.
+  - Resolved already: the registry (`grammar()`) is thread-safe and self-
+    initializing, its allocator is pinned to the heap, and parsers/cursors are now
+    caller-owned (`open_parser`) instead of cached — so the library holds no
+    single-thread-use state and the multi-threaded tests pass without locks.
+  - Remaining choice only matters once we actually parse in parallel: reuse
+    parsers via a pool or per-thread storage, plugged in behind `open_parser`
+    without touching call sites. A `TSParser`/`TSQueryCursor` is one-per-thread.
   - Full write-up: `GRAMMAR_CACHE_THREADING.md`.
 - [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
   - when limit reached, the template fails and stops rendering.
