@@ -1,5 +1,6 @@
 package main
 
+import "base:runtime"
 import "core:fmt"
 import "core:strings"
 import "core:time"
@@ -136,9 +137,43 @@ format_rfc822 :: proc(iso: string) -> string {
 	)
 }
 
-xml_escape :: proc(s: string) -> string {
-	r, _ := strings.replace_all(s, "&", "&amp;")
-	r, _ = strings.replace_all(r, "<", "&lt;")
-	r, _ = strings.replace_all(r, ">", "&gt;")
-	return r
+// xml_escape escapes the XML metacharacters '&', '<' and '>' in s. Only these
+// ASCII characters are touched; all other bytes (including UTF-8 multibyte
+// sequences) pass through verbatim, so s must already be valid UTF-8.
+//
+// The result is allocated in `allocator`, which defaults to
+// context.temp_allocator — the returned string is only valid until the next
+// temp allocator reset, so callers must not retain it across frames.
+xml_escape :: proc(
+	s: string,
+	allocator := context.temp_allocator,
+) -> (
+	escaped: string,
+	err: runtime.Allocator_Error,
+) #optional_allocator_error {
+	sb := strings.builder_make_len_cap(0, len(s), allocator) or_return
+
+	// Single pass over the bytes, copying runs of ordinary text in bulk and
+	// emitting an entity for each metacharacter. The switch is both the
+	// membership test and the replacement lookup, so no per-match scan.
+	start := 0
+	for i := 0; i < len(s); i += 1 {
+		esc: string
+		switch s[i] {
+		case '&':
+			esc = "&amp;"
+		case '<':
+			esc = "&lt;"
+		case '>':
+			esc = "&gt;"
+		case:
+			continue // ordinary byte: copied as part of the next run
+		}
+		strings.write_string(&sb, s[start:i]) // run before the metacharacter
+		strings.write_string(&sb, esc)
+		start = i + 1
+	}
+	strings.write_string(&sb, s[start:]) // tail
+	return strings.to_string(sb), nil
 }
+
