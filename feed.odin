@@ -111,8 +111,7 @@ generate_sitemap :: proc(site: ^Site) -> string {
 	return strings.to_string(sb)
 }
 
-// TODO: Leaks
-format_rfc822 :: proc(iso: string) -> string {
+format_rfc822 :: proc(iso: string, allocator := context.temp_allocator) -> string {
 	if len(iso) < 19 {
 		// TODO: should indicate error somehow
 		return iso
@@ -134,6 +133,7 @@ format_rfc822 :: proc(iso: string) -> string {
 		t,
 		offset / 60,
 		offset % 60,
+		allocator = allocator,
 	)
 }
 
