@@ -7,6 +7,8 @@ import "core:mem"
 import "core:os"
 import "core:strings"
 import "core:sync"
+import si "core:sys/info"
+import "core:thread"
 
 grammar_dir: string
 query_dir: string
@@ -182,9 +184,13 @@ grammar :: proc(lang: string) -> (^Grammar, bool) {
 	return g, g != nil
 }
 
-// build_grammar loads a language and compiles its highlight query. Caller must
-// hold mu. Returns nil if the language itself cannot be loaded; a grammar whose
-// query is absent/failed is still returned (parsing works, highlighting does not).
+// build_grammar loads a language and compiles its highlight query. It touches no
+// shared mutable state — only the set-once `registry.allocator` (for the heap
+// `new`), read-only globals, and the per-thread temp allocator — so it is safe to
+// run OFF the lock and concurrently, provided `ensure_registry` has already run
+// (see preload_grammars). Returns nil if the language itself cannot be loaded; a
+// grammar whose query is absent/failed is still returned (parsing works,
+// highlighting does not).
 @(private)
 build_grammar :: proc(lang: string) -> ^Grammar {
 	language, ok := load_language(lang)
@@ -232,6 +238,19 @@ when SPALL {
 	set_thread_callbacks :: proc(init: proc() = nil, cleanup: proc() = nil) {
 		_thread_init = init
 		_thread_cleanup = cleanup
+	}
+
+	// Pool-shaped adapters: the thread pool calls these once per worker thread at
+	// startup/shutdown, so each worker's parses land in their own SPALL thread.
+	spall_pool_thread_init :: proc(t: ^thread.Thread, data: rawptr) {
+		if _thread_init != nil {
+			_thread_init()
+		}
+	}
+	spall_pool_thread_fini :: proc(t: ^thread.Thread, data: rawptr) {
+		if _thread_cleanup != nil {
+			_thread_cleanup()
+		}
 	}
 }
 
@@ -365,17 +384,100 @@ compile_query :: proc(lang: string, language: Language) -> (query: Query, ok: bo
 	return
 }
 
+// PRELOAD_MAX_WORKERS caps the pool when the CPU count is unknown or absurd.
+PRELOAD_MAX_WORKERS :: 4
+
+// Preload_Task is the per-language work item handed to a pool worker.
+Preload_Task :: struct {
+	lang: string,
+}
+
+// preload_worker builds one grammar off the lock (dlopen + query compile — the
+// expensive, parallelizable part), then takes `mu` only to publish the finished
+// pointer. Publishing nil memoizes a failed load, matching grammar()/build_grammar.
+@(private)
+preload_worker :: proc(task: thread.Task) {
+	pt := cast(^Preload_Task)task.data
+	g := build_grammar(pt.lang)
+	sync.mutex_lock(&registry.mu)
+	registry.grammars[pt.lang] = g
+	sync.mutex_unlock(&registry.mu)
+}
+
 // preload_grammars warms the registry for the given languages ahead of the render
-// loop, so the first page that needs one doesn't pay the load cost inline. Builtins
-// are always available lazily and are skipped. Runs on the calling thread; grammar()
-// is itself thread-safe if a caller ever wants to fan this out.
+// loop, so the first page that needs one doesn't pay the load cost inline. The
+// expensive per-language work (dlopen + compile_query) runs concurrently on a
+// bounded thread pool. Builtins are always available lazily and are skipped.
+//
+// INVARIANT: preload runs to completion before any concurrent lazy grammar() use
+// (render is single-threaded and runs afterward), so the registry is never read
+// while workers publish. Workers still take `mu` for the map insert, keeping the
+// "registry is only ever mutated under mu" discipline uniform with grammar().
 preload_grammars :: proc(languages: []string) {
+	// Snapshot (main thread, under mu): pin the registry allocator before any
+	// worker reads it, and collect the languages still needing a load. Dedupes
+	// against builtins and already-cached grammars (watch-mode reuse).
+	sync.mutex_lock(&registry.mu)
+	ensure_registry()
+	to_load := make([dynamic]string, 0, len(languages), context.temp_allocator)
 	for lang in languages {
 		if _, bok := builtin_language(lang); bok {
 			continue
 		}
-		grammar(lang)
+		if _, seen := registry.grammars[lang]; seen {
+			continue
+		}
+		append(&to_load, lang)
 	}
+	sync.mutex_unlock(&registry.mu)
+
+	if len(to_load) == 0 {
+		return
+	}
+
+	// Bind the pool to the logical core count (load is dlopen/CPU-bound), but
+	// never more workers than tasks, never fewer than one.
+	worker_count: int = ---
+	if _, logical, ok := si.cpu_core_count(); ok {
+		assert(logical > 0)
+		worker_count = min(logical, len(to_load))
+	} else {
+		worker_count = min(PRELOAD_MAX_WORKERS, len(to_load))
+	}
+
+	// Serial fast path: a single worker gains nothing from the pool machinery.
+	if worker_count == 1 {
+		for lang in to_load {
+			g := build_grammar(lang)
+			sync.mutex_lock(&registry.mu)
+			registry.grammars[lang] = g
+			sync.mutex_unlock(&registry.mu)
+		}
+		return
+	}
+
+	// The pool appends to its own `tasks_done` from worker threads, so its
+	// bookkeeping allocator MUST be thread-safe — use the heap, not the (possibly
+	// arena) context allocator that is live during a build.
+	pool: thread.Pool
+	init_proc: thread.Thread_Init_Proc = nil
+	fini_proc: thread.Thread_Init_Proc = nil
+	when SPALL {
+		init_proc = spall_pool_thread_init
+		fini_proc = spall_pool_thread_fini
+	}
+	thread.pool_init(&pool, os.heap_allocator(), worker_count, init_proc, nil, fini_proc, nil)
+	defer thread.pool_destroy(&pool)
+
+	tasks := make([]Preload_Task, len(to_load), context.temp_allocator)
+	thread.pool_start(&pool)
+	for lang, i in to_load {
+		tasks[i].lang = lang
+		// Per-task context allocator = heap, so any stray context.allocator use
+		// inside a worker is thread-safe.
+		thread.pool_add_task(&pool, os.heap_allocator(), preload_worker, &tasks[i], i)
+	}
+	thread.pool_finish(&pool) // barrier: all workers joined before we return
 }
 
 extract_query_token :: proc(src: []byte, offset: u32) -> string {
@@ -410,3 +512,4 @@ helix_version_from_path :: proc(path: string) -> string {
 	if end <= start do return ""
 	return path[start:end]
 }
+
