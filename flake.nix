@@ -169,6 +169,10 @@
 
               bloaty # du for binaries?
 
+              # temp
+              hugo
+              pandoc
+
               # IDE
               unstable.helix
               claude-code
