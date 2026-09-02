@@ -124,15 +124,25 @@ format_rfc822 :: proc(iso: string, allocator := context.temp_allocator) -> strin
 	buf: [8]byte
 	t := time.to_string_hms(date, buf[:])
 
+	// RFC-822 zone: sign followed by two-digit hours and minutes (e.g. +0000,
+	// +0530, -0800). offset is in minutes.
+	sign := '+'
+	off := offset
+	if off < 0 {
+		sign = '-'
+		off = -off
+	}
+
 	return fmt.aprintf(
-		"%s, %02d %s %d %s %3d%2d",
+		"%s, %02d %s %d %s %c%02d%02d",
 		weekday[:3],
 		time.day(date),
 		month[:3],
 		time.year(date),
 		t,
-		offset / 60,
-		offset % 60,
+		sign,
+		off / 60,
+		off % 60,
 		allocator = allocator,
 	)
 }

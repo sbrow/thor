@@ -50,11 +50,24 @@ test_format_rfc822_short_passthrough :: proc(t: ^testing.T) {
 
 @(test)
 test_format_rfc822_full_date :: proc(t: ^testing.T) {
-	got := format_rfc822("2024-01-15T10:30:00Z")
-	// Result is temp-allocated (reset by the test runner), so no delete.
-	// 2024-01-15 is a Monday. Assert the stable leading portion; the trailing
-	// offset rendering is intentionally left unpinned here.
-	testing.expect(t, strings.has_prefix(got, "Mon, 15 Jan 2024 10:30:00"), got)
+	// Results are temp-allocated (reset by the test runner), so no delete.
+	// 2024-01-15 is a Monday; wall-clock time is preserved and the zone is
+	// rendered as an RFC-822 ±HHMM offset.
+	testing.expect_value(
+		t,
+		format_rfc822("2024-01-15T10:30:00Z"),
+		"Mon, 15 Jan 2024 10:30:00 +0000",
+	)
+	testing.expect_value(
+		t,
+		format_rfc822("2024-01-15T10:30:00+05:30"),
+		"Mon, 15 Jan 2024 10:30:00 +0530",
+	)
+	testing.expect_value(
+		t,
+		format_rfc822("2024-01-15T10:30:00-08:00"),
+		"Mon, 15 Jan 2024 10:30:00 -0800",
+	)
 }
 
 // ---------------------------------------------------------------------------
