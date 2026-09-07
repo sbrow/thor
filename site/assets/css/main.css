@@ -16,9 +16,15 @@ body>header {
   top: 116px;
   left: 0;
   overflow-y: auto;
+  --pico-nav-element-spacing-vertical: 0.25rem;
 
   & ul {
-    flex-direction: column;
+    display: block;
+
+    &>li {
+      margin-left: 1rem;
+      width: 100%;
+    }
   }
 }
 
