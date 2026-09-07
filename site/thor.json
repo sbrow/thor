@@ -6,9 +6,21 @@
   "markdown_extensions": {
     "footnotes": true
   },
+  "menus": {
+    "main": [
+      {
+        "name": "GitHub",
+        "url": "https://github.com/sbrow/thor",
+        "weight": 20
+      }
+    ]
+  },
   "params": {
     "author": {
       "name": "Spencer Brower"
-    }
+    },
+    "stylesheets": [
+      "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.blue.min.css"
+    ]
   }
 }

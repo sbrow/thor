@@ -4,7 +4,6 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:mem"
-import "core:os"
 import "core:strings"
 
 DEFAULT_WEIGHT :: 10
@@ -112,42 +111,32 @@ parse_page_menus :: proc(
 	return result
 }
 
-// build_menus populates site.menus:
-//   1. Config menus (thor.json "menus" key present) — exclusive, preserves array order
-//   2. Auto-menus (sections + root-level pages) + page frontmatter menus — merged, sorted
+// build_menus populates site.menus by merging every source into one menu set:
+//   1. Auto-menus (sections + root-level pages)
+//   2. Config menus (thor.json "menus" key), already parsed into site.menus
+//   3. Page frontmatter menus
+// All three are combined per menu name and sorted by weight, then name.
 //
-// If "menus" is present but empty ({}) it means explicit opt-out: no menus.
-// Config menus cannot be mixed with page frontmatter menus (error).
+// If "menus" is present but empty ({}) it means explicit opt-out: no menus at
+// all, and page frontmatter menus are ignored.
 build_menus :: proc(site: ^Site) {
-	if site.menus != nil {
-		has_menus := false
+	// Explicit opt-out: "menus": {} present but empty → no menus; page
+	// frontmatter menus are ignored (with a warning).
+	// TODO(TODOS.md): silently discarding frontmatter here is harsh; revisit.
+	if site.menus != nil && len(site.menus) == 0 {
 		for page in site.pages {
 			if len(page.menus) > 0 {
-				has_menus = true
-				break
-			}
-		}
-
-		// Already populated from config in site_apply_config
-		if len(site.menus) == 0 {
-			// Explicit opt-out ("menus": {})
-			if has_menus {
 				log.warnf(
 					"menus: config has empty menus but pages have frontmatter menu entries; ignoring page menus",
 				)
+				break
 			}
-			return
 		}
-		// Config menus active
-		if has_menus {
-			log.fatalf("menus: cannot mix config menus with frontmatter menus")
-			os.exit(1)
-		}
-		warn_all_duplicate_weights(site)
 		return
 	}
 
-	// No config menus — auto-generate, then merge page menus on top
+	// Merge all sources: auto section/root menus, config menus (already in
+	// site.menus if present), then page frontmatter menus.
 	collect_auto_menus(site)
 	merge_page_menus(site)
 	warn_all_duplicate_weights(site)
@@ -253,8 +242,17 @@ collect_auto_menus :: proc(site: ^Site) {
 		return
 	}
 
+	if site.menus == nil {
+		site.menus = make(map[string][]Menu_Entry, alloc)
+	}
+	// Merge into any existing "main" (e.g. config menus) rather than clobbering.
+	if existing, ok := site.menus["main"]; ok {
+		merged := make([dynamic]Menu_Entry, 0, len(existing) + len(entries), alloc)
+		append(&merged, ..existing)
+		append(&merged, ..entries[:])
+		entries = merged
+	}
 	sort_menu_entries(entries[:])
-	site.menus = make(map[string][]Menu_Entry, alloc)
 	site.menus["main"] = entries[:]
 }
 

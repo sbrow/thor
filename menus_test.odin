@@ -421,6 +421,71 @@ test_auto_menus_no_duplicate_with_frontmatter :: proc(t: ^testing.T) {
 	testing.expect_value(t, main[0].name, "Ideas")
 }
 
+// --- config + frontmatter + auto merge tests ---
+
+@(test)
+test_build_menus_config_merges_frontmatter :: proc(t: ^testing.T) {
+	site: Site
+	mem.dynamic_arena_init(&site.arena)
+	defer mem.dynamic_arena_destroy(&site.arena)
+	context.allocator = site_allocator(&site)
+
+	// Simulate config menus as site_apply_config would populate them.
+	site.menus = make(map[string][]Menu_Entry, site_allocator(&site))
+	cfg := make([dynamic]Menu_Entry, 0, 1, site_allocator(&site))
+	append(&cfg, Menu_Entry{name = "GitHub", url = "https://example.com", weight = 20})
+	site.menus["main"] = cfg[:]
+
+	// A root-level page opting into "main" via frontmatter.
+	page := make_page("Ideas", "/ideas/")
+	page.menus = parse_page_menus(parse_raw(`"main"`), page, site_allocator(&site))
+
+	site.pages = make(#soa[dynamic]Page, 0, 1, site_allocator(&site))
+	append(&site.pages, page)
+
+	build_menus(&site)
+
+	main, ok := site.menus["main"]
+	testing.expect(t, ok)
+	// GitHub (config, weight 20) + Ideas (frontmatter, nil → DEFAULT_WEIGHT 10).
+	testing.expect(t, len(main) == 2, "expected config + frontmatter merged")
+	testing.expect_value(t, main[0].name, "Ideas")
+	testing.expect_value(t, main[1].name, "GitHub")
+}
+
+@(test)
+test_build_menus_config_merges_auto :: proc(t: ^testing.T) {
+	site: Site
+	mem.dynamic_arena_init(&site.arena)
+	defer mem.dynamic_arena_destroy(&site.arena)
+	context.allocator = site_allocator(&site)
+
+	// Config menu in a different bucket ("footer"); auto-gen owns "main".
+	site.menus = make(map[string][]Menu_Entry, site_allocator(&site))
+	cfg := make([dynamic]Menu_Entry, 0, 1, site_allocator(&site))
+	append(&cfg, Menu_Entry{name = "GitHub", url = "https://example.com", weight = 20})
+	site.menus["footer"] = cfg[:]
+
+	// A section (non-index) page triggers an auto "main" section entry.
+	page := make_page("Post", "/blog/post/")
+	page.section = "blog"
+
+	site.pages = make(#soa[dynamic]Page, 0, 1, site_allocator(&site))
+	append(&site.pages, page)
+
+	build_menus(&site)
+
+	footer, ok_f := site.menus["footer"]
+	testing.expect(t, ok_f, "config footer menu should be preserved")
+	testing.expect(t, len(footer) == 1)
+	testing.expect_value(t, footer[0].name, "GitHub")
+
+	main, ok_m := site.menus["main"]
+	testing.expect(t, ok_m, "auto-generated main menu should exist alongside config")
+	testing.expect(t, len(main) == 1)
+	testing.expect_value(t, main[0].name, "Blog")
+}
+
 // --- warn_duplicate_weights tests ---
 
 @(test)

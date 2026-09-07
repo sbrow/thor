@@ -20,6 +20,9 @@
 - [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
   - when limit reached, the template fails and stops rendering.
 - [ ] Brainstorm plugin/tool/(postccs/less/tailwind/sass) support.
+- [ ] Reconsider `"menus": {}` opt-out: it currently discards all page frontmatter
+      menus (with only a warning). Decide whether empty config should instead just
+      suppress the auto-generated menu while still honoring frontmatter.
 
 ## General
 
