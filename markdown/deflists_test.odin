@@ -90,6 +90,17 @@ test_empty_body :: proc(t: ^testing.T) {
 	testing.expect_value(t, result, "")
 }
 
+// Regression: a fenced code block following a definition list must stay a
+// separate block. Without a blank line after the emitted </dl>, CommonMark
+// treats the fence as raw HTML continuation of the <dl> block and passes its
+// contents through unescaped (leaking e.g. an example <h1> into the document).
+@(test)
+test_deflist_before_code_fence :: proc(t: ^testing.T) {
+	input := "term\n\n: def\n\n```\n<h1>example</h1>\n```"
+	result := convert_deflists(input, context.temp_allocator)
+	testing.expect(t, strings.contains(result, "</dl>\n\n```"))
+}
+
 @(test)
 test_docs_md_pattern :: proc(t: ^testing.T) {
 	input := "content\n\n: `content` holds your pages.\n\n assets\n : `assets` contains files."

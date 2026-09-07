@@ -23,6 +23,8 @@
 - [ ] Reconsider `"menus": {}` opt-out: it currently discards all page frontmatter
       menus (with only a warning). Decide whether empty config should instead just
       suppress the auto-generated menu while still honoring frontmatter.
+- [ ] warn when heading levels are skipped in a toc.
+- [ ] extract `[TOC]` from `.md` body (or at least from  the start.)
 
 ## General
 

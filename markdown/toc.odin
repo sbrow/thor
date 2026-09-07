@@ -1,5 +1,6 @@
 package markdown
 
+import "core:log"
 import "core:strings"
 
 // generate_toc scans rendered HTML for <h1>-<h6> tags with id attributes and
@@ -28,8 +29,23 @@ generate_toc :: proc(html: string, allocator := context.allocator) -> string {
 			current_level = level
 			strings.write_string(&b, "<ul>\n")
 		} else if level > current_level {
+			if level - current_level > 1 {
+				log.warnf(
+					"heading level skips from h%d to h%d (\"%s\"); " +
+					"table of contents inserts empty levels to keep valid nesting",
+					current_level,
+					level,
+					text,
+				)
+			}
+			// The first step down nests inside the current, still-open <li>.
+			// Each further skipped level needs its own <li> to host the deeper
+			// <ul>, since a <ul> may only contain <li> — otherwise a jump of
+			// more than one level emits stacked, parentless <ul> tags.
+			strings.write_string(&b, "<ul>\n")
+			current_level += 1
 			for current_level < level {
-				strings.write_string(&b, "<ul>\n")
+				strings.write_string(&b, "<li>\n<ul>\n")
 				current_level += 1
 			}
 		} else if level < current_level {

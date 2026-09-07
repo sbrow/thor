@@ -96,6 +96,19 @@ convert_deflists :: proc(body: string, allocator := context.allocator) -> string
 			if term_pos >= 0 {
 				strings.write_string(&sb, body[emitted_up_to:term_pos])
 				group_end := write_deflist_group(&sb, body, term_pos)
+				// write_deflist_group emits a raw <dl> HTML block with no
+				// trailing newline, so the blank line the author left after the
+				// list is consumed as the </dl> line's terminator rather than a
+				// separating blank line. CommonMark (type-6 HTML block) then
+				// swallows the following block — e.g. a fenced code example —
+				// as raw, unescaped HTML, leaking its markup (a template's
+				// <h1>) into the document. Re-emit a newline so </dl> stands on
+				// its own line and the author's blank line still separates the
+				// block. Only when a blank line actually follows: fused
+				// non-blank fall-through content is left as-is.
+				if line, _, ok := line_at(body, group_end); ok && is_blank_line(line) {
+					strings.write_byte(&sb, '\n')
+				}
 				emitted_up_to = group_end
 				pos = group_end
 				prev1_kind, prev2_kind = .None, .None
