@@ -347,7 +347,8 @@ apply_filter :: proc(
 		span := filter.end_pos - filter.op_pos
 		return take(value, filter.args[:], false, tmpl, filter.op_pos, span)
 	case .Rel_Url:
-		str, ok := reflect.as_string(value)
+		bv, _ := base_value(value)
+		str, ok := reflect.as_string(bv)
 		if !ok {
 			return value, Error_Body {
 				msg = "rel_url may only be used on strings",
@@ -617,3 +618,4 @@ take :: proc(
 		return any{new_clone(str[start:end], context.temp_allocator), typeid_of(string)}, warning
 	}
 }
+
