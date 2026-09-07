@@ -230,5 +230,65 @@ label.margin-toggle:not(.sidenote-number) {
 }
 </style>
 {{/params.stylesheets}}
+<style>
+/* Syntax highlighting. Build-time <span class="hl-*"> wrappers only appear
+   inside fenced code blocks. The base class (e.g. hl-keyword) is always
+   emitted alongside any dotted variant (hl-keyword-control), so styling the
+   base names covers every capture. Re-theme by overriding the --hl-* vars. */
+:root {
+  --hl-bg:        #282c34;
+  --hl-fg:        #abb2bf;
+  --hl-comment:   #5c6370;
+  --hl-keyword:   #c678dd;
+  --hl-string:    #98c379;
+  --hl-escape:    #56b6c2;
+  --hl-number:    #d19a66;
+  --hl-function:  #61afef;
+  --hl-type:      #e5c07b;
+  --hl-variable:  #e06c75;
+  --hl-attribute: #d19a66;
+}
+
+pre:has(> code [class^="hl-"]) {
+  background: var(--hl-bg);
+  color: var(--hl-fg);
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+}
+
+.hl-comment { color: var(--hl-comment); font-style: italic; }
+.hl-keyword,
+.hl-conditional,
+.hl-repeat,
+.hl-exception,
+.hl-include,
+.hl-storageclass { color: var(--hl-keyword); }
+.hl-operator,
+.hl-punctuation { color: var(--hl-fg); }
+.hl-string,
+.hl-character { color: var(--hl-string); }
+.hl-escape,
+.hl-string-escape,
+.hl-string-special { color: var(--hl-escape); }
+.hl-number,
+.hl-float,
+.hl-boolean,
+.hl-constant { color: var(--hl-number); }
+.hl-function,
+.hl-method,
+.hl-constructor { color: var(--hl-function); }
+.hl-type,
+.hl-namespace,
+.hl-module { color: var(--hl-type); }
+.hl-variable,
+.hl-property,
+.hl-field,
+.hl-parameter,
+.hl-tag,
+.hl-symbol { color: var(--hl-variable); }
+.hl-attribute,
+.hl-label,
+.hl-preproc { color: var(--hl-attribute); }
+</style>
 {{#params.stylesheets}}<link rel="stylesheet" href="{{.|rel_url}}">
 {{/params.stylesheets}}

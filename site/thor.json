@@ -4,7 +4,8 @@
     "format": "January 2, 2006"
   },
   "markdown_extensions": {
-    "footnotes": true
+    "footnotes": true,
+    "highlight": true
   },
   "menus": {
     "main": [
@@ -23,5 +24,7 @@
       "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.blue.min.css",
       "/css/main.css"
     ]
-  }
+  },
+  "grammars": "~/.config/helix/runtime/grammars/",
+  "queries": "/nix/store/n9da8d007ygbgsx983jr3ar3wb1fsh6q-helix-25.07.1/lib/runtime/queries"
 }

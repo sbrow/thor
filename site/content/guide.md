@@ -17,7 +17,7 @@ At the heart of any good SSG is the content files. Thor supports markdown (`.md`
 
 Let's make a home page - copy the following text and place it into `./index.md`
 
-```md
+```markdown
 # Hello, World! 
 
 Welcome to your new site. 

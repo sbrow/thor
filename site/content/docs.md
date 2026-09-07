@@ -617,7 +617,7 @@ Essentially, each tool is just a bash-style commandline string with a few specia
 
 <!-- TODO: It might be a terrible idea to combine mustache templates with shell scripts :/ -->
 
-```json
+```json5
 // thor.json
 {
 	"tools": {
@@ -629,7 +629,7 @@ Essentially, each tool is just a bash-style commandline string with a few specia
 
 Both `{{in}}` and `{{out}}` exist to support tools that can't read  from `stdin` and/or can't write to `stdout`. If your tool can do those things, it is ***highly recommended*** to avoid `{{in}}` + `{{out}}`, as each requires thor to make **a full round-trip** to the file system, rather than keeping everything in memory.
 
-```json
+```json5
 // thor.json
 {
 	"tools": {
@@ -661,7 +661,7 @@ Both `{{in}}` and `{{out}}` exist to support tools that can't read  from `stdin`
 Thor supports [Open Graph](https://ogp.me/) tags, allowing you to customize how your site looks when linked to on social media or in apps like Discord. It is accessible through the `{{>opengraph}}` template, which should be automatically included in your header by your theme.
 
 ```html
-TODO: {{>opengraph shorcode here}}
+TODO: {{opengraph shorcode here}}
 ```
 
 The options are sourced [using the context stack], first from your page frontmatter, and then from your site config. Thor will attempt to infer as much information as possible, to keep you from needing to set them explictly.
@@ -693,9 +693,11 @@ TODO: Modules
 
 TODO: Themes
 
-## Zen
 
-> The guding principals behind Thor.
+<hgroup>
+  <h2 id="zen">Zen</h2>
+  <p>The guding principals behind Thor.</p>
+</hgroup>
 
 Simpler is Better
 
