@@ -1,0 +1,28 @@
+body>header {
+  background: var(--pico-primary-background);
+  position: sticky;
+  top: 0;
+
+  nav>ul li a {
+    color: var(--pico-primary-inverse);
+  }
+}
+
+/* TODO: Should probaby use a container for the page content like Odin does */
+.toc {
+  position: fixed;
+  height: calc(100vh - 116px);
+  width: 280px;
+  top: 116px;
+  left: 0;
+  overflow-y: auto;
+
+  & ul {
+    flex-direction: column;
+  }
+}
+
+main>article {
+  width: 60%;
+  margin: auto;
+}

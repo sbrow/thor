@@ -23,6 +23,9 @@
 - [ ] Reconsider `"menus": {}` opt-out: it currently discards all page frontmatter
       menus (with only a warning). Decide whether empty config should instead just
       suppress the auto-generated menu while still honoring frontmatter.
+- [ ] asset css files not  automatically  included in site.
+  - should we at least warn about them?
+- [ ] warn if stylesheet url starts with /assets  (and is therefore invalid).
 - [ ] warn when heading levels are skipped in a toc.
 - [ ] extract `[TOC]` from `.md` body (or at least from  the start.)
 

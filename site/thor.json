@@ -20,7 +20,8 @@
       "name": "Spencer Brower"
     },
     "stylesheets": [
-      "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.blue.min.css"
+      "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.blue.min.css",
+      "/css/main.css"
     ]
   }
 }
