@@ -17,6 +17,8 @@ etc.
 TODO: Use consistent spacing with mustache tags
 -->
 
+[TOC]
+
 ## Introduction
 
 This guide assumes you have either read [The Guide](../guide), or have built a [Hugo](https://gohugo.io) site before. It also assumes you have a basic knowledge of HTML and CSS.
@@ -48,11 +50,35 @@ The highlight extension enables server-side syntax highlighting, powered by Tree
 
 If enabled, `minify` will perform simple whitespace removal on all your output `.html` files, and any `.css` files in your `assets` directories. Minifying JavaScript is not supported (yet).
 
-TODO: Do we minify inline css?
+Inline CSS will be minified.
 
 #### Sections
 
 The `sections` extension wraps each of your content sections in a `<section>` block. Sections are opened just before each heading, and closed before the next heading, or the end the document, whichever comes first. 
+
+```markdown
+<!-- Example -->
+## First Section
+
+content
+
+## Second Section
+
+content
+```
+
+Becomes:
+
+```html
+<section>
+  <h2>First Section</h2>
+  <p>content</p>
+</section>
+<section>
+  <h2>Second Section</h2>
+  <p>content</p>
+</section>
+```
 
 ### Opt-Out Features
 
@@ -272,6 +298,14 @@ When building your page(s), the following keys are accessible to your template f
 
 : The HTML rendered page content 
 
+`page.url`
+
+: The full url to the page. .e.g. `https://example.com/about`
+
+`page.rel_url`
+
+: The url to the page, minus the `site.base_url`, e.g. `/about`.
+
 TODO: write
 
 #### Site
@@ -365,6 +399,15 @@ To get around this, Thor extends mustache to include a handful of data filters i
 `format ["format string"]`
 
 : Used to display a date in a particular format. See [DateTimes](#datetimes). If no format is given, the default will be used. 
+
+`rel_url`
+
+: Should only be used by theme designers or when building a site where the homepage is not the website root (i.e. https://example.com/my-cool-site/).
+Will take a url like `/about` and convert it to `https://example.com/my-cool-site/about`
+
+`tool`
+
+: Allows you to run your assets / content through any external tools you've configured. Most commonly used for css processors like Tailwind or Sass. See [Tools](#tools) for more  info.
 
 #### Chaining Pipes
 
@@ -552,8 +595,67 @@ The following keys are available:
 
 Menu configuration for the site. Note that (unlike Hugo) if your configuration contains this key, frontmatter `menus` will be ignored. See [menus](#menus) for more info. 
 
+`tools`
 
+Allows you to configure external content/asset processing tools. Too... See [Tools](#tools) for more info.
 
+## Tools
+
+Configuring tools will allow you to create custom pipelines for your content and assets. For example, you could create a tailwindcss tool to pre-process your css files. You could also create a conversion tool to make all your images be a certain format or maximum size.
+
+Tools are configured in your config file and utilized in your template files:
+
+> [!DANGER]: You should never run a tool you have not configured yourself, as running arbetrary commands can be extremely dangerous.
+
+```mustache
+{{!layouts/partials/styles.css}}
+{{#params.stylesheets}}<link rel="stylesheet" href="{{. | tool tailwind}}">
+{{/params.stylesheets}}
+```
+
+Essentially, each tool is just a bash-style commandline string with a few special variables:
+
+<!-- TODO: It might be a terrible idea to combine mustache templates with shell scripts :/ -->
+
+```json
+// thor.json
+{
+	"tools": {
+		// For demonstration purposes only, not recommended (see below).
+	    "tailwind": "tailwindcss -i {{in}} -o {{out}}",
+	}
+}
+```
+
+Both `{{in}}` and `{{out}}` exist to support tools that can't read  from `stdin` and/or can't write to `stdout`. If your tool can do those things, it is ***highly recommended*** to avoid `{{in}}` + `{{out}}`, as each requires thor to make **a full round-trip** to the file system, rather than keeping everything in memory.
+
+```json
+// thor.json
+{
+	"tools": {
+		// The recommended way to configure Tailwind 4.3.3
+	    "tailwind": "tailwindcss {{#minify}}--minify{{/minify}} -i -",
+	}
+}
+```
+
+### Special Variables
+
+`in`
+
+:  The path to a file created by thor, containing the content that will be processed by your tool.
+
+`out`
+
+: The path to a file, created by your tool,  that will be represents the file output by the tool, that will be ingested by thor.
+
+`minify`
+
+: True if the `minify` config option has been set, or `--production` flag has been passed.
+
+- it is up to you to have the necessary binaries installed - thor won't do it for you.
+- every tool you want to use must be configured - there is no default <!-- TODO: Should there be? Perhaps we could include support for them in a future, interactive site builder setup TUI. -->
+ 
 ## Open Graph
 
 Thor supports [Open Graph](https://ogp.me/) tags, allowing you to customize how your site looks when linked to on social media or in apps like Discord. It is accessible through the `{{>opengraph}}` template, which should be automatically included in your header by your theme.
