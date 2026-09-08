@@ -20,6 +20,14 @@
 - [ ] instead of `warnings: [dynamic]Error` we should use `warnings: [dynamic; 8]Error`
   - when limit reached, the template fails and stops rendering.
 - [ ] Brainstorm plugin/tool/(postccs/less/tailwind/sass) support.
+- [ ] `fingerprint` pipe + contents-based composition. The `tool` pipe currently
+      carries a URL string and each stage publishes a file to the output dir, so
+      `| tool sass | fingerprint` would leave a dead unhashed intermediate. When
+      fingerprint lands, move the pipe value from a URL string to a contents/
+      Resource (bytes + logical name) where only the terminal stage publishes;
+      a Resource must stringify to its URL so existing bare-`tool` templates keep
+      working. stdin/stdout tools compose best there (bytes stay in memory), which
+      is why stdin/stdout is the documented preferred form over `{{in}}`/`{{out}}`.
 - [ ] Reconsider `"menus": {}` opt-out: it currently discards all page frontmatter
       menus (with only a warning). Decide whether empty config should instead just
       suppress the auto-generated menu while still honoring frontmatter.
@@ -33,6 +41,9 @@
 - [ ] warn if stylesheet url starts with /assets  (and is therefore invalid).
 - [ ] warn when heading levels are skipped in a toc.
 - [ ] extract `[TOC]` from `.md` body (or at least from  the start.)
+- [ ] add `--production` flag
+  - set `minify` to true
+  - warn when `base_url` unset
 
 ## General
 

@@ -140,6 +140,60 @@ test_tool_runs :: proc(t: ^testing.T) {
 	}
 }
 
+// tool_io_case runs `cmd` over a source file containing `content` and returns
+// the resulting output-file contents. Exercises the in/out ↔ stdin/stdout 2×2.
+tool_io_case :: proc(name, cmd, content: string) -> (out: string, ok: bool) {
+	in_dir, out_dir := tool_test_dirs(name)
+	_ = os.write_entire_file_from_string(fmt.tprintf("%s/a.css", in_dir), content)
+	commands := make(map[string]string, context.temp_allocator)
+	commands[name] = cmd
+	reg := Tool_Registry {
+		commands   = commands,
+		input_dir  = in_dir,
+		output_dir = out_dir,
+	}
+	_, err := run_tool(&reg, name, "/a.css", 0)
+	if err != nil {
+		return "", false
+	}
+	data, rerr := os.read_entire_file_from_path(
+		fmt.tprintf("%s/a.css", out_dir),
+		context.temp_allocator,
+	)
+	return string(data), rerr == nil
+}
+
+@(test)
+test_tool_stdin_stdout :: proc(t: ^testing.T) {
+	when ODIN_OS != .Windows {
+		// `cat` with no args: reads stdin (thor feeds the source), writes stdout
+		// (thor captures and persists it).
+		out, ok := tool_io_case("stream", "cat", "body{a:1}")
+		testing.expect(t, ok, "cat (stdin→stdout) should produce output")
+		testing.expect_value(t, out, "body{a:1}")
+	}
+}
+
+@(test)
+test_tool_in_path_stdout :: proc(t: ^testing.T) {
+	when ODIN_OS != .Windows {
+		// `cat {{in}}`: tool opens the file by path, streams to stdout.
+		out, ok := tool_io_case("in_stream", "cat {{in}}", "body{b:2}")
+		testing.expect(t, ok, "cat {{in}} (file→stdout) should produce output")
+		testing.expect_value(t, out, "body{b:2}")
+	}
+}
+
+@(test)
+test_tool_stdin_out_path :: proc(t: ^testing.T) {
+	when ODIN_OS != .Windows {
+		// `tee {{out}}`: thor feeds stdin, tool writes the file itself.
+		out, ok := tool_io_case("stream_out", "tee {{out}}", "body{c:3}")
+		testing.expect(t, ok, "tee {{out}} (stdin→file) should produce output")
+		testing.expect_value(t, out, "body{c:3}")
+	}
+}
+
 @(test)
 test_tool_minify_section :: proc(t: ^testing.T) {
 	// The command template is itself mustache: {{#minify}} should expand only

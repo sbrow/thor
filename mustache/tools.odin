@@ -14,9 +14,12 @@ import "core:sync"
 //   {{out}}     absolute path the tool should write its result to
 //   {{#minify}} section, non-empty when the site is building with minify on
 //
-// The tool does its own file I/O through {{in}}/{{out}}; neither mustache nor
-// the host shuffles bytes. The pipe takes an asset path (e.g. "/css/main.css"),
-// runs the tool, and returns the root-relative URL of the written output.
+// {{in}}/{{out}} are optional per tool. If a command omits {{in}}, thor feeds
+// the source file on the tool's stdin; if it omits {{out}}, thor captures the
+// tool's stdout. Stdin/stdout is the preferred form (it will compose best with
+// the future `fingerprint` pipe); {{in}}/{{out}} is the fallback for tools that
+// can't stream. The pipe takes an asset path (e.g. "/css/main.css"), runs the
+// tool, and returns the root-relative URL of the written output.
 
 // Tool_Registry is the host-supplied configuration for the `tool` pipe. The
 // host (thor) owns one per build and threads a pointer to it through render, so
@@ -127,7 +130,18 @@ run_tool :: proc(
 		return cached, nil
 	}
 
-	// Ensure the output's parent dir exists so the tool can write {{out}}.
+	// How the tool speaks I/O is inferred from whether the command references
+	// the paths thor substituted:
+	//   {{in}}  present -> the tool opens the source file itself
+	//   {{in}}  absent  -> thor feeds the source file on stdin
+	//   {{out}} present -> the tool writes the output file itself
+	//   {{out}} absent  -> thor captures stdout and writes it to out_path
+	// Either way the run ends with a real file at out_path.
+	uses_in := strings.contains(cmd_str, in_path)
+	uses_out := strings.contains(cmd_str, out_path)
+
+	// Ensure the output's parent dir exists (for the tool's {{out}} write or
+	// thor's stdout write).
 	if idx := strings.last_index(out_path, "/"); idx >= 0 {
 		if merr := os.make_directory_all(out_path[:idx]); merr != nil && merr != .Exist {
 			return "", Error_Body {
@@ -138,10 +152,28 @@ run_tool :: proc(
 		}
 	}
 
-	state, _, stderr, xerr := os.process_exec(
-		os.Process_Desc{command = argv},
-		context.temp_allocator,
-	)
+	desc := os.Process_Desc {
+		command = argv,
+	}
+	// Feed the source on stdin unless the tool takes it as a {{in}} path.
+	stdin_file: ^os.File
+	if !uses_in {
+		f, oerr := os.open(in_path)
+		if oerr != nil {
+			return "", Error_Body {
+				msg = fmt.tprintf("tool '%s': cannot open %s: %v", name, in_path, oerr),
+				pos = pos,
+				kind = .Data,
+			}
+		}
+		stdin_file = f
+		desc.stdin = f
+	}
+	defer if stdin_file != nil {
+		os.close(stdin_file)
+	}
+
+	state, stdout, stderr, xerr := os.process_exec(desc, context.temp_allocator)
 	if xerr != nil {
 		return "", Error_Body {
 			msg = fmt.tprintf("tool '%s': failed to run '%s': %v", name, argv[0], xerr),
@@ -160,6 +192,17 @@ run_tool :: proc(
 			),
 			pos = pos,
 			kind = .Data,
+		}
+	}
+
+	// If the tool streamed to stdout, persist it as the output file.
+	if !uses_out {
+		if werr := os.write_entire_file(out_path, stdout); werr != nil {
+			return "", Error_Body {
+				msg = fmt.tprintf("tool '%s': cannot write %s: %v", name, out_path, werr),
+				pos = pos,
+				kind = .Data,
+			}
 		}
 	}
 
