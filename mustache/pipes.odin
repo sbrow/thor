@@ -25,6 +25,7 @@ Pipe_Op :: enum {
 	First,
 	Last,
 	Rel_Url,
+	Tool,
 }
 
 // Pipe op names are derived from the enum via reflection (lowercased).
@@ -225,13 +226,14 @@ apply_pipeline :: proc(
 	ctx: []any,
 	tmpl: Template,
 	warnings: ^[dynamic]Error = nil,
+	tools: ^Tool_Registry = nil,
 ) -> (
 	current: any,
 	err: Error,
 ) {
 	current = value
 	for &filter in filters {
-		result, ferr := apply_filter(current, &filter, pos, ctx, tmpl)
+		result, ferr := apply_filter(current, &filter, pos, ctx, tmpl, tools)
 		if ferr != nil {
 			b := body(ferr)
 			if b.kind != .Warning {
@@ -278,6 +280,7 @@ apply_filter :: proc(
 	pos: int,
 	ctx: []any,
 	tmpl: Template,
+	tools: ^Tool_Registry = nil,
 ) -> (
 	any,
 	Error,
@@ -357,6 +360,32 @@ apply_filter :: proc(
 			}
 		}
 		result := rel_url(str, ctx)
+		return any{new_clone(result, context.temp_allocator), typeid_of(string)}, nil
+	case .Tool:
+		if len(filter.args) != 1 {
+			return value, Error_Body {
+				msg = fmt.tprintf(
+					"tool expects 1 argument (the tool name), got %d",
+					len(filter.args),
+				),
+				pos = filter.op_pos,
+				span = filter.end_pos - filter.op_pos,
+				kind = .Data,
+			}
+		}
+		bv, _ := base_value(value)
+		str, ok := reflect.as_string(bv)
+		if !ok {
+			return value, Error_Body {
+				msg = "tool may only be used on strings",
+				pos = pos,
+				kind = .Data,
+			}
+		}
+		result, terr := run_tool(tools, filter.args[0], str, filter.op_pos)
+		if terr != nil {
+			return value, terr
+		}
 		return any{new_clone(result, context.temp_allocator), typeid_of(string)}, nil
 	}
 	return {}, nil
@@ -618,4 +647,3 @@ take :: proc(
 		return any{new_clone(str[start:end], context.temp_allocator), typeid_of(string)}, warning
 	}
 }
-

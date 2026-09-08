@@ -10,6 +10,7 @@ import "core:time/datetime"
 import "core:time/timezone"
 
 import md "markdown"
+import "mustache"
 
 
 // Site_Context holds the site date that is accessible in templates.
@@ -48,6 +49,11 @@ Site :: struct {
 	tz:                  ^datetime.TZ_Region,
 	grammars:            string,
 	queries:             string,
+	// tool_registry is the `tool` pipe's state: `commands` is filled from
+	// thor.json at config time; the per-build I/O dirs, minify flag, and memo
+	// are set by mustache.tool_registry_init in render_site. A pointer is
+	// threaded into mustache.render.
+	tool_registry:       mustache.Tool_Registry,
 }
 
 Date_Preferences :: struct {
@@ -79,6 +85,7 @@ Config_File :: struct {
 	date:                Date_Preferences,
 	grammars:            string,
 	queries:             string,
+	tools:               map[string]string,
 }
 
 // Configuration loaded from command line arguments. Gets folded in to Site
@@ -218,6 +225,10 @@ site_apply_config :: proc(site: ^Site, config: Config_File, config_dir: string) 
 
 	site.grammars = expand_path(config.grammars, site_allocator(site))
 	site.queries = expand_path(config.queries, site_allocator(site))
+
+	if config.tools != nil {
+		site.tool_registry.commands = config.tools
+	}
 }
 
 // site_base_path extracts the path component of base_url, normalized to a

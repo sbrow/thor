@@ -27,6 +27,12 @@ copy_assets_dir :: proc(vfs: ^VFS, output_dir: string, features: bit_set[Feature
 		rel := virtual_path[len("assets/"):]
 		dest := fmt.tprintf("%s/%s", output_dir, rel)
 
+		// Don't clobber a file already written this build (e.g. the output of a
+		// `tool` pipe, which publishes to the same dest path as its source).
+		if os.exists(dest) {
+			continue
+		}
+
 		if idx := strings.last_index(dest, "/"); idx >= 0 {
 			if err := os.make_directory_all(dest[:idx]); err != nil && err != .Exist {
 				log.warnf("cannot create %s: %v", dest[:idx], err)

@@ -182,6 +182,7 @@ render :: proc(
 	partials: map[string]Template = nil,
 	allocator := context.allocator,
 	warnings: ^[dynamic]Error = nil,
+	tools: ^Tool_Registry = nil,
 ) -> (
 	result: string,
 	err: Error,
@@ -207,7 +208,15 @@ render :: proc(
 	}
 
 	all_nodes := tmpl.nodes[:]
-	err = render_nodes(tmpl, all_nodes, &ctx, partials, &builder, warnings = warnings)
+	err = render_nodes(
+		tmpl,
+		all_nodes,
+		&ctx,
+		partials,
+		&builder,
+		warnings = warnings,
+		tools = tools,
+	)
 	if err != nil {
 		return result, err
 	}
@@ -588,6 +597,7 @@ render_template :: proc(
 	blocks: map[string]Block_Override,
 	indent: string,
 	warnings: ^[dynamic]Error = nil,
+	tools: ^Tool_Registry = nil,
 ) -> Error {
 	if len(indent) > 0 {
 		state := Indent_State {
@@ -595,9 +605,9 @@ render_template :: proc(
 			at_line_start = false,
 		}
 		strings.write_string(b, indent) // first line always gets indent
-		return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, &state, warnings)
+		return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, &state, warnings, tools)
 	}
-	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, nil, warnings)
+	return render_nodes(pt, pt.nodes[:], ctx, partials, b, blocks, nil, warnings, tools)
 }
 
 write_indented :: proc(
@@ -642,6 +652,7 @@ render_nodes :: proc(
 	blocks: map[string]Block_Override = nil,
 	indent_state: ^Indent_State = nil,
 	warnings: ^[dynamic]Error = nil,
+	tools: ^Tool_Registry = nil,
 ) -> Error {
 	i := 0
 	for i < len(nodes) {
@@ -672,6 +683,7 @@ render_nodes :: proc(
 					ctx[:],
 					current,
 					warnings,
+					tools,
 				)
 				if perr != nil {
 					return tag_error(perr, current)
@@ -698,6 +710,7 @@ render_nodes :: proc(
 					ctx[:],
 					current,
 					warnings,
+					tools,
 				)
 				if perr != nil {
 					return tag_error(perr, current)
@@ -720,6 +733,7 @@ render_nodes :: proc(
 					ctx[:],
 					current,
 					warnings,
+					tools,
 				)
 				if perr != nil {
 					return tag_error(perr, current)
@@ -743,6 +757,7 @@ render_nodes :: proc(
 							blocks,
 							indent_state,
 							warnings,
+							tools,
 						) or_return
 					}
 				} else {
@@ -775,6 +790,7 @@ render_nodes :: proc(
 					ctx[:],
 					current,
 					warnings,
+					tools,
 				)
 				if perr != nil {
 					return tag_error(perr, current)
@@ -791,6 +807,7 @@ render_nodes :: proc(
 					blocks,
 					indent_state,
 					warnings,
+					tools,
 				) or_return
 			}
 			i += 1 + len(node.children)
@@ -805,7 +822,7 @@ render_nodes :: proc(
 			if !found {
 				warn_missing_partial(current, partials, node, name)
 			} else {
-				render_template(pt, ctx, partials, b, nil, node.indent, warnings) or_return
+				render_template(pt, ctx, partials, b, nil, node.indent, warnings, tools) or_return
 				if indent_state != nil {
 					indent_state.at_line_start = false
 				}
@@ -841,6 +858,7 @@ render_nodes :: proc(
 					content_blocks,
 					nil,
 					warnings,
+					tools,
 				) or_return
 				at_ls := true
 				write_indented(b, node.indent, strings.to_string(temp), &at_ls)
@@ -854,6 +872,7 @@ render_nodes :: proc(
 					content_blocks,
 					indent_state,
 					warnings,
+					tools,
 				) or_return
 			}
 			i += 1 + len(node.children)
@@ -866,7 +885,16 @@ render_nodes :: proc(
 				warn_missing_partial(current, partials, node, node.key)
 			} else {
 				warn_unmatched_block_overrides(current, pt, parent_children)
-				render_template(pt, ctx, partials, b, merged, node.indent, warnings) or_return
+				render_template(
+					pt,
+					ctx,
+					partials,
+					b,
+					merged,
+					node.indent,
+					warnings,
+					tools,
+				) or_return
 				if indent_state != nil {
 					indent_state.at_line_start = false
 				}
@@ -1057,4 +1085,3 @@ warn_context_depth :: proc(current: Template, node: Node) {
 	)
 	log.warnf("%s", diag)
 }
-

@@ -139,8 +139,14 @@ render_template :: proc(
 	ctx: Template_Context,
 	partials: map[string]mustache.Template,
 	reported_errors: ^map[string]bool,
+	tools: ^mustache.Tool_Registry,
 ) -> string {
-	result, err := mustache.render(content_tpl, []any{ctx.site, ctx.page, ctx}, partials)
+	result, err := mustache.render(
+		content_tpl,
+		[]any{ctx.site, ctx.page, ctx},
+		partials,
+		tools = tools,
+	)
 	if err != nil {
 		formatted := mustache.format_render_error(
 			err,
@@ -184,6 +190,16 @@ render_site :: proc(site: ^Site) {
 		date_format = site.date.format,
 		timezone    = site.tz,
 	}
+
+	// Prepare the `tool` pipe registry for this build (commands were filled from
+	// thor.json at config time). A pointer to it is threaded into every
+	// mustache.render call.
+	mustache.tool_registry_init(
+		&site.tool_registry,
+		site.assets_dir,
+		site.output_dir,
+		.Minify in site.features,
+	)
 
 	// Find home page
 	home: Page
@@ -317,7 +333,7 @@ render_page_html :: proc(
 	ctx.page = page
 	ctx.og = og_for_page(site.og, page)
 	ctx.params = merge_params(site.params, page.params)
-	return render_template(content_tpl, ctx, partials, seen)
+	return render_template(content_tpl, ctx, partials, seen, &site.tool_registry)
 }
 
 render_home_html :: proc(
@@ -341,7 +357,7 @@ render_home_html :: proc(
 	ctx.og = og_for_page(site.og, home)
 	ctx.params = merge_params(site.params, home.params)
 
-	return render_template(content_tpl, ctx, partials, seen)
+	return render_template(content_tpl, ctx, partials, seen, &site.tool_registry)
 }
 
 render_section :: proc(
@@ -380,7 +396,7 @@ render_section :: proc(
 	}
 	ctx.posts = posts
 	ctx.params = merge_params(site.params, ctx.page.params)
-	return render_template(content_tpl, ctx, partials, seen)
+	return render_template(content_tpl, ctx, partials, seen, &site.tool_registry)
 }
 
 load_partials :: proc(vfs: ^VFS) -> map[string]mustache.Template {

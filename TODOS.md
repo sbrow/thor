@@ -25,6 +25,11 @@
       suppress the auto-generated menu while still honoring frontmatter.
 - [ ] asset css files not  automatically  included in site.
   - should we at least warn about them?
+- [ ] Review the whole `copy_assets_dir` pipeline. It copies every file under
+      `assets/` to the output dir blindly, whether or not anything references it,
+      and now also skips dests that already exist (a blunt collision guard so the
+      raw copy doesn't clobber `tool`-pipe output written earlier in the build).
+      Reconsider tracking which assets are actually used/published instead.
 - [ ] warn if stylesheet url starts with /assets  (and is therefore invalid).
 - [ ] warn when heading levels are skipped in a toc.
 - [ ] extract `[TOC]` from `.md` body (or at least from  the start.)
